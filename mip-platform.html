@@ -668,7 +668,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     <div class="sb-footer"><div class="sb-user"><div class="av">JP</div><div><div class="name">Juan Pérez</div><div class="email">juan@empresa.com</div></div></div></div>
   </aside>
   <div class="main">
-    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="go('page-auth')"><i class="fas fa-sign-out-alt"></i></button></div></div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
 
     <div class="page-body" id="c-dash">
       <div class="stat-grid">
@@ -759,7 +759,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     <div class="sb-footer"><div class="sb-user"><div class="av" style="background:var(--danger-bg);color:var(--danger)">A</div><div><div class="name">Admin MIP</div><div class="email">admin@mipquality.com</div></div></div></div>
   </aside>
   <div class="main">
-    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="go('page-auth')"><i class="fas fa-sign-out-alt"></i></button></div></div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
 
     <!-- ADMIN: Requests -->
     <div class="page-body" id="a-req">
@@ -926,28 +926,297 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 </div>
 
 <script>
-function go(id){document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active','fade-enter'));const p=document.getElementById(id);if(p){p.classList.add('active','fade-enter');window.scrollTo(0,0)}document.querySelectorAll('.sidebar').forEach(s=>s.classList.remove('open'))}
-function scrollTo2(id){const e=document.getElementById(id);if(e)e.scrollIntoView({behavior:'smooth',block:'start'})}
-function authTab(t){document.querySelectorAll('.auth-tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.auth-form').forEach(x=>x.classList.remove('active'));if(t==='login'){document.querySelectorAll('.auth-tab')[0].classList.add('active');document.getElementById('loginForm').classList.add('active')}else{document.querySelectorAll('.auth-tab')[1].classList.add('active');document.getElementById('registerForm').classList.add('active')}}
-function doLogin(e){e.preventDefault();toast('success','Bienvenido','Ingresando al portal...');setTimeout(()=>go('page-client'),800)}
-function doAdmin(){toast('success','Acceso Admin','Ingresando al panel...');setTimeout(()=>go('page-admin'),800)}
-function doRegister(e){e.preventDefault();toast('success','Cuenta creada','Registro exitoso.');setTimeout(()=>authTab('login'),1200)}
-function cView(id){['c-dash','c-quote','c-track'].forEach(v=>{const e=document.getElementById(v);if(e)e.style.display=v===id?'block':'none'});const t={'c-dash':'Dashboard','c-quote':'Nueva Cotización','c-track':'Seguimiento'};document.getElementById('cTitle').textContent=t[id]||'Dashboard';const links=document.querySelectorAll('#page-client .sb-link');links.forEach(l=>l.classList.remove('active'));const idx={'c-dash':0,'c-quote':1,'c-track':2};if(links[idx[id]])links[idx[id]].classList.add('active')}
-function aView(id){['a-req','a-ops','a-acc'].forEach(v=>{const e=document.getElementById(v);if(e)e.style.display=v===id?'block':'none'});const t={'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos'};document.getElementById('aTitle').textContent=t[id]||'Admin';const links=document.querySelectorAll('#page-admin .sb-section:first-child .sb-link');links.forEach(l=>l.classList.remove('active'));const idx={'a-req':0,'a-ops':1,'a-acc':2};if(links[idx[id]])links[idx[id]].classList.add('active')}
-function doQuote(e){e.preventDefault();toast('success','Solicitud enviada','Recibirás confirmación en tu correo.');setTimeout(()=>cView('c-dash'),1500)}
-function openDetail(){document.getElementById('dPanel').classList.add('open');document.getElementById('dOverlay').classList.add('open')}
-function closeDetail(){document.getElementById('dPanel').classList.remove('open');document.getElementById('dOverlay').classList.remove('open')}
-function sendQuote(){closeDetail();toast('success','Cotización enviada','Email generado vía IA Copilot y enviado al cliente.')}
-function toggleSw(sid,did){const s=document.getElementById(sid);const d=document.getElementById(did);s.classList.toggle('on');d.style.display=s.classList.contains('on')?'block':'none'}
-function simUpload(pid){const p=document.getElementById(pid);if(!p)return;const icons=['fa-image','fa-file-pdf','fa-file-excel'];const colors=['var(--text-muted)','var(--danger)','var(--success)'];const r=Math.floor(Math.random()*3);const t=document.createElement('div');t.className='upload-thumb';t.innerHTML=`<i class="fas ${icons[r]}" style="color:${colors[r]}"></i><button class="rm" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;t.style.animation='scaleIn .2s ease';p.appendChild(t)}
-function openExpModal(){document.getElementById('expModal').classList.add('open')}
-function closeExpModal(){document.getElementById('expModal').classList.remove('open')}
-function doExpense(e){e.preventDefault();closeExpModal();toast('success','Registrado','Movimiento contable registrado.')}
-function toast(type,title,msg){const t=document.getElementById('toast');const ic=document.getElementById('toastIcon');const c={success:'var(--success)',error:'var(--danger)',info:'var(--info)',warning:'var(--warning)'};const i={success:'fa-check-circle',error:'fa-times-circle',info:'fa-info-circle',warning:'fa-exclamation-circle'};ic.innerHTML=`<i class="fas ${i[type]}" style="color:${c[type]};font-size:18px"></i>`;document.getElementById('toastTitle').textContent=title;document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4000)}
-function openSb(id){document.getElementById(id).classList.add('open')}
-function closeSb(id){document.getElementById(id).classList.remove('open')}
-window.addEventListener('scroll',()=>{const n=document.getElementById('landingNav');if(n)n.classList.toggle('scrolled',window.scrollY>50)});
-document.querySelectorAll('.filters').forEach(g=>{g.querySelectorAll('.chip').forEach(c=>{c.addEventListener('click',()=>{g.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')})})});
+// ─── API Helper ───
+const API = '';
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    ...opts
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: 'Error' }));
+    throw new Error(err.detail || 'Error');
+  }
+  return r.json();
+}
+
+// ─── Session ───
+let currentUser = JSON.parse(localStorage.getItem('mip_user') || 'null');
+
+// ─── Navigation ───
+function go(id) {
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active', 'fade-enter'));
+  const p = document.getElementById(id);
+  if (p) { p.classList.add('active', 'fade-enter'); window.scrollTo(0, 0); }
+  document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('open'));
+  if (id === 'page-client' && currentUser) loadClientDashboard();
+  if (id === 'page-admin') loadAdminData();
+}
+function scrollTo2(id) { const e = document.getElementById(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+// ─── Auth ───
+function authTab(t) {
+  document.querySelectorAll('.auth-tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.auth-form').forEach(x => x.classList.remove('active'));
+  if (t === 'login') { document.querySelectorAll('.auth-tab')[0].classList.add('active'); document.getElementById('loginForm').classList.add('active'); }
+  else { document.querySelectorAll('.auth-tab')[1].classList.add('active'); document.getElementById('registerForm').classList.add('active'); }
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  const form = e.target;
+  const email = form.querySelector('input[type="email"]').value;
+  const password = form.querySelector('input[type="password"]').value;
+  try {
+    const user = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    currentUser = user;
+    localStorage.setItem('mip_user', JSON.stringify(user));
+    updateUserUI();
+    toast('success', 'Bienvenido', `Hola ${user.nombre}`);
+    setTimeout(() => go('page-client'), 800);
+  } catch (err) {
+    toast('error', 'Error', err.message);
+  }
+}
+
+function doAdmin() {
+  currentUser = { id: 0, nombre: 'Admin MIP', email: 'admin@mipquality.com', role: 'admin' };
+  localStorage.setItem('mip_user', JSON.stringify(currentUser));
+  toast('success', 'Acceso Admin', 'Ingresando al panel...');
+  setTimeout(() => go('page-admin'), 800);
+}
+
+async function doRegister(e) {
+  e.preventDefault();
+  const form = e.target;
+  const inputs = form.querySelectorAll('.form-input');
+  const data = {
+    nombre: inputs[0].value,
+    empresa: inputs[1].value,
+    rut: inputs[2].value,
+    rubro: inputs[3].value,
+    email: inputs[4].value,
+    telefono: inputs[5].value,
+    password: inputs[6].value,
+  };
+  try {
+    await api('/api/auth/register', { method: 'POST', body: JSON.stringify(data) });
+    toast('success', 'Cuenta creada', 'Registro exitoso. Ahora inicia sesión.');
+    setTimeout(() => authTab('login'), 1200);
+  } catch (err) {
+    toast('error', 'Error', err.message);
+  }
+}
+
+function updateUserUI() {
+  if (!currentUser) return;
+  const initials = currentUser.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  document.querySelectorAll('.sb-user .av').forEach(el => el.textContent = initials);
+  document.querySelectorAll('.sb-user .name').forEach(el => el.textContent = currentUser.nombre);
+  document.querySelectorAll('.sb-user .email').forEach(el => el.textContent = currentUser.email);
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('mip_user');
+  go('page-auth');
+}
+
+// ─── Client Dashboard ───
+async function loadClientDashboard() {
+  if (!currentUser) return;
+  try {
+    const stats = await api(`/api/dashboard/stats?cliente_id=${currentUser.id}`);
+    const cards = document.querySelectorAll('#c-dash .stat-card');
+    if (cards[0]) cards[0].querySelector('.s-val').textContent = stats.cotizaciones_activas;
+    if (cards[1]) cards[1].querySelector('.s-val').textContent = stats.pedidos_en_curso;
+    if (cards[2]) cards[2].querySelector('.s-val').textContent = stats.completados;
+    if (cards[3]) cards[3].querySelector('.s-val').textContent = '$' + (stats.total_importado / 1000).toFixed(0) + 'K';
+
+    const cots = await api(`/api/cotizaciones?cliente_id=${currentUser.id}`);
+    const tbody = document.querySelector('#c-dash .dtable tbody');
+    if (tbody && cots.length > 0) {
+      tbody.innerHTML = cots.map((c, i) => {
+        const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
+        const icons = { pendiente: 'fa-clock', cotizado: 'fa-dollar-sign', produccion: 'fa-cog', entregado: 'fa-check' };
+        const labels = { pendiente: 'En revisión', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
+        const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado] || 'badge-neutral'}"><i class="fas ${icons[c.estado] || 'fa-circle'}"></i> ${labels[c.estado] || c.estado}</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>`;
+      }).join('');
+    }
+  } catch (err) { console.error('Dashboard load error:', err); }
+}
+
+// ─── Client Views ───
+function cView(id) {
+  ['c-dash', 'c-quote', 'c-track'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  const t = { 'c-dash': 'Dashboard', 'c-quote': 'Nueva Cotización', 'c-track': 'Seguimiento' };
+  document.getElementById('cTitle').textContent = t[id] || 'Dashboard';
+  const links = document.querySelectorAll('#page-client .sb-link');
+  links.forEach(l => l.classList.remove('active'));
+  const idx = { 'c-dash': 0, 'c-quote': 1, 'c-track': 2 };
+  if (links[idx[id]]) links[idx[id]].classList.add('active');
+  if (id === 'c-dash') loadClientDashboard();
+}
+
+// ─── Create Cotización ───
+async function doQuote(e) {
+  e.preventDefault();
+  if (!currentUser) { toast('error', 'Error', 'Debes iniciar sesión'); return; }
+  const form = e.target;
+  const inputs = form.querySelectorAll('.form-input');
+  const sw = document.getElementById('sw1');
+  const data = {
+    cliente_id: currentUser.id,
+    producto: inputs[0].value,
+    descripcion: inputs[1].value,
+    cantidad: inputs[2].value,
+    precio_objetivo: inputs[3].value,
+    plazo: inputs[4].value,
+    uso_final: inputs[5].value,
+    personalizacion: sw && sw.classList.contains('on') ? (inputs[6] ? inputs[6].value : '') : '',
+  };
+  try {
+    await api('/api/cotizaciones', { method: 'POST', body: JSON.stringify(data) });
+    toast('success', 'Solicitud enviada', 'Recibirás confirmación en tu correo.');
+    form.reset();
+    setTimeout(() => cView('c-dash'), 1500);
+  } catch (err) {
+    toast('error', 'Error', err.message);
+  }
+}
+
+// ─── Admin ───
+function aView(id) {
+  ['a-req', 'a-ops', 'a-acc'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  const t = { 'a-req': 'Solicitudes entrantes', 'a-ops': 'Gestión Operacional', 'a-acc': 'Contabilidad & Gastos' };
+  document.getElementById('aTitle').textContent = t[id] || 'Admin';
+  const links = document.querySelectorAll('#page-admin .sb-section:first-child .sb-link');
+  links.forEach(l => l.classList.remove('active'));
+  const idx = { 'a-req': 0, 'a-ops': 1, 'a-acc': 2 };
+  if (links[idx[id]]) links[idx[id]].classList.add('active');
+  if (id === 'a-acc') loadContabilidad();
+}
+
+async function loadAdminData() {
+  try {
+    const stats = await api('/api/dashboard/stats');
+    const cards = document.querySelectorAll('#a-req .stat-card');
+    if (cards[0]) cards[0].querySelector('.s-val').textContent = stats.cotizaciones_activas;
+    if (cards[2]) cards[2].querySelector('.s-val').textContent = stats.pedidos_en_curso;
+    if (cards[3]) cards[3].querySelector('.s-val').textContent = stats.completados;
+
+    const cots = await api('/api/cotizaciones');
+    const tbody = document.querySelector('#a-req .dtable tbody');
+    if (tbody && cots.length > 0) {
+      const clientes = {};
+      for (const c of cots) {
+        if (!clientes[c.cliente_id]) {
+          try { clientes[c.cliente_id] = await api(`/api/clientes/${c.cliente_id}`); } catch { clientes[c.cliente_id] = { nombre: 'Cliente', empresa: '' }; }
+        }
+      }
+      tbody.innerHTML = cots.slice(0, 10).map(c => {
+        const cl = clientes[c.cliente_id] || { nombre: 'N/A', empresa: '' };
+        const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
+        const labels = { pendiente: 'Pendiente', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
+        const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td><button class="btn btn-outline btn-sm" onclick="openDetail()"><i class="fas fa-eye"></i></button></td></tr>`;
+      }).join('');
+    }
+  } catch (err) { console.error('Admin load error:', err); }
+}
+
+// ─── Contabilidad ───
+async function loadContabilidad() {
+  try {
+    const resumen = await api('/api/contabilidad/resumen');
+    const cards = document.querySelectorAll('#a-acc .stat-card');
+    if (cards[0]) cards[0].querySelector('.s-val').textContent = '$' + resumen.ingresos.toLocaleString();
+    if (cards[1]) cards[1].querySelector('.s-val').textContent = '$' + resumen.gastos.toLocaleString();
+    if (cards[2]) cards[2].querySelector('.s-val').textContent = '$' + resumen.utilidad_neta.toLocaleString();
+    if (cards[3]) cards[3].querySelector('.s-val').textContent = resumen.facturas_pendientes;
+  } catch (err) { console.error('Contabilidad load error:', err); }
+}
+
+async function doExpense(e) {
+  e.preventDefault();
+  const form = e.target;
+  const inputs = form.querySelectorAll('.form-input');
+  const data = {
+    tipo: inputs[0].value.toLowerCase() === 'ingreso' ? 'ingreso' : 'gasto',
+    categoria: inputs[1].value,
+    descripcion: inputs[2].value,
+    monto: parseFloat(inputs[3].value.replace(/[^0-9.-]/g, '')) || 0,
+    fecha: new Date(inputs[4].value).toISOString(),
+    pedido_id: inputs[5].value ? parseInt(inputs[5].value.replace('#SOL-', '')) : null,
+    estado: inputs[6].value.toLowerCase() === 'pagado' ? 'pagado' : 'pendiente',
+  };
+  try {
+    await api('/api/contabilidad', { method: 'POST', body: JSON.stringify(data) });
+    closeExpModal();
+    toast('success', 'Registrado', 'Movimiento contable registrado.');
+    loadContabilidad();
+  } catch (err) {
+    toast('error', 'Error', err.message);
+  }
+}
+
+// ─── Upload ───
+async function simUpload(pid) {
+  const p = document.getElementById(pid);
+  if (!p) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,.pdf,.xlsx,.xls';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const result = await fetch('/api/archivos/upload', { method: 'POST', body: fd });
+      const data = await result.json();
+      const ext = file.name.split('.').pop().toLowerCase();
+      const iconMap = { pdf: 'fa-file-pdf', xlsx: 'fa-file-excel', xls: 'fa-file-excel', jpg: 'fa-image', jpeg: 'fa-image', png: 'fa-image' };
+      const colorMap = { pdf: 'var(--danger)', xlsx: 'var(--success)', xls: 'var(--success)', jpg: 'var(--text-muted)', jpeg: 'var(--text-muted)', png: 'var(--text-muted)' };
+      const t = document.createElement('div');
+      t.className = 'upload-thumb';
+      t.innerHTML = `<i class="fas ${iconMap[ext] || 'fa-file'}" style="color:${colorMap[ext] || 'var(--text-muted)'}"></i><button class="rm" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+      t.style.animation = 'scaleIn .2s ease';
+      t.title = file.name;
+      p.appendChild(t);
+      toast('success', 'Subido', `${file.name} (${(data.size / 1024).toFixed(0)} KB)`);
+    } catch {
+      toast('error', 'Error', 'No se pudo subir el archivo');
+    }
+  };
+  input.click();
+}
+
+// ─── UI Helpers ───
+function openDetail() { document.getElementById('dPanel').classList.add('open'); document.getElementById('dOverlay').classList.add('open'); }
+function closeDetail() { document.getElementById('dPanel').classList.remove('open'); document.getElementById('dOverlay').classList.remove('open'); }
+function sendQuote() { closeDetail(); toast('success', 'Cotización enviada', 'Email generado vía IA Copilot y enviado al cliente.'); }
+function toggleSw(sid, did) { const s = document.getElementById(sid); const d = document.getElementById(did); s.classList.toggle('on'); d.style.display = s.classList.contains('on') ? 'block' : 'none'; }
+function openExpModal() { document.getElementById('expModal').classList.add('open'); }
+function closeExpModal() { document.getElementById('expModal').classList.remove('open'); }
+function toast(type, title, msg) {
+  const t = document.getElementById('toast'); const ic = document.getElementById('toastIcon');
+  const c = { success: 'var(--success)', error: 'var(--danger)', info: 'var(--info)', warning: 'var(--warning)' };
+  const i = { success: 'fa-check-circle', error: 'fa-times-circle', info: 'fa-info-circle', warning: 'fa-exclamation-circle' };
+  ic.innerHTML = `<i class="fas ${i[type]}" style="color:${c[type]};font-size:18px"></i>`;
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 4000);
+}
+function openSb(id) { document.getElementById(id).classList.add('open'); }
+function closeSb(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── Init ───
+window.addEventListener('scroll', () => { const n = document.getElementById('landingNav'); if (n) n.classList.toggle('scrolled', window.scrollY > 50); });
+document.querySelectorAll('.filters').forEach(g => { g.querySelectorAll('.chip').forEach(c => { c.addEventListener('click', () => { g.querySelectorAll('.chip').forEach(x => x.classList.remove('active')); c.classList.add('active'); }); }); });
+if (currentUser) updateUserUI();
 </script>
 </body>
 </html>
