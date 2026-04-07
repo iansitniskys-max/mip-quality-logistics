@@ -15,10 +15,16 @@ from schemas import (
     MovimientoCreate, MovimientoOut, LoginRequest,
 )
 
-# Create tables on startup
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="MIP Q&L API", version="1.0.0")
+
+
+@app.on_event("startup")
+def on_startup():
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Warning: Could not create tables: {e}")
 
 app.add_middleware(
     CORSMiddleware,

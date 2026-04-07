@@ -1,18 +1,15 @@
-FROM python:3.11-slim AS python-deps
-
-WORKDIR /app
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 FROM nginx:alpine
 
-# Install Python, pip and supervisor
-RUN apk add --no-cache python3 py3-pip supervisor
+# Install Python, pip, supervisor, and PostgreSQL client libs
+RUN apk add --no-cache python3 py3-pip supervisor postgresql-libs gcc python3-dev musl-dev postgresql-dev
 
 # Create venv and install deps
 RUN python3 -m venv /opt/venv
 COPY backend/requirements.txt /tmp/requirements.txt
 RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Remove build deps to reduce image size
+RUN apk del gcc python3-dev musl-dev postgresql-dev
 
 # Copy backend code
 COPY backend/ /app/backend/
