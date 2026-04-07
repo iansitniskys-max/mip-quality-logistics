@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
-# Install Python, pip, supervisor, and PostgreSQL client libs
-RUN apk add --no-cache python3 py3-pip supervisor postgresql-libs gcc python3-dev musl-dev postgresql-dev
+# Install Python, pip, and PostgreSQL client libs
+RUN apk add --no-cache python3 py3-pip postgresql-libs gcc python3-dev musl-dev postgresql-dev
 
 # Create venv and install deps
 RUN python3 -m venv /opt/venv
@@ -21,9 +21,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Frontend
 COPY mip-platform.html /usr/share/nginx/html/index.html
 
-# Supervisord config
-COPY supervisord.conf /etc/supervisord.conf
+# Start script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 EXPOSE 8080
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["/start.sh"]
