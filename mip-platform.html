@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIP Quality & Logistics — Tu socio estratégico en importación y logística</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f2;
+  --bg-white:#ffffff;
+  --bg-surface:#efeee8;
+  --bg-muted:#e8e6db;
+  --bg-input:#f7f6f2;
+  --bg-dark:#1a1a1a;
+  --bg-dark-soft:#2c2c2a;
+  --border:rgba(0,0,0,0.08);
+  --border-hover:rgba(0,0,0,0.15);
+  --border-active:rgba(0,0,0,0.25);
+  --text:#1a1a1a;
+  --text-secondary:#6b6b63;
+  --text-muted:#8a8a7e;
+  --text-faint:#b0afa8;
+  --text-inv:#f7f6f2;
+  --success:#2d7a4f;
+  --success-bg:rgba(45,122,79,0.08);
+  --success-light:#e8f5ee;
+  --warning:#a06b0a;
+  --warning-bg:rgba(160,107,10,0.08);
+  --warning-light:#faf3e0;
+  --danger:#a03030;
+  --danger-bg:rgba(160,48,48,0.08);
+  --danger-light:#fceaea;
+  --info:#2563a0;
+  --info-bg:rgba(37,99,160,0.08);
+  --info-light:#e6f0fb;
+  --radius:6px;
+  --radius-lg:10px;
+  --radius-xl:14px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:0 2px 8px rgba(0,0,0,0.06);
+  --shadow-lg:0 4px 20px rgba(0,0,0,0.08);
+  --font:'DM Sans',system-ui,sans-serif;
+  --font-serif:'Instrument Serif',Georgia,serif;
+  --sidebar-w:240px;
+  --topbar-h:56px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;font-family:inherit;border:none;background:none}
+input,select,textarea{font-family:inherit;border:none;outline:none;background:none;color:var(--text)}
+ul{list-style:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:3px}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.fade-enter{animation:fadeIn .4s ease forwards}
+
+.logo{display:flex;align-items:center;gap:10px}
+.logo svg{width:28px;height:28px}
+.logo-name{font-size:12px;font-weight:600;letter-spacing:1.8px;color:var(--text)}
+.logo-sub{font-size:9px;letter-spacing:2.5px;color:var(--text-muted);margin-top:1px}
+
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 22px;border-radius:var(--radius);font-size:13px;font-weight:500;transition:all .2s;letter-spacing:.2px}
+.btn-dark{background:var(--bg-dark);color:var(--text-inv)}
+.btn-dark:hover{background:var(--bg-dark-soft)}
+.btn-outline{border:1px solid var(--border-hover);color:var(--text)}
+.btn-outline:hover{border-color:var(--border-active);background:rgba(0,0,0,0.02)}
+.btn-sm{padding:7px 16px;font-size:12px}
+.btn-lg{padding:13px 30px;font-size:14px}
+.btn-block{width:100%;justify-content:center}
+
+.card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;transition:border-color .2s}
+.card:hover{border-color:var(--border-hover)}
+
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-success{background:var(--success-light);color:var(--success)}
+.badge-warning{background:var(--warning-light);color:var(--warning)}
+.badge-danger{background:var(--danger-light);color:var(--danger)}
+.badge-info{background:var(--info-light);color:var(--info)}
+.badge-neutral{background:var(--bg-surface);color:var(--text-muted)}
+
+.form-group{margin-bottom:18px}
+.form-label{display:block;font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;letter-spacing:.3px}
+.form-input{width:100%;padding:10px 14px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;transition:border-color .2s}
+.form-input:focus{border-color:var(--border-active)}
+.form-input::placeholder{color:var(--text-faint)}
+textarea.form-input{resize:vertical;min-height:90px}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%238a8a7e' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+.page-section{display:none;min-height:100vh}
+.page-section.active{display:block}
+
+/* ═══ LANDING ═══ */
+.l-nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:14px 40px;display:flex;align-items:center;justify-content:space-between;background:rgba(247,246,242,0.9);backdrop-filter:blur(16px);border-bottom:1px solid transparent;transition:all .3s}
+.l-nav.scrolled{border-color:var(--border)}
+.l-nav-links{display:flex;gap:28px;font-size:13px;color:var(--text-secondary)}
+.l-nav-links a{transition:color .2s}
+.l-nav-links a:hover{color:var(--text)}
+.l-nav-actions{display:flex;gap:10px}
+
+.hero{min-height:100vh;display:flex;align-items:center;padding:120px 40px 80px;max-width:1100px;margin:0 auto}
+.hero-inner{max-width:600px}
+.hero .overline{font-size:11px;letter-spacing:2.5px;color:var(--text-muted);margin-bottom:16px}
+.hero h1{font-family:var(--font-serif);font-size:clamp(32px,5vw,48px);font-weight:400;line-height:1.2;margin-bottom:16px;color:var(--text)}
+.hero h1 em{font-style:italic}
+.hero .subtitle{font-size:15px;color:var(--text-secondary);max-width:460px;line-height:1.75;margin-bottom:28px}
+.hero-actions{display:flex;gap:10px;margin-bottom:40px}
+.hero-stats{display:flex;gap:48px}
+.hero-stat .num{font-size:24px;font-weight:600}
+.hero-stat .label{font-size:11px;color:var(--text-muted);margin-top:2px;letter-spacing:.3px}
+
+.l-section{padding:80px 40px;max-width:1100px;margin:0 auto}
+.l-section-full{padding:80px 40px;background:var(--bg-white);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.section-label{font-size:10px;font-weight:600;letter-spacing:2.5px;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase}
+.section-title{font-family:var(--font-serif);font-size:clamp(24px,3.5vw,34px);font-weight:400;margin-bottom:10px}
+.section-desc{font-size:14px;color:var(--text-secondary);max-width:500px;line-height:1.7}
+.section-header-center{text-align:center;margin-bottom:48px}
+.section-header-center .section-desc{margin:0 auto}
+
+.adn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-top:40px}
+.adn-item{background:var(--bg-white);padding:32px 28px}
+.adn-item .adn-num{font-size:11px;color:var(--text-faint);letter-spacing:1px;margin-bottom:12px}
+.adn-item h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.adn-item p{font-size:13px;color:var(--text-secondary);line-height:1.7}
+
+.steps-row{display:flex;gap:0;margin-top:40px;max-width:900px;margin-left:auto;margin-right:auto}
+.step{flex:1;text-align:center;position:relative;padding:0 12px}
+.step-num{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border-hover);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;margin:0 auto 12px;background:var(--bg-white)}
+.step::after{content:'';position:absolute;top:18px;left:calc(50% + 24px);width:calc(100% - 48px);height:1px;background:var(--border-hover)}
+.step:last-child::after{display:none}
+.step h4{font-size:13px;font-weight:600;margin-bottom:4px}
+.step p{font-size:11px;color:var(--text-muted)}
+
+.sectors-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:40px}
+.sector-item{padding:24px 16px;text-align:center;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg-white);transition:border-color .2s}
+.sector-item:hover{border-color:var(--border-hover)}
+.sector-item i{font-size:22px;color:var(--text-muted);margin-bottom:10px}
+.sector-item h4{font-size:13px;font-weight:600;margin-bottom:3px}
+.sector-item p{font-size:11px;color:var(--text-muted)}
+
+.trust-bar{padding:48px 40px;text-align:center;border-bottom:1px solid var(--border)}
+.trust-bar .section-label{margin-bottom:24px}
+.trust-marquee-wrap{overflow:hidden;max-width:900px;margin:0 auto;position:relative}
+.trust-marquee-wrap::before,.trust-marquee-wrap::after{content:'';position:absolute;top:0;bottom:0;width:80px;z-index:2;pointer-events:none}
+.trust-marquee-wrap::before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+.trust-marquee-wrap::after{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
+.trust-marquee{display:flex;gap:56px;align-items:center;animation:marquee 28s linear infinite;width:max-content}
+.trust-logo{font-size:14px;font-weight:600;letter-spacing:.5px;color:var(--text);opacity:.2;white-space:nowrap;flex-shrink:0}
+
+.testi-section{max-width:1100px;margin:0 auto}
+.testi-featured{display:grid;grid-template-columns:1.4fr 1fr;gap:0;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:20px;background:var(--bg-white)}
+.testi-featured::before{display:none}
+.tf-body{padding:36px 40px;display:flex;flex-direction:column;justify-content:center}
+.tf-quote{font-family:var(--font-serif);font-size:17px;font-style:italic;line-height:1.8;color:var(--text-secondary);margin-bottom:24px}
+.tf-author{display:flex;align-items:center;gap:12px}
+.tf-av{width:40px;height:40px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--text-secondary)}
+.tf-name{font-size:13px;font-weight:600}
+.tf-role{font-size:12px;color:var(--text-muted)}
+.tf-company{font-size:11px;color:var(--text-muted);letter-spacing:.5px;margin-top:1px}
+.tf-metrics{padding:36px;background:var(--bg-surface);display:flex;flex-direction:column;justify-content:center;gap:24px;border-left:1px solid var(--border)}
+.tf-metric{text-align:center}
+.tf-metric .val{font-size:28px;font-weight:600}
+.tf-metric .label{font-size:11px;color:var(--text-muted);margin-top:2px;letter-spacing:.3px}
+
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.testi-card{border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;background:var(--bg-white);transition:border-color .2s}
+.testi-card:hover{border-color:var(--border-hover)}
+.testi-card .stars{font-size:11px;color:var(--warning);margin-bottom:12px}
+.testi-card .quote{font-size:13px;color:var(--text-secondary);line-height:1.75;font-style:italic;margin-bottom:16px}
+.testi-card .author{display:flex;align-items:center;gap:10px}
+.testi-card .av{width:32px;height:32px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-secondary)}
+.testi-card .a-name{font-size:12px;font-weight:600}
+.testi-card .a-role{font-size:11px;color:var(--text-muted)}
+
+.l-footer{background:var(--bg-white);border-top:1px solid var(--border);padding:48px 40px 24px}
+.footer-inner{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:32px;max-width:1100px;margin:0 auto}
+.footer-brand p{font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.7;max-width:280px}
+.footer-social{display:flex;gap:8px;margin-top:16px}
+.footer-social a{width:32px;height:32px;border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;transition:all .2s}
+.footer-social a:hover{border-color:var(--text);color:var(--text)}
+.footer-col h4{font-size:11px;font-weight:600;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:14px;text-transform:uppercase}
+.footer-col li{margin-bottom:8px}
+.footer-col a{font-size:12px;color:var(--text-muted);transition:color .2s}
+.footer-col a:hover{color:var(--text)}
+.footer-bottom{max-width:1100px;margin:32px auto 0;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--text-faint)}
+
+/* ═══ AUTH ═══ */
+.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px}
+.auth-wrap{width:100%;max-width:420px}
+.auth-card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-xl);padding:36px}
+.auth-tabs{display:flex;gap:0;margin-bottom:24px;background:var(--bg-surface);border-radius:var(--radius);padding:3px}
+.auth-tab{flex:1;padding:8px;text-align:center;font-size:13px;font-weight:500;border-radius:5px;color:var(--text-muted);transition:all .2s}
+.auth-tab.active{background:var(--bg-white);color:var(--text);box-shadow:var(--shadow-sm)}
+.auth-form{display:none}
+.auth-form.active{display:block}
+
+/* ═══ APP LAYOUT ═══ */
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-w);background:var(--bg-white);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .3s}
+.sb-header{padding:16px 16px 12px;border-bottom:1px solid var(--border)}
+.sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.sb-section{margin-bottom:20px}
+.sb-section-title{font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint);padding:0 12px;margin-bottom:6px}
+.sb-link{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius);font-size:13px;color:var(--text-secondary);transition:all .15s;margin-bottom:1px}
+.sb-link:hover{background:var(--bg-surface);color:var(--text)}
+.sb-link.active{background:var(--bg-surface);color:var(--text);font-weight:600}
+.sb-link i{width:18px;text-align:center;font-size:13px}
+.sb-link .cnt{margin-left:auto;background:var(--bg-dark);color:var(--text-inv);padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600}
+.sb-footer{padding:12px 16px;border-top:1px solid var(--border)}
+.sb-user{display:flex;align-items:center;gap:8px}
+.sb-user .av{width:32px;height:32px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-secondary)}
+.sb-user .name{font-size:12px;font-weight:600}
+.sb-user .email{font-size:10px;color:var(--text-muted)}
+.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;background:var(--bg)}
+.topbar{height:var(--topbar-h);padding:0 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(247,246,242,0.9);backdrop-filter:blur(16px);position:sticky;top:0;z-index:50}
+.topbar h1{font-size:16px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-search{display:flex;align-items:center;gap:6px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;width:200px}
+.topbar-search i{color:var(--text-faint);font-size:12px}
+.topbar-search input{font-size:12px;width:100%}
+.topbar-notif{position:relative;width:32px;height:32px;border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;transition:border-color .2s}
+.topbar-notif:hover{border-color:var(--border-active)}
+.topbar-notif .dot{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--danger)}
+.page-body{padding:28px}
+
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat-card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px}
+.stat-card .s-label{font-size:12px;color:var(--text-muted);margin-bottom:6px}
+.stat-card .s-val{font-size:22px;font-weight:600}
+.stat-card .s-sub{font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:3px}
+.stat-card .s-sub.up{color:var(--success)}
+.stat-card .s-sub.down{color:var(--danger)}
+
+.dtable-wrap{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.dtable-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.dtable-header h3{font-size:14px;font-weight:600}
+.filters{display:flex;gap:6px}
+.chip{padding:5px 12px;border-radius:4px;font-size:11px;font-weight:500;background:var(--bg-surface);color:var(--text-muted);border:1px solid transparent;transition:all .2s}
+.chip:hover,.chip.active{border-color:var(--border-hover);color:var(--text);background:var(--bg-white)}
+.dtable{width:100%;border-collapse:collapse}
+.dtable th{text-align:left;padding:10px 20px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint);border-bottom:1px solid var(--border);background:var(--bg)}
+.dtable td{padding:14px 20px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle}
+.dtable tr:hover td{background:rgba(0,0,0,0.01)}
+.dtable .client-cell{display:flex;align-items:center;gap:8px}
+.dtable .c-av{width:28px;height:28px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--text-secondary)}
+.table-pg{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;font-size:12px;color:var(--text-muted)}
+.pg-btns{display:flex;gap:3px}
+.pg-btns button{width:28px;height:28px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-white);color:var(--text-muted);font-size:12px;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.pg-btns button.active,.pg-btns button:hover{background:var(--bg-dark);color:var(--text-inv);border-color:var(--bg-dark)}
+
+.timeline{position:relative;padding-left:28px}
+.timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:1px;background:var(--border-hover)}
+.tl-item{position:relative;padding-bottom:28px}
+.tl-item:last-child{padding-bottom:0}
+.tl-dot{position:absolute;left:-28px;top:3px;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border-hover);background:var(--bg);display:flex;align-items:center;justify-content:center}
+.tl-dot i{font-size:7px;color:var(--text-faint)}
+.tl-dot.done{border-color:var(--success);background:var(--success-light)}
+.tl-dot.done i{color:var(--success)}
+.tl-dot.current{border-color:var(--text);background:var(--bg-surface)}
+.tl-dot.current i{color:var(--text)}
+.tl-content h4{font-size:13px;font-weight:600;margin-bottom:2px}
+.tl-content p{font-size:12px;color:var(--text-muted)}
+
+.upload-zone{border:1.5px dashed var(--border-hover);border-radius:var(--radius-lg);padding:32px;text-align:center;transition:all .2s;cursor:pointer}
+.upload-zone:hover{border-color:var(--border-active);background:rgba(0,0,0,0.01)}
+.upload-zone i{font-size:24px;color:var(--text-faint);margin-bottom:8px}
+.upload-zone h4{font-size:13px;font-weight:500;margin-bottom:3px}
+.upload-zone p{font-size:11px;color:var(--text-muted)}
+.upload-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.upload-thumb{width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--text-faint);position:relative}
+.upload-thumb .rm{position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;background:var(--danger);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center}
+
+.toast{position:fixed;top:16px;right:16px;z-index:9999;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 20px;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:10px;transform:translateX(120%);transition:transform .3s;max-width:380px}
+.toast.show{transform:translateX(0)}
+
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:199;opacity:0;pointer-events:none;transition:opacity .3s}
+.detail-overlay.open{opacity:1;pointer-events:all}
+.detail-panel{position:fixed;top:0;right:0;bottom:0;width:480px;background:var(--bg-white);border-left:1px solid var(--border);z-index:200;transform:translateX(100%);transition:transform .3s;overflow-y:auto}
+.detail-panel.open{transform:translateX(0)}
+.detail-head{display:flex;align-items:center;justify-content:space-between;padding:20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-white);z-index:1}
+.detail-body{padding:20px}
+
+.switch-wrap{display:flex;align-items:center;gap:10px}
+.switch{width:38px;height:20px;border-radius:10px;background:var(--bg-surface);border:1px solid var(--border);position:relative;cursor:pointer;transition:all .2s}
+.switch.on{background:var(--bg-dark);border-color:var(--bg-dark)}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--bg-white);transition:transform .2s;box-shadow:var(--shadow-sm)}
+.switch.on::after{transform:translateX(18px)}
+
+.ai-tag{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:var(--radius);background:var(--bg-surface);border:1px solid var(--border);margin-top:14px}
+.ai-tag i{color:var(--text-muted);font-size:14px}
+.ai-tag span{font-size:12px;color:var(--text-secondary)}
+
+.integration-tag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);background:var(--bg-surface);border:1px solid var(--border);font-size:12px;color:var(--text-secondary)}
+
+/* ═══ ACCOUNTING ═══ */
+.acc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.mini-bars{display:flex;align-items:flex-end;gap:2px;height:32px;margin-top:10px}
+.mini-bars div{flex:1;border-radius:2px 2px 0 0;min-height:3px;transition:opacity .2s}
+.mini-bars div:hover{opacity:1!important}
+.exp-row{display:grid;grid-template-columns:32px 2fr 1fr 1fr 1fr 90px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.exp-row:hover{background:rgba(0,0,0,0.01)}
+.exp-row.hdr{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint);background:var(--bg);border-bottom:1px solid var(--border)}
+.exp-icon{width:28px;height:28px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:12px}
+.exp-cat{font-size:11px;color:var(--text-muted)}
+.exp-amt{font-weight:600;font-size:14px}
+.exp-amt.in{color:var(--success)}
+.exp-amt.out{color:var(--danger)}
+.pl-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.pl-row:last-child{border:none}
+.pl-row.total{font-weight:600;border-top:1.5px solid var(--border-hover);border-bottom:none;margin-top:4px;padding-top:12px}
+.pl-label{color:var(--text-secondary)}
+.pl-val{font-weight:600}
+.pl-val.pos{color:var(--success)}
+.pl-val.neg{color:var(--danger)}
+.budget-item{margin-bottom:16px}
+.budget-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+.budget-top .b-name{font-weight:500}
+.budget-top .b-nums{color:var(--text-muted)}
+.budget-bar{height:5px;background:var(--bg-surface);border-radius:3px;overflow:hidden}
+.budget-fill{height:100%;border-radius:3px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:300;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal-box{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:500px;box-shadow:var(--shadow-lg);animation:scaleIn .25s ease}
+
+.mobile-btn{display:none;font-size:18px;color:var(--text)}
+.sb-close{display:none;position:absolute;top:16px;right:12px;font-size:16px;color:var(--text-muted)}
+@media(max-width:1024px){
+  .hero{padding:100px 24px 60px}
+  .l-section,.l-section-full{padding:60px 24px}
+  .adn-grid{grid-template-columns:1fr}
+  .sectors-grid{grid-template-columns:repeat(2,1fr)}
+  .testi-featured{grid-template-columns:1fr}
+  .tf-metrics{border-left:none;border-top:1px solid var(--border);flex-direction:row;flex-wrap:wrap}
+  .testi-grid{grid-template-columns:1fr}
+  .footer-inner{grid-template-columns:1fr 1fr}
+  .stat-grid,.acc-grid{grid-template-columns:repeat(2,1fr)}
+  .steps-row{flex-wrap:wrap;gap:16px}
+  .step::after{display:none}
+}
+@media(max-width:768px){
+  .l-nav{padding:10px 16px}
+  .l-nav-links{display:none}
+  .mobile-btn{display:block}
+  .hero{padding:80px 16px 40px}
+  .l-section,.l-section-full{padding:40px 16px}
+  .sectors-grid{grid-template-columns:1fr}
+  .footer-inner{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .sb-close{display:block}
+  .main{margin-left:0}
+  .topbar{padding:0 16px}
+  .topbar-search{display:none}
+  .page-body{padding:16px}
+  .stat-grid,.acc-grid{grid-template-columns:1fr}
+  .detail-panel{width:100%}
+  .exp-row{grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+  .exp-row.hdr{display:none}
+}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"><div id="toastIcon"><i class="fas fa-check-circle" style="color:var(--success);font-size:18px"></i></div><div><strong id="toastTitle" style="font-size:13px;display:block;margin-bottom:1px">Éxito</strong><span id="toastMsg" style="font-size:12px;color:var(--text-secondary)">OK</span></div></div>
+
+<!-- ═══════ 1. LANDING ═══════ -->
+<section class="page-section active" id="page-landing">
+<nav class="l-nav" id="landingNav">
+  <a class="logo" href="#" onclick="go('page-landing');return false">
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><ellipse cx="16" cy="16" rx="8" ry="14" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".35"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg>
+    <div><div class="logo-name">MIP QUALITY & LOGISTICS</div><div class="logo-sub">IMPORTACIÓN & LOGÍSTICA</div></div>
+  </a>
+  <div class="l-nav-links">
+    <a onclick="scrollTo2('about')">Nosotros</a>
+    <a onclick="scrollTo2('process')">Proceso</a>
+    <a onclick="scrollTo2('sectors')">Sectores</a>
+    <a onclick="scrollTo2('testimonials')">Casos de Éxito</a>
+  </div>
+  <div class="l-nav-actions">
+    <button class="btn btn-outline btn-sm" onclick="go('page-auth')"><i class="fas fa-sign-in-alt"></i> Ingresar</button>
+    <button class="btn btn-dark btn-sm" onclick="go('page-auth')">Solicitar cotización</button>
+  </div>
+  <button class="mobile-btn" onclick="document.querySelector('.l-nav-links').classList.toggle('show')"><i class="fas fa-bars"></i></button>
+</nav>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="overline">COMERCIO INTERNACIONAL</div>
+    <h1>Tu socio estratégico en <em>importación y logística</em></h1>
+    <p class="subtitle">Conectamos tu negocio con los mejores fabricantes de China. Gestión integral desde la cotización hasta la entrega en tu bodega.</p>
+    <div class="hero-actions">
+      <button class="btn btn-dark btn-lg" onclick="go('page-auth')"><i class="fas fa-file-invoice-dollar"></i> Solicitar cotización</button>
+      <button class="btn btn-outline btn-lg" onclick="go('page-auth')"><i class="fas fa-user-plus"></i> Registrarse</button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">500+</div><div class="label">Productos importados</div></div>
+      <div class="hero-stat"><div class="num">120+</div><div class="label">Clientes activos</div></div>
+      <div class="hero-stat"><div class="num">98%</div><div class="label">Tasa de satisfacción</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="l-section" id="about">
+  <div class="section-label">ADN de marca</div>
+  <div class="section-title">¿Por qué elegirnos?</div>
+  <div class="section-desc">Más de una década conectando empresas latinoamericanas con fabricantes de clase mundial en Asia.</div>
+  <div class="adn-grid">
+    <div class="adn-item"><div class="adn-num">01</div><h3>Sourcing Estratégico</h3><p>Identificamos y validamos los mejores proveedores según tus requerimientos de calidad, precio y volumen.</p></div>
+    <div class="adn-item"><div class="adn-num">02</div><h3>Control de Calidad</h3><p>Inspecciones en fábrica, control pre-embarque y certificaciones internacionales para tu tranquilidad.</p></div>
+    <div class="adn-item"><div class="adn-num">03</div><h3>Logística Integral</h3><p>Coordinamos flete marítimo y aéreo, internación aduanera y entrega final puerta a puerta.</p></div>
+  </div>
+</div>
+
+<div class="l-section-full" id="process">
+  <div class="section-header-center">
+    <div class="section-label">Proceso</div>
+    <div class="section-title">¿Cómo funciona?</div>
+    <div class="section-desc">Un proceso transparente de 5 pasos diseñado para maximizar tu inversión.</div>
+  </div>
+  <div class="steps-row">
+    <div class="step"><div class="step-num">1</div><h4>Solicitud</h4><p>Describe tu producto</p></div>
+    <div class="step"><div class="step-num">2</div><h4>Cotización</h4><p>Recibe propuestas reales</p></div>
+    <div class="step"><div class="step-num">3</div><h4>Muestras</h4><p>Aprueba antes de producir</p></div>
+    <div class="step"><div class="step-num">4</div><h4>Producción</h4><p>Fabricación con QC</p></div>
+    <div class="step"><div class="step-num">5</div><h4>Entrega</h4><p>Recibe en tu bodega</p></div>
+  </div>
+</div>
+
+<div class="l-section" id="sectors">
+  <div class="section-header-center">
+    <div class="section-label">Sectores</div>
+    <div class="section-title">Industrias que atendemos</div>
+    <div class="section-desc">Experiencia transversal en múltiples sectores del mercado.</div>
+  </div>
+  <div class="sectors-grid">
+    <div class="sector-item"><i class="fas fa-tshirt"></i><h4>Retail & Moda</h4><p>Ropa, calzado, accesorios</p></div>
+    <div class="sector-item"><i class="fas fa-industry"></i><h4>Industrial</h4><p>Equipos, repuestos, herramientas</p></div>
+    <div class="sector-item"><i class="fas fa-hotel"></i><h4>Hospitality</h4><p>Hotelería, restaurant, amenities</p></div>
+    <div class="sector-item"><i class="fas fa-heartbeat"></i><h4>Salud</h4><p>Insumos médicos, equipamiento</p></div>
+    <div class="sector-item"><i class="fas fa-laptop"></i><h4>Tecnología</h4><p>Electrónica, accesorios tech</p></div>
+    <div class="sector-item"><i class="fas fa-home"></i><h4>Hogar & Deco</h4><p>Mobiliario, decoración, textil</p></div>
+    <div class="sector-item"><i class="fas fa-futbol"></i><h4>Deportes</h4><p>Equipamiento deportivo, outdoor</p></div>
+    <div class="sector-item"><i class="fas fa-baby"></i><h4>Infantil</h4><p>Juguetes, ropa niños</p></div>
+  </div>
+</div>
+
+<div class="trust-bar">
+  <div class="section-label">Empresas que confían en nosotros</div>
+  <div class="trust-marquee-wrap">
+    <div class="trust-marquee">
+      <span class="trust-logo">Falabella</span><span class="trust-logo">LATAM</span><span class="trust-logo">Cencosud</span><span class="trust-logo">COPEC</span><span class="trust-logo">Ripley</span><span class="trust-logo">ARAUCO</span><span class="trust-logo">CMPC</span><span class="trust-logo">Sodimac</span><span class="trust-logo">CAP</span><span class="trust-logo">Tottus</span>
+      <span class="trust-logo">Falabella</span><span class="trust-logo">LATAM</span><span class="trust-logo">Cencosud</span><span class="trust-logo">COPEC</span><span class="trust-logo">Ripley</span><span class="trust-logo">ARAUCO</span><span class="trust-logo">CMPC</span><span class="trust-logo">Sodimac</span><span class="trust-logo">CAP</span><span class="trust-logo">Tottus</span>
+    </div>
+  </div>
+</div>
+
+<div class="l-section testi-section" id="testimonials">
+  <div class="section-header-center">
+    <div class="section-label">Casos de éxito</div>
+    <div class="section-title">Lo que dicen nuestros clientes</div>
+    <div class="section-desc">Resultados reales de empresas que confiaron en MIP.</div>
+  </div>
+  <div class="testi-featured">
+    <div class="tf-body">
+      <div class="tf-quote">MIP nos permitió ingresar al mercado asiático con total confianza. Redujimos costos de importación en un 35%, mejoramos la calidad y acortamos los tiempos de entrega. Su control in-situ en fábricas es un diferenciador único.</div>
+      <div class="tf-author"><div class="tf-av">RC</div><div><div class="tf-name">Roberto Cifuentes</div><div class="tf-role">Gerente de Compras Internacionales</div><div class="tf-company">Grupo Retail — Falabella</div></div></div>
+    </div>
+    <div class="tf-metrics">
+      <div class="tf-metric"><div class="val">-35%</div><div class="label">Reducción en costos</div></div>
+      <div class="tf-metric"><div class="val">2x</div><div class="label">Más rápido que antes</div></div>
+      <div class="tf-metric"><div class="val">98.5%</div><div class="label">Aprobación QC</div></div>
+    </div>
+  </div>
+  <div class="testi-grid">
+    <div class="testi-card">
+      <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+      <div class="quote">La transparencia en el proceso es impecable. Siempre sabemos en qué etapa va nuestro pedido. El portal de seguimiento nos ahorró cientos de horas.</div>
+      <div class="author"><div class="av">MV</div><div><div class="a-name">María Valentina Soto</div><div class="a-role">Dir. Comercial — Cencosud</div></div></div>
+    </div>
+    <div class="testi-card">
+      <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+      <div class="quote">Llevamos 3 años trabajando con MIP. Su control de calidad en fábrica nos da la tranquilidad de recibir exactamente lo que pedimos.</div>
+      <div class="author"><div class="av">JP</div><div><div class="a-name">Juan Pablo Méndez</div><div class="a-role">CEO — Sodimac Proveedores</div></div></div>
+    </div>
+    <div class="testi-card">
+      <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star-half-alt"></i></div>
+      <div class="quote">Importar equipamiento médico es crítico. MIP manejó certificaciones, normativa y logística sin un solo error. Profesionalismo de clase mundial.</div>
+      <div class="author"><div class="av">CL</div><div><div class="a-name">Carolina Lagos</div><div class="a-role">Jefa Procurement — COPEC</div></div></div>
+    </div>
+  </div>
+</div>
+
+<footer class="l-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a class="logo" href="#" onclick="go('page-landing');return false">
+        <svg viewBox="0 0 32 32" width="24" height="24" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg>
+        <div><div class="logo-name" style="font-size:11px">MIP QUALITY & LOGISTICS</div></div>
+      </a>
+      <p>Tu socio estratégico en importación y logística. Conectamos tu negocio con los mejores fabricantes de China.</p>
+      <div class="footer-social"><a href="#"><i class="fab fa-linkedin-in"></i></a><a href="#"><i class="fab fa-instagram"></i></a><a href="#"><i class="fab fa-whatsapp"></i></a><a href="#"><i class="fas fa-envelope"></i></a></div>
+    </div>
+    <div class="footer-col"><h4>Plataforma</h4><ul><li><a href="#" onclick="go('page-auth');return false">Solicitar Cotización</a></li><li><a href="#" onclick="go('page-auth');return false">Portal Cliente</a></li><li><a href="#">Seguimiento</a></li></ul></div>
+    <div class="footer-col"><h4>Empresa</h4><ul><li><a href="#">Nosotros</a></li><li><a href="#">Blog</a></li><li><a href="#">Privacidad</a></li><li><a href="#">Términos</a></li></ul></div>
+    <div class="footer-col"><h4>Contacto</h4><ul><li><a href="#">contacto@mipquality.com</a></li><li><a href="#">+56 9 1234 5678</a></li><li><a href="#">Santiago, Chile</a></li></ul></div>
+  </div>
+  <div class="footer-bottom"><span>© 2026 MIP Quality & Logistics</span><span>Santiago, Chile</span></div>
+</footer>
+</section>
+
+<!-- ═══════ 2. AUTH ═══════ -->
+<section class="page-section" id="page-auth">
+<div class="auth-page">
+  <div class="auth-wrap">
+    <div style="text-align:center;margin-bottom:20px">
+      <a class="logo" href="#" style="display:inline-flex" onclick="go('page-landing');return false">
+        <svg viewBox="0 0 32 32" width="28" height="28" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg>
+        <div><div class="logo-name">MIP QUALITY & LOGISTICS</div><div class="logo-sub">IMPORTACIÓN & LOGÍSTICA</div></div>
+      </a>
+    </div>
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="authTab('login')">Iniciar sesión</button>
+        <button class="auth-tab" onclick="authTab('register')">Registrarse</button>
+      </div>
+      <form class="auth-form active" id="loginForm" onsubmit="doLogin(event)">
+        <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" placeholder="tu@empresa.com" required></div>
+        <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="••••••••" required></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;font-size:12px"><label style="display:flex;align-items:center;gap:6px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark)"> Recordarme</label><a href="#" style="color:var(--text-secondary)">¿Olvidaste tu contraseña?</a></div>
+        <button type="submit" class="btn btn-dark btn-block btn-lg">Ingresar</button>
+        <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
+      </form>
+      <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
+        <div class="form-row"><div class="form-group"><label class="form-label">Nombre completo</label><input type="text" class="form-input" placeholder="Juan Pérez" required></div><div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" placeholder="Mi Empresa SpA" required></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">RUT Empresa</label><input type="text" class="form-input" placeholder="76.123.456-7"></div><div class="form-group"><label class="form-label">Rubro</label><select class="form-input" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Otro</option></select></div></div>
+        <div class="form-group"><label class="form-label">Email corporativo</label><input type="email" class="form-input" placeholder="contacto@miempresa.com" required></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Teléfono</label><input type="tel" class="form-input" placeholder="+56 9 1234 5678"></div><div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="Min. 8 caracteres" required></div></div>
+        <div style="margin-bottom:20px"><label style="display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark);margin-top:2px" required> Acepto los términos y condiciones y la política de privacidad.</label></div>
+        <button type="submit" class="btn btn-dark btn-block btn-lg">Crear cuenta</button>
+      </form>
+    </div>
+    <p style="text-align:center;margin-top:14px;font-size:12px;color:var(--text-muted)"><a href="#" onclick="go('page-landing');return false" style="color:var(--text-secondary)"><i class="fas fa-arrow-left"></i> Volver al inicio</a></p>
+  </div>
+</div>
+</section>
+
+<!-- ═══════ 3. CLIENT PORTAL ═══════ -->
+<section class="page-section" id="page-client">
+<div class="app">
+  <aside class="sidebar" id="cSb">
+    <button class="sb-close" onclick="closeSb('cSb')"><i class="fas fa-times"></i></button>
+    <div class="sb-header"><a class="logo" href="#" onclick="go('page-landing');return false"><svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg><div><div class="logo-name" style="font-size:11px">MIP Q&L</div><div class="logo-sub" style="font-size:8px">Portal Cliente</div></div></a></div>
+    <nav class="sb-nav">
+      <div class="sb-section"><div class="sb-section-title">Principal</div>
+        <a class="sb-link active" onclick="cView('c-dash')"><i class="fas fa-th-large"></i> Dashboard<span class="cnt">3</span></a>
+        <a class="sb-link" onclick="cView('c-quote')"><i class="fas fa-plus-circle"></i> Nueva Cotización</a>
+        <a class="sb-link" onclick="cView('c-track')"><i class="fas fa-history"></i> Mis Solicitudes</a>
+      </div>
+      <div class="sb-section"><div class="sb-section-title">Operaciones</div>
+        <a class="sb-link"><i class="fas fa-box"></i> Mis Pedidos<span class="cnt">2</span></a>
+        <a class="sb-link"><i class="fas fa-file-invoice"></i> Facturas</a>
+        <a class="sb-link"><i class="fas fa-headset"></i> Soporte</a>
+      </div>
+    </nav>
+    <div class="sb-footer"><div class="sb-user"><div class="av">JP</div><div><div class="name">Juan Pérez</div><div class="email">juan@empresa.com</div></div></div></div>
+  </aside>
+  <div class="main">
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="go('page-auth')"><i class="fas fa-sign-out-alt"></i></button></div></div>
+
+    <div class="page-body" id="c-dash">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Cotizaciones activas</div><div class="s-val">3</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> 1 nueva esta semana</div></div>
+        <div class="stat-card"><div class="s-label">Pedidos en curso</div><div class="s-val">2</div><div class="s-sub up"><i class="fas fa-truck"></i> 1 en tránsito</div></div>
+        <div class="stat-card"><div class="s-label">Completados</div><div class="s-val">12</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +3 vs trim. ant.</div></div>
+        <div class="stat-card"><div class="s-label">Total importado (USD)</div><div class="s-val">$84K</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +22% YoY</div></div>
+      </div>
+      <div style="margin-bottom:20px"><button class="btn btn-dark" onclick="cView('c-quote')"><i class="fas fa-plus"></i> Nueva solicitud de cotización</button></div>
+      <div class="dtable-wrap">
+        <div class="dtable-header"><h3>Solicitudes recientes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">En revisión</button><button class="chip">Cotizado</button><button class="chip">Producción</button></div></div>
+        <table class="dtable"><thead><tr><th>ID</th><th>Producto</th><th>Fecha</th><th>Cantidad</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600">#SOL-047</td><td>Zapatillas Running Custom</td><td style="color:var(--text-muted)">28 Mar 2026</td><td>5,000 prs</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> En revisión</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+          <tr><td style="font-weight:600">#SOL-043</td><td>Bolsas Ecológicas Marca Propia</td><td style="color:var(--text-muted)">15 Mar 2026</td><td>20,000 un</td><td><span class="badge badge-info"><i class="fas fa-dollar-sign"></i> Cotizado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+          <tr><td style="font-weight:600">#SOL-038</td><td>Luminarias LED Industrial</td><td style="color:var(--text-muted)">02 Mar 2026</td><td>1,200 un</td><td><span class="badge badge-success"><i class="fas fa-cog"></i> Producción</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+          <tr><td style="font-weight:600">#SOL-031</td><td>Cojines Decorativos Premium</td><td style="color:var(--text-muted)">10 Feb 2026</td><td>8,000 un</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+        </tbody></table>
+        <div class="table-pg"><span>Mostrando 4 de 15</span><div class="pg-btns"><button><i class="fas fa-chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button><i class="fas fa-chevron-right"></i></button></div></div>
+      </div>
+    </div>
+
+    <div class="page-body" id="c-quote" style="display:none">
+      <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
+      <div class="card" style="max-width:860px;padding:28px">
+        <h2 style="font-size:18px;font-weight:600;margin-bottom:4px">Nueva solicitud de cotización</h2>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:28px">Nuestro equipo te contactará con una propuesta en 24-48 horas.</p>
+        <form onsubmit="doQuote(event)">
+          <div class="form-row"><div class="form-group" style="grid-column:1/-1"><label class="form-label">Nombre del producto *</label><input type="text" class="form-input" placeholder="Ej: Zapatillas Running con suela Eva" required></div></div>
+          <div class="form-group"><label class="form-label">Descripción técnica *</label><textarea class="form-input" placeholder="Materiales, dimensiones, colores, especificaciones..." required></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Cantidad requerida *</label><input type="text" class="form-input" placeholder="Ej: 5,000 unidades" required></div>
+            <div class="form-group"><label class="form-label">Precio objetivo (USD)</label><input type="text" class="form-input" placeholder="Ej: $3.50 por unidad"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Plazo deseado</label><select class="form-input"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>Flexible</option></select></div>
+            <div class="form-group"><label class="form-label">Uso final</label><select class="form-input"><option value="">Seleccionar...</option><option>Venta directa (retail)</option><option>Marca propia / OEM</option><option>Uso interno</option><option>Reventa mayorista</option></select></div>
+          </div>
+          <div class="form-group"><label class="form-label">¿Requiere personalización?</label><div class="switch-wrap"><div class="switch" id="sw1" onclick="toggleSw('sw1','swDetail')"></div><span style="font-size:13px;color:var(--text-secondary)">Sí</span></div><div id="swDetail" style="display:none;margin-top:10px"><textarea class="form-input" placeholder="Logo, colores corporativos, packaging especial..."></textarea></div></div>
+          <div class="form-group"><label class="form-label">Imágenes de referencia (máx. 5)</label><div class="upload-zone" onclick="simUpload('imgPrv')"><i class="fas fa-cloud-upload-alt"></i><h4>Arrastra imágenes o haz clic</h4><p>JPG, PNG hasta 5MB</p></div><div class="upload-preview" id="imgPrv"></div></div>
+          <div class="form-group"><label class="form-label">Archivos adjuntos</label><div class="upload-zone" onclick="simUpload('filePrv')"><i class="fas fa-paperclip"></i><h4>Adjuntar archivos técnicos</h4><p>PDF, XLSX hasta 10MB</p></div><div class="upload-preview" id="filePrv"></div></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="cView('c-dash')">Cancelar</button><button type="submit" class="btn btn-dark btn-lg"><i class="fas fa-paper-plane"></i> Enviar solicitud</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="page-body" id="c-track" style="display:none">
+      <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
+      <div class="card" style="padding:28px;max-width:640px">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:4px">Pedido #SOL-038 — Luminarias LED</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">1,200 unidades</p>
+        <div class="timeline">
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Solicitud enviada</h4><p>02 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización aprobada</h4><p>05 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Muestra aprobada</h4><p>18 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pago 50% recibido</h4><p>20 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot current"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>En producción</h4><p>22 Mar 2026 — en curso</p></div></div>
+          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>QC China</h4><p>Pendiente</p></div></div>
+          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Embarque</h4><p>Pendiente</p></div></div>
+          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Entrega</h4><p>Pendiente</p></div></div>
+          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Pago final</h4><p>Pendiente</p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══════ 4. ADMIN ═══════ -->
+<section class="page-section" id="page-admin">
+<div class="app">
+  <aside class="sidebar" id="aSb">
+    <button class="sb-close" onclick="closeSb('aSb')"><i class="fas fa-times"></i></button>
+    <div class="sb-header"><a class="logo" href="#" onclick="go('page-landing');return false"><svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg><div><div class="logo-name" style="font-size:11px">MIP Q&L</div><div class="logo-sub" style="font-size:8px;color:var(--danger)">Panel Admin</div></div></a></div>
+    <nav class="sb-nav">
+      <div class="sb-section"><div class="sb-section-title">Administración</div>
+        <a class="sb-link active" onclick="aView('a-req')"><i class="fas fa-inbox"></i> Solicitudes<span class="cnt">5</span></a>
+        <a class="sb-link" onclick="aView('a-ops')"><i class="fas fa-project-diagram"></i> Gestión Operacional</a>
+        <a class="sb-link" onclick="aView('a-acc')"><i class="fas fa-calculator"></i> Contabilidad</a>
+        <a class="sb-link"><i class="fas fa-users"></i> Clientes</a>
+        <a class="sb-link"><i class="fas fa-chart-bar"></i> Reportes</a>
+      </div>
+      <div class="sb-section"><div class="sb-section-title">Sistema</div>
+        <a class="sb-link"><i class="fas fa-cog"></i> Configuración</a>
+        <a class="sb-link"><i class="fas fa-plug"></i> Integraciones</a>
+      </div>
+    </nav>
+    <div class="sb-footer"><div class="sb-user"><div class="av" style="background:var(--danger-light);color:var(--danger)">A</div><div><div class="name">Admin MIP</div><div class="email">admin@mipquality.com</div></div></div></div>
+  </aside>
+  <div class="main">
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="go('page-auth')"><i class="fas fa-sign-out-alt"></i></button></div></div>
+
+    <!-- ADMIN: Requests -->
+    <div class="page-body" id="a-req">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Pendientes</div><div class="s-val">5</div></div>
+        <div class="stat-card"><div class="s-label">Cotizaciones enviadas</div><div class="s-val">8</div></div>
+        <div class="stat-card"><div class="s-label">En producción</div><div class="s-val">6</div></div>
+        <div class="stat-card"><div class="s-label">En tránsito</div><div class="s-val">3</div></div>
+      </div>
+      <div class="dtable-wrap">
+        <div class="dtable-header"><h3>Todas las solicitudes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">Pendientes</button><button class="chip">Cotizadas</button><button class="chip">Producción</button></div></div>
+        <table class="dtable"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Fecha</th><th>Cant.</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600">#SOL-047</td><td><div class="client-cell"><div class="c-av">JP</div><div><div style="font-weight:500">Juan Pérez</div><div style="font-size:11px;color:var(--text-muted)">RetailMax SpA</div></div></div></td><td>Zapatillas Running</td><td style="color:var(--text-muted)">28 Mar</td><td>5,000</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></td><td><button class="btn btn-dark btn-sm" onclick="openDetail()"><i class="fas fa-eye"></i> Ver</button></td></tr>
+          <tr><td style="font-weight:600">#SOL-046</td><td><div class="client-cell"><div class="c-av">MV</div><div><div style="font-weight:500">María V. Soto</div><div style="font-size:11px;color:var(--text-muted)">HealthPro</div></div></div></td><td>Guantes Nitrilo</td><td style="color:var(--text-muted)">25 Mar</td><td>50,000</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
+          <tr><td style="font-weight:600">#SOL-043</td><td><div class="client-cell"><div class="c-av">RC</div><div><div style="font-weight:500">Roberto Cifuentes</div><div style="font-size:11px;color:var(--text-muted)">EcoStore</div></div></div></td><td>Bolsas Ecológicas</td><td style="color:var(--text-muted)">15 Mar</td><td>20,000</td><td><span class="badge badge-info"><i class="fas fa-dollar-sign"></i> Cotizado</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
+          <tr><td style="font-weight:600">#SOL-038</td><td><div class="client-cell"><div class="c-av">AL</div><div><div style="font-weight:500">Andrea López</div><div style="font-size:11px;color:var(--text-muted)">LuxHome</div></div></div></td><td>Luminarias LED</td><td style="color:var(--text-muted)">02 Mar</td><td>1,200</td><td><span class="badge badge-success"><i class="fas fa-cog"></i> Producción</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
+          <tr><td style="font-weight:600">#SOL-035</td><td><div class="client-cell"><div class="c-av">CS</div><div><div style="font-weight:500">Carlos Sepúlveda</div><div style="font-size:11px;color:var(--text-muted)">SportMax</div></div></div></td><td>Pelotas Fútbol</td><td style="color:var(--text-muted)">20 Feb</td><td>10,000</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
+        </tbody></table>
+        <div class="table-pg"><span>Mostrando 5 de 22</span><div class="pg-btns"><button><i class="fas fa-chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button>4</button><button>5</button><button><i class="fas fa-chevron-right"></i></button></div></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: Operations -->
+    <div class="page-body" id="a-ops" style="display:none">
+      <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="aView('a-req')"><i class="fas fa-arrow-left"></i> Volver</button></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="card" style="padding:24px">
+          <h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Pedido #SOL-038 — Luminarias LED</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Andrea López — LuxHome · 1,200 un</p>
+          <div class="timeline">
+            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Solicitud</h4><p>02 Mar</p></div></div>
+            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización</h4><p>05 Mar</p></div></div>
+            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Muestra aprobada</h4><p>18 Mar</p></div></div>
+            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pago 50% ($8,400)</h4><p>20 Mar</p></div></div>
+            <div class="tl-item"><div class="tl-dot current"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>En producción</h4><p>22 Mar — en curso</p></div></div>
+            <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>QC China</h4></div></div>
+            <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Embarque</h4></div></div>
+            <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Entrega + Pago final</h4></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="padding:24px;margin-bottom:16px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-file-upload" style="color:var(--text-muted);margin-right:6px"></i>Facturas & Comprobantes</h3>
+            <div class="upload-zone" onclick="simUpload('aUpPrv')" style="margin-bottom:12px;padding:20px"><i class="fas fa-cloud-upload-alt" style="font-size:18px"></i><h4 style="font-size:12px">Subir factura o comprobante</h4></div>
+            <div class="upload-preview" id="aUpPrv"></div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px"><i class="fas fa-file-pdf" style="color:var(--danger)"></i><div style="flex:1"><div style="font-weight:500">Factura_SOL038_anticipo.pdf</div><div style="font-size:10px;color:var(--text-muted)">20 Mar — 245 KB</div></div><button style="color:var(--text-muted);font-size:12px"><i class="fas fa-download"></i></button></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px"><i class="fas fa-file-image" style="color:var(--info)"></i><div style="flex:1"><div style="font-weight:500">Comprobante_transferencia.jpg</div><div style="font-size:10px;color:var(--text-muted)">20 Mar — 1.2 MB</div></div><button style="color:var(--text-muted);font-size:12px"><i class="fas fa-download"></i></button></div>
+            </div>
+          </div>
+          <div class="card" style="padding:24px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-plug" style="color:var(--text-muted);margin-right:6px"></i>Integraciones</h3>
+            <div class="integration-tag" style="margin-bottom:8px"><i class="fab fa-google-drive"></i> Google Drive — Sincronizado <i class="fas fa-check-circle" style="margin-left:auto;color:var(--success)"></i></div>
+            <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Sincronización automática a MIP/Clientes/LuxHome/SOL-038</p>
+            <div class="integration-tag"><i class="fas fa-robot"></i> IA Copilot — Activo <i class="fas fa-check-circle" style="margin-left:auto;color:var(--success)"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN: Accounting -->
+    <div class="page-body" id="a-acc" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px">
+        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Control de Gastos</h2><p style="font-size:13px;color:var(--text-secondary)">Marzo 2026</p></div>
+        <div style="display:flex;gap:8px"><select class="form-input" style="width:140px;padding:7px 12px;font-size:12px"><option>Marzo 2026</option><option>Febrero 2026</option><option>Enero 2026</option><option>Q1 2026</option></select><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo gasto</button><button class="btn btn-outline btn-sm"><i class="fas fa-file-export"></i> Exportar</button></div>
+      </div>
+      <div class="acc-grid">
+        <div class="stat-card"><div class="s-label">Ingresos</div><div class="s-val" style="color:var(--success)">$142,800</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +18.3% vs mes ant.</div><div class="mini-bars"><div style="height:45%;background:var(--success);opacity:.4"></div><div style="height:62%;background:var(--success);opacity:.5"></div><div style="height:38%;background:var(--success);opacity:.4"></div><div style="height:55%;background:var(--success);opacity:.5"></div><div style="height:70%;background:var(--success);opacity:.6"></div><div style="height:50%;background:var(--success);opacity:.5"></div><div style="height:85%;background:var(--success);opacity:.7"></div><div style="height:95%;background:var(--success);opacity:.9"></div></div></div>
+        <div class="stat-card"><div class="s-label">Gastos</div><div class="s-val" style="color:var(--danger)">$98,450</div><div class="s-sub down"><i class="fas fa-arrow-up"></i> +5.2%</div><div class="mini-bars"><div style="height:60%;background:var(--danger);opacity:.4"></div><div style="height:55%;background:var(--danger);opacity:.5"></div><div style="height:70%;background:var(--danger);opacity:.5"></div><div style="height:45%;background:var(--danger);opacity:.4"></div><div style="height:50%;background:var(--danger);opacity:.5"></div><div style="height:65%;background:var(--danger);opacity:.6"></div><div style="height:75%;background:var(--danger);opacity:.7"></div><div style="height:80%;background:var(--danger);opacity:.8"></div></div></div>
+        <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val">$44,350</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> Margen 31.1%</div></div>
+        <div class="stat-card"><div class="s-label">Facturas pendientes</div><div class="s-val">14</div><div class="s-sub down"><i class="fas fa-exclamation-triangle"></i> 3 vencidas</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+        <div class="dtable-wrap">
+          <div class="dtable-header"><h3>Libro de gastos & ingresos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Ingresos</button><button class="chip">Gastos</button></div></div>
+          <div style="max-height:420px;overflow-y:auto">
+            <div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto</div><div>Estado</div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--success-light);color:var(--success)"><i class="fas fa-arrow-down"></i></div><div><div style="font-weight:500">Pago anticipo 50% — SOL-038</div><div class="exp-cat">LuxHome · Luminarias</div></div><div><span class="badge badge-success" style="font-size:10px">Ingreso</span></div><div style="color:var(--text-muted)">20 Mar</div><div class="exp-amt in">+$8,400</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-light);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Pago proveedor Shenzhen</div><div class="exp-cat">Producción · Luminarias</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">22 Mar</div><div class="exp-amt out">-$6,200</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--success-light);color:var(--success)"><i class="fas fa-arrow-down"></i></div><div><div style="font-weight:500">Comisión broker SOL-035</div><div class="exp-cat">SportMax · Pelotas</div></div><div><span class="badge badge-success" style="font-size:10px">Ingreso</span></div><div style="color:var(--text-muted)">18 Mar</div><div class="exp-amt in">+$4,500</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-light);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Flete marítimo 40'</div><div class="exp-cat">Shanghai → Valparaíso</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">15 Mar</div><div class="exp-amt out">-$3,800</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-light);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Agente aduanero</div><div class="exp-cat">Aduanas · Despacho marzo</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">12 Mar</div><div class="exp-amt out">-$1,250</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-light);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Inspección QC pre-embarque</div><div class="exp-cat">Calidad · Guangzhou</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">10 Mar</div><div class="exp-amt out">-$850</div><div><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--success-light);color:var(--success)"><i class="fas fa-arrow-down"></i></div><div><div style="font-weight:500">Pago final SOL-031</div><div class="exp-cat">RetailMax · Cojines</div></div><div><span class="badge badge-success" style="font-size:10px">Ingreso</span></div><div style="color:var(--text-muted)">08 Mar</div><div class="exp-amt in">+$12,000</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-light);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Sueldos operaciones</div><div class="exp-cat">RRHH · Marzo</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">05 Mar</div><div class="exp-amt out">-$8,200</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
+          </div>
+          <div class="table-pg"><span>Mostrando 8 de 34</span><div class="pg-btns"><button><i class="fas fa-chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button><i class="fas fa-chevron-right"></i></button></div></div>
+        </div>
+        <div>
+          <div class="card" style="padding:24px;margin-bottom:16px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px">Estado de resultados</h3>
+            <div class="pl-row"><span class="pl-label">Comisiones importación</span><span class="pl-val pos">$86,400</span></div>
+            <div class="pl-row"><span class="pl-label">Servicios sourcing</span><span class="pl-val pos">$32,200</span></div>
+            <div class="pl-row"><span class="pl-label">Gestión logística</span><span class="pl-val pos">$24,200</span></div>
+            <div class="pl-row total"><span class="pl-label">Total ingresos</span><span class="pl-val pos">$142,800</span></div>
+            <div style="height:12px"></div>
+            <div class="pl-row"><span class="pl-label">Proveedores</span><span class="pl-val neg">-$52,300</span></div>
+            <div class="pl-row"><span class="pl-label">Fletes & logística</span><span class="pl-val neg">-$18,600</span></div>
+            <div class="pl-row"><span class="pl-label">Aduanas</span><span class="pl-val neg">-$6,350</span></div>
+            <div class="pl-row"><span class="pl-label">Personal</span><span class="pl-val neg">-$14,800</span></div>
+            <div class="pl-row"><span class="pl-label">QC & muestras</span><span class="pl-val neg">-$4,200</span></div>
+            <div class="pl-row"><span class="pl-label">Marketing</span><span class="pl-val neg">-$2,200</span></div>
+            <div class="pl-row total"><span class="pl-label">Total gastos</span><span class="pl-val neg">-$98,450</span></div>
+            <div style="margin-top:12px;padding:14px;background:var(--success-light);border-radius:var(--radius);text-align:center"><div style="font-size:11px;color:var(--success);letter-spacing:.5px">UTILIDAD NETA</div><div style="font-size:24px;font-weight:600;color:var(--success)">$44,350</div><div style="font-size:11px;color:var(--success)">Margen 31.1%</div></div>
+          </div>
+          <div class="card" style="padding:24px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px">Control de presupuesto</h3>
+            <div class="budget-item"><div class="budget-top"><span class="b-name">Proveedores</span><span class="b-nums">$52,300 / $60,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:87%;background:var(--warning)"></div></div></div>
+            <div class="budget-item"><div class="budget-top"><span class="b-name">Fletes</span><span class="b-nums">$18,600 / $25,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:74%;background:var(--success)"></div></div></div>
+            <div class="budget-item"><div class="budget-top"><span class="b-name">Aduanas</span><span class="b-nums">$6,350 / $8,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:79%;background:var(--success)"></div></div></div>
+            <div class="budget-item"><div class="budget-top"><span class="b-name">Personal</span><span class="b-nums">$14,800 / $15,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:99%;background:var(--danger)"></div></div></div>
+            <div class="budget-item"><div class="budget-top"><span class="b-name">QC & Muestras</span><span class="b-nums">$4,200 / $6,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:70%;background:var(--success)"></div></div></div>
+            <div class="budget-item"><div class="budget-top"><span class="b-name">Marketing</span><span class="b-nums">$2,200 / $5,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:44%;background:var(--text-muted)"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- EXPENSE MODAL -->
+<div class="modal-bg" id="expModal">
+  <div class="modal-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><h3 style="font-size:16px;font-weight:600">Registrar movimiento</h3><button onclick="closeExpModal()" style="font-size:16px;color:var(--text-muted)"><i class="fas fa-times"></i></button></div>
+    <form onsubmit="doExpense(event)">
+      <div class="form-row"><div class="form-group"><label class="form-label">Tipo</label><select class="form-input" required><option value="">Seleccionar...</option><option>Gasto</option><option>Ingreso</option></select></div><div class="form-group"><label class="form-label">Categoría</label><select class="form-input" required><option value="">Seleccionar...</option><option>Proveedores</option><option>Flete & Logística</option><option>Aduanas</option><option>Personal</option><option>QC & Muestras</option><option>Marketing</option><option>Pago cliente</option><option>Otro</option></select></div></div>
+      <div class="form-group"><label class="form-label">Descripción</label><input type="text" class="form-input" placeholder="Ej: Pago anticipo fábrica — SOL-047" required></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Monto (USD)</label><input type="text" class="form-input" placeholder="$0.00" required></div><div class="form-group"><label class="form-label">Fecha</label><input type="date" class="form-input" required></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Pedido asociado</label><select class="form-input"><option value="">Sin asociar</option><option>#SOL-047</option><option>#SOL-046</option><option>#SOL-038</option></select></div><div class="form-group"><label class="form-label">Estado</label><select class="form-input"><option>Pagado</option><option>Pendiente</option></select></div></div>
+      <div class="form-group"><label class="form-label">Comprobante</label><div class="upload-zone" onclick="simUpload('expUp')" style="padding:14px"><i class="fas fa-paperclip" style="font-size:16px"></i><h4 style="font-size:12px">Adjuntar</h4></div><div class="upload-preview" id="expUp"></div></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="closeExpModal()">Cancelar</button><button type="submit" class="btn btn-dark"><i class="fas fa-save"></i> Registrar</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-overlay" id="dOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="dPanel">
+  <div class="detail-head"><div><h3 style="font-size:16px;font-weight:600">#SOL-047 — Detalle</h3><span class="badge badge-warning" style="margin-top:4px"><i class="fas fa-clock"></i> Pendiente</span></div><button onclick="closeDetail()" style="font-size:16px;color:var(--text-muted)"><i class="fas fa-times"></i></button></div>
+  <div class="detail-body">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><div style="width:40px;height:40px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--text-secondary)">JP</div><div><div style="font-weight:600">Juan Pérez</div><div style="font-size:12px;color:var(--text-muted)">RetailMax SpA — juan@empresa.com</div></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Producto</span><span style="font-weight:500;font-size:13px">Zapatillas Running Custom</span></div>
+      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Cantidad</span><span style="font-weight:500;font-size:13px">5,000 pares</span></div>
+      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Precio objetivo</span><span style="font-weight:500;font-size:13px">$8.50 USD/par</span></div>
+      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Plazo</span><span style="font-weight:500;font-size:13px">60 días</span></div>
+      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Personalización</span><span style="font-weight:500;font-size:13px;color:var(--success)">Sí — Logo + colores</span></div>
+      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Uso final</span><span style="font-weight:500;font-size:13px">Venta retail</span></div>
+    </div>
+    <div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.5px">DESCRIPCIÓN TÉCNICA</div><p style="font-size:13px;color:var(--text-secondary);line-height:1.7;background:var(--bg-surface);padding:14px;border-radius:var(--radius)">Zapatilla running con upper mesh transpirable, suela EVA con placa de carbono, logo bordado lateral. Colores: negro/dorado y blanco/azul. Tallas 36-45. Caja individual con packaging personalizado.</p></div>
+    <div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.5px">IMÁGENES DE REFERENCIA</div><div style="display:flex;gap:8px"><div style="width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);display:flex;align-items:center;justify-content:center"><i class="fas fa-image" style="color:var(--text-faint)"></i></div><div style="width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);display:flex;align-items:center;justify-content:center"><i class="fas fa-image" style="color:var(--text-faint)"></i></div><div style="width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);display:flex;align-items:center;justify-content:center"><i class="fas fa-image" style="color:var(--text-faint)"></i></div></div></div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+    <h4 style="font-size:14px;font-weight:600;margin-bottom:14px">Subir cotización</h4>
+    <div class="card" style="padding:20px">
+      <div class="form-group"><label class="form-label">Precio unitario (USD)</label><input type="text" class="form-input" value="$9.20"></div>
+      <div class="form-group"><label class="form-label">Condiciones</label><textarea class="form-input">MOQ 3,000 pares. Producción 45 días. Pago 50/50. FOB Shenzhen.</textarea></div>
+      <div class="form-group"><label class="form-label">Adjuntar propuesta</label><div class="upload-zone" onclick="simUpload('qUp')" style="padding:14px"><i class="fas fa-file-pdf" style="font-size:16px"></i><h4 style="font-size:12px">Adjuntar PDF</h4></div><div class="upload-preview" id="qUp"></div></div>
+      <div class="ai-tag"><i class="fas fa-robot"></i><span>Al enviar, la IA Copilot generará un email profesional con la propuesta para el cliente.</span></div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline btn-sm" onclick="closeDetail()">Cancelar</button><button class="btn btn-dark" onclick="sendQuote()"><i class="fas fa-paper-plane"></i> Enviar cotización</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function go(id){document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active','fade-enter'));const p=document.getElementById(id);if(p){p.classList.add('active','fade-enter');window.scrollTo(0,0)}document.querySelectorAll('.sidebar').forEach(s=>s.classList.remove('open'))}
+function scrollTo2(id){const e=document.getElementById(id);if(e)e.scrollIntoView({behavior:'smooth',block:'start'})}
+function authTab(t){document.querySelectorAll('.auth-tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.auth-form').forEach(x=>x.classList.remove('active'));if(t==='login'){document.querySelectorAll('.auth-tab')[0].classList.add('active');document.getElementById('loginForm').classList.add('active')}else{document.querySelectorAll('.auth-tab')[1].classList.add('active');document.getElementById('registerForm').classList.add('active')}}
+function doLogin(e){e.preventDefault();toast('success','Bienvenido','Ingresando al portal...');setTimeout(()=>go('page-client'),800)}
+function doAdmin(){toast('success','Acceso Admin','Ingresando al panel...');setTimeout(()=>go('page-admin'),800)}
+function doRegister(e){e.preventDefault();toast('success','Cuenta creada','Registro exitoso.');setTimeout(()=>authTab('login'),1200)}
+function cView(id){['c-dash','c-quote','c-track'].forEach(v=>{const e=document.getElementById(v);if(e)e.style.display=v===id?'block':'none'});const t={'c-dash':'Dashboard','c-quote':'Nueva Cotización','c-track':'Seguimiento'};document.getElementById('cTitle').textContent=t[id]||'Dashboard';const links=document.querySelectorAll('#page-client .sb-link');links.forEach(l=>l.classList.remove('active'));const idx={'c-dash':0,'c-quote':1,'c-track':2};if(links[idx[id]])links[idx[id]].classList.add('active')}
+function aView(id){['a-req','a-ops','a-acc'].forEach(v=>{const e=document.getElementById(v);if(e)e.style.display=v===id?'block':'none'});const t={'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos'};document.getElementById('aTitle').textContent=t[id]||'Admin';const links=document.querySelectorAll('#page-admin .sb-section:first-child .sb-link');links.forEach(l=>l.classList.remove('active'));const idx={'a-req':0,'a-ops':1,'a-acc':2};if(links[idx[id]])links[idx[id]].classList.add('active')}
+function doQuote(e){e.preventDefault();toast('success','Solicitud enviada','Recibirás confirmación en tu correo.');setTimeout(()=>cView('c-dash'),1500)}
+function openDetail(){document.getElementById('dPanel').classList.add('open');document.getElementById('dOverlay').classList.add('open')}
+function closeDetail(){document.getElementById('dPanel').classList.remove('open');document.getElementById('dOverlay').classList.remove('open')}
+function sendQuote(){closeDetail();toast('success','Cotización enviada','Email generado vía IA Copilot y enviado al cliente.')}
+function toggleSw(sid,did){const s=document.getElementById(sid);const d=document.getElementById(did);s.classList.toggle('on');d.style.display=s.classList.contains('on')?'block':'none'}
+function simUpload(pid){const p=document.getElementById(pid);if(!p)return;const icons=['fa-image','fa-file-pdf','fa-file-excel'];const colors=['var(--text-muted)','var(--danger)','var(--success)'];const r=Math.floor(Math.random()*3);const t=document.createElement('div');t.className='upload-thumb';t.innerHTML=`<i class="fas ${icons[r]}" style="color:${colors[r]}"></i><button class="rm" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;t.style.animation='scaleIn .2s ease';p.appendChild(t)}
+function openExpModal(){document.getElementById('expModal').classList.add('open')}
+function closeExpModal(){document.getElementById('expModal').classList.remove('open')}
+function doExpense(e){e.preventDefault();closeExpModal();toast('success','Registrado','Movimiento contable registrado.')}
+function toast(type,title,msg){const t=document.getElementById('toast');const ic=document.getElementById('toastIcon');const c={success:'var(--success)',error:'var(--danger)',info:'var(--info)',warning:'var(--warning)'};const i={success:'fa-check-circle',error:'fa-times-circle',info:'fa-info-circle',warning:'fa-exclamation-circle'};ic.innerHTML=`<i class="fas ${i[type]}" style="color:${c[type]};font-size:18px"></i>`;document.getElementById('toastTitle').textContent=title;document.getElementById('toastMsg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4000)}
+function openSb(id){document.getElementById(id).classList.add('open')}
+function closeSb(id){document.getElementById(id).classList.remove('open')}
+window.addEventListener('scroll',()=>{const n=document.getElementById('landingNav');if(n)n.classList.toggle('scrolled',window.scrollY>50)});
+document.querySelectorAll('.filters').forEach(g=>{g.querySelectorAll('.chip').forEach(c=>{c.addEventListener('click',()=>{g.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')})})});
+</script>
+</body>
+</html>
