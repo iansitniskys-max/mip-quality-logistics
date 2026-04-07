@@ -4,6 +4,8 @@ from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 
@@ -16,6 +18,11 @@ from schemas import (
 )
 
 app = FastAPI(title="MIP Q&L API", version="1.0.0")
+
+STATIC_DIR = os.getenv("STATIC_DIR", "/app/frontend")
+
+# Serve uploaded files
+os.makedirs("/app/uploads", exist_ok=True)
 
 
 @app.on_event("startup")
@@ -298,3 +305,17 @@ def dashboard_stats(cliente_id: Optional[int] = None, db: Session = Depends(get_
         "completados": completados,
         "total_importado": float(total_monto),
     }
+
+
+# ─── Serve Frontend ───
+@app.get("/health")
+def health_nginx():
+    return {"status": "ok"}
+
+
+@app.get("/{full_path:path}")
+def serve_frontend(full_path: str):
+    index = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index):
+        return FileResponse(index, media_type="text/html")
+    return {"error": "Frontend not found"}

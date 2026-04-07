@@ -1,26 +1,22 @@
-FROM nginx:alpine
+FROM python:3.11-slim
 
-# Install Python, pip, and PostgreSQL client libs
-RUN apk add --no-cache python3 py3-pip postgresql-libs gcc python3-dev musl-dev postgresql-dev
+# Install PostgreSQL client libs
+RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*
 
-# Create venv and install deps
-RUN python3 -m venv /opt/venv
-COPY backend/requirements.txt /tmp/requirements.txt
-RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+WORKDIR /app
 
-# Remove build deps to reduce image size
-RUN apk del gcc python3-dev musl-dev postgresql-dev
+# Install Python deps
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY backend/ /app/backend/
 
-# Nginx config
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Frontend
-COPY mip-platform.html /usr/share/nginx/html/index.html
+# Copy frontend
+RUN mkdir -p /app/frontend
+COPY mip-platform.html /app/frontend/index.html
 
 EXPOSE 8080
 
-CMD sh -c "cd /app/backend && /opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 & sleep 3 && nginx -g 'daemon off;'"
+WORKDIR /app/backend
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--log-level", "info"]
