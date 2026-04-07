@@ -411,12 +411,18 @@ def export_clientes(template_only: bool = False, db: Session = Depends(get_db)):
 @app.post("/api/facturas/bulk")
 def bulk_import_facturas(facturas: list[FacturaCreate], db: Session = Depends(get_db)):
     created = 0
-    for data in facturas:
-        f = Factura(**data.model_dump())
-        db.add(f)
-        created += 1
+    errors = []
+    for i, data in enumerate(facturas):
+        try:
+            f = Factura(**data.model_dump())
+            db.add(f)
+            db.flush()
+            created += 1
+        except Exception as e:
+            db.rollback()
+            errors.append(f"Fila {i+1}: {str(e)}")
     db.commit()
-    return {"created": created}
+    return {"created": created, "errors": errors}
 
 
 @app.get("/api/facturas/export")
@@ -437,12 +443,18 @@ def export_facturas(template_only: bool = False, db: Session = Depends(get_db)):
 @app.post("/api/contabilidad/bulk")
 def bulk_import_movimientos(movimientos: list[MovimientoCreate], db: Session = Depends(get_db)):
     created = 0
-    for data in movimientos:
-        m = MovimientoContable(**data.model_dump())
-        db.add(m)
-        created += 1
+    errors = []
+    for i, data in enumerate(movimientos):
+        try:
+            m = MovimientoContable(**data.model_dump())
+            db.add(m)
+            db.flush()
+            created += 1
+        except Exception as e:
+            db.rollback()
+            errors.append(f"Fila {i+1}: {str(e)}")
     db.commit()
-    return {"created": created}
+    return {"created": created, "errors": errors}
 
 
 @app.get("/api/contabilidad/export")

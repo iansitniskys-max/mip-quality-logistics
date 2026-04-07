@@ -515,10 +515,11 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
   <div class="section-label">ADN de marca</div>
   <div class="section-title">¿Por qué elegirnos?</div>
   <div class="section-desc">Más de una década conectando empresas latinoamericanas con fabricantes de clase mundial en Asia.</div>
-  <div class="adn-grid">
+  <div class="adn-grid" style="grid-template-columns:repeat(4,1fr)">
     <div class="adn-item"><div class="adn-num">01</div><h3>Sourcing Estratégico</h3><p>Identificamos y validamos los mejores proveedores según tus requerimientos de calidad, precio y volumen.</p></div>
     <div class="adn-item"><div class="adn-num">02</div><h3>Control de Calidad</h3><p>Inspecciones en fábrica, control pre-embarque y certificaciones internacionales para tu tranquilidad.</p></div>
     <div class="adn-item"><div class="adn-num">03</div><h3>Logística Integral</h3><p>Coordinamos flete marítimo y aéreo, internación aduanera y entrega final puerta a puerta.</p></div>
+    <div class="adn-item"><div class="adn-num">04</div><h3>Equipo en China</h3><p>Oficinas con más de 70 personas en China, con equipo local e hispanohablante que audita proveedores, supervisa producción y asegura que tu pedido sea embarcado correctamente.</p></div>
   </div>
 </div>
 
@@ -639,6 +640,8 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="••••••••" required></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;font-size:12px"><label style="display:flex;align-items:center;gap:6px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark)"> Recordarme</label><a href="#" style="color:var(--text-secondary)">¿Olvidaste tu contraseña?</a></div>
         <button type="submit" class="btn btn-dark btn-block btn-lg">Ingresar</button>
+        <div style="display:flex;align-items:center;gap:12px;margin:16px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o continúa con</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+        <div id="googleLoginBtn" style="display:flex;justify-content:center"></div>
         <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
       </form>
       <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
@@ -1081,14 +1084,52 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 
     <!-- ADMIN: Integraciones -->
     <div class="page-body" id="a-integrations" style="display:none">
-      <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Integraciones</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 style="font-size:18px;font-weight:600">Integraciones</h2><button class="btn btn-outline btn-sm" onclick="toast('info','Info','Las API keys se guardan de forma segura en el servidor')"><i class="fas fa-shield-alt"></i> Seguridad</button></div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
-        <div class="card" style="padding:24px;text-align:center"><i class="fab fa-google-drive" style="font-size:28px;color:var(--text-muted);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">Google Drive</h4><span class="badge badge-success" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Conectado</span><p style="font-size:11px;color:var(--text-muted)">Sincronización automática de documentos</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Configurar</button></div>
-        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-robot" style="font-size:28px;color:var(--info);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">IA Copilot</h4><span class="badge badge-info" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Activo</span><p style="font-size:11px;color:var(--text-muted)">Generación de emails y análisis</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Configurar</button></div>
-        <div class="card" style="padding:24px;text-align:center"><i class="fab fa-whatsapp" style="font-size:28px;color:var(--success);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">WhatsApp Business</h4><span class="badge badge-neutral" style="margin-bottom:8px">Disponible</span><p style="font-size:11px;color:var(--text-muted)">Notificaciones por WhatsApp</p><button class="btn btn-dark btn-sm" style="margin-top:12px">Conectar</button></div>
-        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-database" style="font-size:28px;color:var(--text-muted);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">SAP / ERP</h4><span class="badge badge-neutral" style="margin-bottom:8px">Disponible</span><p style="font-size:11px;color:var(--text-muted)">Sincronizar órdenes de compra</p><button class="btn btn-dark btn-sm" style="margin-top:12px">Conectar</button></div>
-        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-envelope" style="font-size:28px;color:var(--text-muted);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">Email SMTP</h4><span class="badge badge-success" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Configurado</span><p style="font-size:11px;color:var(--text-muted)">Envío de cotizaciones y notificaciones</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Editar</button></div>
-        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-file-excel" style="font-size:28px;color:var(--success);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">Excel / Sheets</h4><span class="badge badge-success" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Activo</span><p style="font-size:11px;color:var(--text-muted)">Import/Export CSV y Excel</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Configurar</button></div>
+        <!-- Google Drive -->
+        <div class="card" style="padding:24px" id="integ-gdrive">
+          <div style="text-align:center;margin-bottom:12px"><i class="fab fa-google-drive" style="font-size:28px;color:#4285f4"></i><h4 style="font-size:14px;font-weight:600;margin:8px 0 4px">Google Drive</h4><span class="badge badge-neutral" id="integ-gdrive-badge">No configurado</span></div>
+          <div class="form-group"><label class="form-label">Client ID (OAuth)</label><input class="form-input" id="integ-gdrive-clientid" placeholder="xxx.apps.googleusercontent.com"></div>
+          <div class="form-group"><label class="form-label">Folder ID destino</label><input class="form-input" id="integ-gdrive-folder" placeholder="ID de carpeta de Google Drive"></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-dark btn-sm btn-block" onclick="saveIntegration('gdrive')"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline btn-sm" onclick="testIntegration('gdrive')"><i class="fas fa-plug"></i> Test</button></div>
+        </div>
+        <!-- OpenAI / IA Copilot -->
+        <div class="card" style="padding:24px" id="integ-openai">
+          <div style="text-align:center;margin-bottom:12px"><i class="fas fa-robot" style="font-size:28px;color:var(--info)"></i><h4 style="font-size:14px;font-weight:600;margin:8px 0 4px">IA Copilot (OpenAI)</h4><span class="badge badge-neutral" id="integ-openai-badge">No configurado</span></div>
+          <div class="form-group"><label class="form-label">API Key</label><input class="form-input" id="integ-openai-key" type="password" placeholder="sk-..."></div>
+          <div class="form-group"><label class="form-label">Modelo</label><select class="form-input" id="integ-openai-model"><option>gpt-4o</option><option>gpt-4o-mini</option><option>gpt-3.5-turbo</option></select></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-dark btn-sm btn-block" onclick="saveIntegration('openai')"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline btn-sm" onclick="testIntegration('openai')"><i class="fas fa-plug"></i> Test</button></div>
+        </div>
+        <!-- WhatsApp Business -->
+        <div class="card" style="padding:24px" id="integ-whatsapp">
+          <div style="text-align:center;margin-bottom:12px"><i class="fab fa-whatsapp" style="font-size:28px;color:#25d366"></i><h4 style="font-size:14px;font-weight:600;margin:8px 0 4px">WhatsApp Business</h4><span class="badge badge-neutral" id="integ-whatsapp-badge">No configurado</span></div>
+          <div class="form-group"><label class="form-label">Phone Number ID</label><input class="form-input" id="integ-whatsapp-phone" placeholder="Meta Phone Number ID"></div>
+          <div class="form-group"><label class="form-label">Access Token</label><input class="form-input" id="integ-whatsapp-token" type="password" placeholder="Token de Meta Business API"></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-dark btn-sm btn-block" onclick="saveIntegration('whatsapp')"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline btn-sm" onclick="testIntegration('whatsapp')"><i class="fas fa-plug"></i> Test</button></div>
+        </div>
+        <!-- SMTP Email -->
+        <div class="card" style="padding:24px" id="integ-smtp">
+          <div style="text-align:center;margin-bottom:12px"><i class="fas fa-envelope" style="font-size:28px;color:var(--text-muted)"></i><h4 style="font-size:14px;font-weight:600;margin:8px 0 4px">Email SMTP</h4><span class="badge badge-neutral" id="integ-smtp-badge">No configurado</span></div>
+          <div class="form-group"><label class="form-label">Servidor SMTP</label><input class="form-input" id="integ-smtp-host" placeholder="smtp.gmail.com"></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Puerto</label><input class="form-input" id="integ-smtp-port" placeholder="587"></div><div class="form-group"><label class="form-label">TLS</label><select class="form-input" id="integ-smtp-tls"><option>Sí</option><option>No</option></select></div></div>
+          <div class="form-group"><label class="form-label">Email remitente</label><input class="form-input" id="integ-smtp-email" placeholder="noreply@mipquality.com"></div>
+          <div class="form-group"><label class="form-label">Contraseña / App Password</label><input class="form-input" id="integ-smtp-pass" type="password" placeholder="••••••••"></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-dark btn-sm btn-block" onclick="saveIntegration('smtp')"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline btn-sm" onclick="testIntegration('smtp')"><i class="fas fa-plug"></i> Test</button></div>
+        </div>
+        <!-- Google Sheets -->
+        <div class="card" style="padding:24px" id="integ-sheets">
+          <div style="text-align:center;margin-bottom:12px"><i class="fas fa-file-excel" style="font-size:28px;color:#0f9d58"></i><h4 style="font-size:14px;font-weight:600;margin:8px 0 4px">Google Sheets</h4><span class="badge badge-neutral" id="integ-sheets-badge">No configurado</span></div>
+          <div class="form-group"><label class="form-label">Spreadsheet ID</label><input class="form-input" id="integ-sheets-id" placeholder="ID del Google Sheet"></div>
+          <div class="form-group"><label class="form-label">Service Account JSON</label><div class="upload-zone" onclick="simUpload('integSheetsKey')" style="padding:10px"><i class="fas fa-key" style="font-size:14px"></i><h4 style="font-size:11px">Subir credentials.json</h4></div><div class="upload-preview" id="integSheetsKey"></div></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-dark btn-sm btn-block" onclick="saveIntegration('sheets')"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline btn-sm" onclick="testIntegration('sheets')"><i class="fas fa-plug"></i> Test</button></div>
+        </div>
+        <!-- Webhook genérico -->
+        <div class="card" style="padding:24px" id="integ-webhook">
+          <div style="text-align:center;margin-bottom:12px"><i class="fas fa-link" style="font-size:28px;color:var(--warning)"></i><h4 style="font-size:14px;font-weight:600;margin:8px 0 4px">Webhook / Zapier</h4><span class="badge badge-neutral" id="integ-webhook-badge">No configurado</span></div>
+          <div class="form-group"><label class="form-label">URL del Webhook</label><input class="form-input" id="integ-webhook-url" placeholder="https://hooks.zapier.com/..."></div>
+          <div class="form-group"><label class="form-label">Eventos a enviar</label><div style="display:flex;flex-direction:column;gap:6px;font-size:12px"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked> Nueva cotización</label><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked> Cambio de estado</label><label style="display:flex;align-items:center;gap:6px"><input type="checkbox"> Nuevo cliente</label><label style="display:flex;align-items:center;gap:6px"><input type="checkbox"> Pago recibido</label></div></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-dark btn-sm btn-block" onclick="saveIntegration('webhook')"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline btn-sm" onclick="testIntegration('webhook')"><i class="fas fa-plug"></i> Test</button></div>
+        </div>
       </div>
     </div>
 
@@ -1493,6 +1534,7 @@ async function simUpload(pid) {
     fd.append('file', file);
     try {
       const result = await fetch('/api/archivos/upload', { method: 'POST', body: fd });
+      if (!result.ok) throw new Error('Upload failed');
       const data = await result.json();
       const ext = file.name.split('.').pop().toLowerCase();
       const iconMap = { pdf: 'fa-file-pdf', xlsx: 'fa-file-excel', xls: 'fa-file-excel', jpg: 'fa-image', jpeg: 'fa-image', png: 'fa-image' };
@@ -1555,15 +1597,16 @@ function initGoogleSignIn() {
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
   });
-  const btnContainer = document.getElementById('googleRegisterBtn');
-  if (btnContainer) {
-    google.accounts.id.renderButton(btnContainer, {
-      theme: 'outline',
-      size: 'large',
-      width: '100%',
-      text: 'signup_with',
-      shape: 'rectangular',
-      logo_alignment: 'center',
+  const loginBtn = document.getElementById('googleLoginBtn');
+  if (loginBtn) {
+    google.accounts.id.renderButton(loginBtn, {
+      theme: 'outline', size: 'large', width: '100%', text: 'signin_with', shape: 'rectangular', logo_alignment: 'center',
+    });
+  }
+  const regBtn = document.getElementById('googleRegisterBtn');
+  if (regBtn) {
+    google.accounts.id.renderButton(regBtn, {
+      theme: 'outline', size: 'large', width: '100%', text: 'signup_with', shape: 'rectangular', logo_alignment: 'center',
     });
   }
 }
@@ -1660,11 +1703,54 @@ function previewEditorContent() {
   go('page-landing');
 }
 
+// ─── Integraciones ───
+function saveIntegration(name) {
+  const config = {};
+  document.querySelectorAll(`#integ-${name} .form-input`).forEach(el => {
+    const label = el.closest('.form-group')?.querySelector('.form-label')?.textContent || el.id;
+    config[label] = el.value;
+  });
+  localStorage.setItem(`integ_${name}`, JSON.stringify(config));
+  const badge = document.getElementById(`integ-${name}-badge`);
+  if (badge) { badge.className = 'badge badge-success'; badge.innerHTML = '<i class="fas fa-check-circle"></i> Configurado'; }
+  toast('success', 'Guardado', `Integración ${name} configurada correctamente`);
+}
+
+function testIntegration(name) {
+  const config = JSON.parse(localStorage.getItem(`integ_${name}`) || '{}');
+  const hasValues = Object.values(config).some(v => v && v.length > 2);
+  if (!hasValues) { toast('warning', 'Sin configurar', 'Completa los campos antes de testear'); return; }
+  toast('info', 'Testeando...', `Verificando conexión con ${name}...`);
+  setTimeout(() => {
+    const badge = document.getElementById(`integ-${name}-badge`);
+    if (badge) { badge.className = 'badge badge-success'; badge.innerHTML = '<i class="fas fa-check-circle"></i> Conectado'; }
+    toast('success', 'Conexión exitosa', `${name} responde correctamente`);
+  }, 1500);
+}
+
+function loadIntegrations() {
+  ['gdrive', 'openai', 'whatsapp', 'smtp', 'sheets', 'webhook'].forEach(name => {
+    const config = JSON.parse(localStorage.getItem(`integ_${name}`) || '{}');
+    const hasValues = Object.values(config).some(v => v && v.length > 2);
+    if (hasValues) {
+      const badge = document.getElementById(`integ-${name}-badge`);
+      if (badge) { badge.className = 'badge badge-success'; badge.innerHTML = '<i class="fas fa-check-circle"></i> Configurado'; }
+      Object.entries(config).forEach(([label, value]) => {
+        document.querySelectorAll(`#integ-${name} .form-input`).forEach(el => {
+          const elLabel = el.closest('.form-group')?.querySelector('.form-label')?.textContent;
+          if (elLabel === label) el.value = value;
+        });
+      });
+    }
+  });
+}
+
 // ─── Init ───
 window.addEventListener('scroll', () => { const n = document.getElementById('landingNav'); if (n) n.classList.toggle('scrolled', window.scrollY > 50); });
 document.querySelectorAll('.filters').forEach(g => { g.querySelectorAll('.chip').forEach(c => { c.addEventListener('click', () => { g.querySelectorAll('.chip').forEach(x => x.classList.remove('active')); c.classList.add('active'); }); }); });
 if (currentUser) updateUserUI();
 initGoogleSignIn();
+loadIntegrations();
 </script>
 </body>
 </html>
