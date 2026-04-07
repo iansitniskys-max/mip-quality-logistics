@@ -49,7 +49,46 @@ def health():
     return {"status": "ok"}
 
 
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
+
 # ─── Auth ───
+@app.post("/api/auth/google")
+def google_login(request_body: dict, db: Session = Depends(get_db)):
+    """Verify Google ID token and create/login user"""
+    credential = request_body.get("credential", "")
+    if not credential:
+        raise HTTPException(400, "No credential provided")
+
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as g_requests
+        idinfo = id_token.verify_oauth2_token(credential, g_requests.Request(), GOOGLE_CLIENT_ID)
+    except Exception as e:
+        raise HTTPException(401, f"Invalid Google token: {str(e)}")
+
+    email = idinfo.get("email", "")
+    nombre = idinfo.get("name", "")
+    picture = idinfo.get("picture", "")
+
+    # Find or create user
+    cliente = db.query(Cliente).filter(Cliente.email == email).first()
+    if not cliente:
+        cliente = Cliente(nombre=nombre, email=email, empresa="", rut="", rubro="", telefono="")
+        db.add(cliente)
+        db.commit()
+        db.refresh(cliente)
+
+    return {
+        "id": cliente.id,
+        "nombre": cliente.nombre,
+        "email": cliente.email,
+        "empresa": cliente.empresa,
+        "picture": picture,
+        "role": "client",
+    }
+
+
 @app.post("/api/auth/login")
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     cliente = db.query(Cliente).filter(Cliente.email == data.email).first()

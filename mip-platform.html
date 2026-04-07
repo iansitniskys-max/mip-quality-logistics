@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -631,6 +632,8 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="••••••••" required></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;font-size:12px"><label style="display:flex;align-items:center;gap:6px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark)"> Recordarme</label><a href="#" style="color:var(--text-secondary)">¿Olvidaste tu contraseña?</a></div>
         <button type="submit" class="btn btn-dark btn-block btn-lg">Ingresar</button>
+        <div style="display:flex;align-items:center;gap:12px;margin:16px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o continúa con</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+        <div id="googleSignInBtn" style="display:flex;justify-content:center"></div>
         <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
       </form>
       <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
@@ -1213,10 +1216,49 @@ function toast(type, title, msg) {
 function openSb(id) { document.getElementById(id).classList.add('open'); }
 function closeSb(id) { document.getElementById(id).classList.remove('open'); }
 
+// ─── Google Sign-In ───
+const GOOGLE_CLIENT_ID = '750756373393-PLACEHOLDER.apps.googleusercontent.com';
+
+async function handleGoogleCredential(response) {
+  try {
+    const user = await api('/api/auth/google', { method: 'POST', body: JSON.stringify({ credential: response.credential }) });
+    currentUser = user;
+    localStorage.setItem('mip_user', JSON.stringify(user));
+    updateUserUI();
+    toast('success', 'Bienvenido', `Hola ${user.nombre}`);
+    setTimeout(() => go('page-client'), 800);
+  } catch (err) {
+    toast('error', 'Error', err.message);
+  }
+}
+
+function initGoogleSignIn() {
+  if (typeof google === 'undefined' || !google.accounts) {
+    setTimeout(initGoogleSignIn, 500);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+  });
+  const btnContainer = document.getElementById('googleSignInBtn');
+  if (btnContainer) {
+    google.accounts.id.renderButton(btnContainer, {
+      theme: 'outline',
+      size: 'large',
+      width: '100%',
+      text: 'signin_with',
+      shape: 'rectangular',
+      logo_alignment: 'center',
+    });
+  }
+}
+
 // ─── Init ───
 window.addEventListener('scroll', () => { const n = document.getElementById('landingNav'); if (n) n.classList.toggle('scrolled', window.scrollY > 50); });
 document.querySelectorAll('.filters').forEach(g => { g.querySelectorAll('.chip').forEach(c => { c.addEventListener('click', () => { g.querySelectorAll('.chip').forEach(x => x.classList.remove('active')); c.classList.add('active'); }); }); });
 if (currentUser) updateUserUI();
+initGoogleSignIn();
 </script>
 </body>
 </html>
