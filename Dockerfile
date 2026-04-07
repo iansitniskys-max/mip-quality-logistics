@@ -21,10 +21,6 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Frontend
 COPY mip-platform.html /usr/share/nginx/html/index.html
 
-# Start script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
 EXPOSE 8080
 
-CMD ["/start.sh"]
+CMD sh -c "cd /app/backend && /opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 & sleep 3 && nginx -g 'daemon off;'"
