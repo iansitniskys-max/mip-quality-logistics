@@ -94,3 +94,25 @@ class MovimientoContable(Base):
     pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=True)
     comprobante_url = Column(String(500))
     created_at = Column(DateTime, server_default=func.now())
+
+
+class HistorialEvento(Base):
+    __tablename__ = "historial_eventos"
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String(50), nullable=False)  # cotizacion, pedido, factura, movimiento, archivo, cliente
+    accion = Column(String(50), nullable=False)  # creado, actualizado, estado_cambiado, archivo_subido
+    entidad_id = Column(Integer)
+    descripcion = Column(String(500))
+    usuario = Column(String(200))
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class SiteContent(Base):
+    __tablename__ = "site_content"
+    id = Column(Integer, primary_key=True, index=True)
+    section = Column(String(50), nullable=False)  # hero, adn, process, sectors, testimonials, footer
+    key = Column(String(100), nullable=False)
+    value = Column(Text)
+    content_type = Column(String(20), default="text")  # text, image, json
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

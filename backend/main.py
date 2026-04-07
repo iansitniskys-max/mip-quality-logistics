@@ -10,12 +10,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 
 from database import engine, get_db, Base
-from models import Cliente, Cotizacion, Pedido, Factura, Archivo, MovimientoContable
+from fastapi.responses import StreamingResponse
+from models import Cliente, Cotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent
 from schemas import (
-    ClienteCreate, ClienteOut, CotizacionCreate, CotizacionUpdate, CotizacionOut,
+    ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
     PedidoCreate, PedidoUpdate, PedidoOut, FacturaCreate, FacturaOut,
-    MovimientoCreate, MovimientoOut, LoginRequest,
+    MovimientoCreate, MovimientoOut, LoginRequest, HistorialOut,
+    SiteContentUpdate, SiteContentOut,
 )
+import csv
+import io
 
 app = FastAPI(title="MIP Q&L API", version="1.0.0")
 
@@ -173,8 +177,11 @@ def update_cotizacion(id: int, data: CotizacionUpdate, db: Session = Depends(get
 
 # ─── Pedidos ───
 @app.get("/api/pedidos", response_model=list[PedidoOut])
-def listar_pedidos(db: Session = Depends(get_db)):
-    return db.query(Pedido).order_by(Pedido.created_at.desc()).all()
+def listar_pedidos(cliente_id: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(Pedido)
+    if cliente_id:
+        q = q.join(Cotizacion).filter(Cotizacion.cliente_id == cliente_id)
+    return q.order_by(Pedido.created_at.desc()).all()
 
 
 @app.post("/api/pedidos", response_model=PedidoOut)
@@ -344,6 +351,174 @@ def dashboard_stats(cliente_id: Optional[int] = None, db: Session = Depends(get_
         "completados": completados,
         "total_importado": float(total_monto),
     }
+
+
+# ─── Helper: Log Evento ───
+def log_evento(db: Session, tipo: str, accion: str, descripcion: str, usuario: str = "", entidad_id: int = None, cliente_id: int = None):
+    evento = HistorialEvento(tipo=tipo, accion=accion, descripcion=descripcion, usuario=usuario, entidad_id=entidad_id, cliente_id=cliente_id)
+    db.add(evento)
+    db.commit()
+
+
+# ─── Clientes: Update + Bulk + Export ───
+@app.put("/api/clientes/{id}", response_model=ClienteOut)
+def update_cliente(id: int, data: ClienteUpdate, db: Session = Depends(get_db)):
+    c = db.query(Cliente).get(id)
+    if not c:
+        raise HTTPException(404, "Cliente no encontrado")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(c, k, v)
+    db.commit()
+    db.refresh(c)
+    log_evento(db, "cliente", "actualizado", f"Cliente {c.nombre} actualizado", entidad_id=c.id, cliente_id=c.id)
+    return c
+
+
+@app.post("/api/clientes/bulk")
+def bulk_import_clientes(clientes: list[ClienteCreate], db: Session = Depends(get_db)):
+    created = 0
+    errors = []
+    for i, data in enumerate(clientes):
+        try:
+            existing = db.query(Cliente).filter(Cliente.email == data.email).first()
+            if existing:
+                errors.append(f"Fila {i+1}: Email {data.email} ya existe")
+                continue
+            c = Cliente(nombre=data.nombre, empresa=data.empresa, rut=data.rut, rubro=data.rubro, email=data.email, telefono=data.telefono, password_hash=data.password)
+            db.add(c)
+            db.commit()
+            created += 1
+        except Exception as e:
+            errors.append(f"Fila {i+1}: {str(e)}")
+    return {"created": created, "errors": errors}
+
+
+@app.get("/api/clientes/export")
+def export_clientes(template_only: bool = False, db: Session = Depends(get_db)):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    headers = ["nombre", "empresa", "rut", "rubro", "email", "telefono"]
+    writer.writerow(headers)
+    if not template_only:
+        for c in db.query(Cliente).all():
+            writer.writerow([c.nombre, c.empresa, c.rut, c.rubro, c.email, c.telefono])
+    output.seek(0)
+    filename = "plantilla_clientes.csv" if template_only else "clientes_export.csv"
+    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ─── Facturas: Bulk + Export ───
+@app.post("/api/facturas/bulk")
+def bulk_import_facturas(facturas: list[FacturaCreate], db: Session = Depends(get_db)):
+    created = 0
+    for data in facturas:
+        f = Factura(**data.model_dump())
+        db.add(f)
+        created += 1
+    db.commit()
+    return {"created": created}
+
+
+@app.get("/api/facturas/export")
+def export_facturas(template_only: bool = False, db: Session = Depends(get_db)):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    headers = ["pedido_id", "tipo", "categoria", "descripcion", "monto", "fecha", "estado", "archivo_url"]
+    writer.writerow(headers)
+    if not template_only:
+        for f in db.query(Factura).all():
+            writer.writerow([f.pedido_id, f.tipo, f.categoria, f.descripcion, f.monto, f.fecha, f.estado, f.archivo_url])
+    output.seek(0)
+    filename = "plantilla_facturas.csv" if template_only else "facturas_export.csv"
+    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ─── Contabilidad: Bulk + Export ───
+@app.post("/api/contabilidad/bulk")
+def bulk_import_movimientos(movimientos: list[MovimientoCreate], db: Session = Depends(get_db)):
+    created = 0
+    for data in movimientos:
+        m = MovimientoContable(**data.model_dump())
+        db.add(m)
+        created += 1
+    db.commit()
+    return {"created": created}
+
+
+@app.get("/api/contabilidad/export")
+def export_movimientos(template_only: bool = False, db: Session = Depends(get_db)):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    headers = ["tipo", "categoria", "descripcion", "monto", "fecha", "estado", "pedido_id"]
+    writer.writerow(headers)
+    if not template_only:
+        for m in db.query(MovimientoContable).all():
+            writer.writerow([m.tipo, m.categoria, m.descripcion, m.monto, m.fecha, m.estado, m.pedido_id])
+    output.seek(0)
+    filename = "plantilla_movimientos.csv" if template_only else "movimientos_export.csv"
+    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ─── Historial ───
+@app.get("/api/historial", response_model=list[HistorialOut])
+def listar_historial(
+    cliente_id: Optional[int] = None,
+    tipo: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    q = db.query(HistorialEvento)
+    if cliente_id:
+        q = q.filter(HistorialEvento.cliente_id == cliente_id)
+    if tipo:
+        q = q.filter(HistorialEvento.tipo == tipo)
+    return q.order_by(HistorialEvento.created_at.desc()).limit(limit).all()
+
+
+# ─── Site Content (Admin Web Editor) ───
+@app.get("/api/site-content", response_model=list[SiteContentOut])
+def get_site_content(section: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(SiteContent)
+    if section:
+        q = q.filter(SiteContent.section == section)
+    return q.all()
+
+
+@app.put("/api/site-content")
+def update_site_content(items: list[SiteContentUpdate], db: Session = Depends(get_db)):
+    updated = 0
+    for item in items:
+        existing = db.query(SiteContent).filter(SiteContent.section == item.section, SiteContent.key == item.key).first()
+        if existing:
+            existing.value = item.value
+            existing.content_type = item.content_type
+        else:
+            sc = SiteContent(section=item.section, key=item.key, value=item.value, content_type=item.content_type)
+            db.add(sc)
+        updated += 1
+    db.commit()
+    return {"updated": updated}
+
+
+@app.post("/api/site-content/upload-image")
+async def upload_site_image(file: UploadFile = File(...), section: str = Query("hero"), key: str = Query("image")):
+    content = await file.read()
+    filename = f"site/{section}_{key}_{file.filename}"
+    url = ""
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(filename)
+        blob.upload_from_string(content, content_type=file.content_type)
+        url = f"https://storage.googleapis.com/{GCS_BUCKET}/{filename}"
+    except Exception:
+        os.makedirs("/app/uploads/site", exist_ok=True)
+        local_path = f"/app/uploads/site/{section}_{key}_{file.filename}"
+        with open(local_path, "wb") as f:
+            f.write(content)
+        url = f"/uploads/site/{section}_{key}_{file.filename}"
+    return {"url": url, "section": section, "key": key}
 
 
 # ─── Serve Frontend ───

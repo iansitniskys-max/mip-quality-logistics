@@ -142,3 +142,44 @@ class MovimientoOut(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+# --- Clientes Update ---
+class ClienteUpdate(BaseModel):
+    nombre: Optional[str] = None
+    empresa: Optional[str] = None
+    rut: Optional[str] = None
+    rubro: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+# --- Historial ---
+class HistorialOut(BaseModel):
+    id: int
+    tipo: str
+    accion: str
+    entidad_id: Optional[int]
+    descripcion: str
+    usuario: Optional[str]
+    cliente_id: Optional[int]
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# --- Site Content ---
+class SiteContentUpdate(BaseModel):
+    section: str
+    key: str
+    value: str
+    content_type: str = "text"
+
+class SiteContentOut(BaseModel):
+    id: int
+    section: str
+    key: str
+    value: str
+    content_type: str
+    updated_at: datetime
+    class Config:
+        from_attributes = True

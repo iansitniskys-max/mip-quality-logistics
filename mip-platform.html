@@ -336,6 +336,13 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 .modal-bg.open{display:flex}
 .modal-box{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:500px;box-shadow:var(--shadow-lg);animation:scaleIn .25s ease}
 
+.faq-item{border-bottom:1px solid var(--border);padding:12px 0;cursor:pointer}
+.faq-q{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px}
+.faq-q i{font-size:9px;transition:transform .2s;color:var(--text-muted)}
+.faq-a{font-size:13px;color:var(--text-secondary);line-height:1.7;max-height:0;overflow:hidden;transition:max-height .3s,padding .3s;padding:0}
+.faq-item.open .faq-q i{transform:rotate(90deg)}
+.faq-item.open .faq-a{max-height:200px;padding:8px 0 0 17px}
+
 .mobile-btn{display:none;font-size:18px;color:var(--text)}
 .sb-close{display:none;position:absolute;top:16px;right:12px;font-size:16px;color:var(--text-muted)}
 
@@ -632,11 +639,11 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="••••••••" required></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;font-size:12px"><label style="display:flex;align-items:center;gap:6px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark)"> Recordarme</label><a href="#" style="color:var(--text-secondary)">¿Olvidaste tu contraseña?</a></div>
         <button type="submit" class="btn btn-dark btn-block btn-lg">Ingresar</button>
-        <div style="display:flex;align-items:center;gap:12px;margin:16px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o continúa con</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
-        <div id="googleSignInBtn" style="display:flex;justify-content:center"></div>
         <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
       </form>
       <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
+        <div id="googleRegisterBtn" style="display:flex;justify-content:center;margin-bottom:16px"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o completa el formulario</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
         <div class="form-row"><div class="form-group"><label class="form-label">Nombre completo</label><input type="text" class="form-input" placeholder="Juan Pérez" required></div><div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" placeholder="Mi Empresa SpA" required></div></div>
         <div class="form-row"><div class="form-group"><label class="form-label">RUT Empresa</label><input type="text" class="form-input" placeholder="76.123.456-7"></div><div class="form-group"><label class="form-label">Rubro</label><select class="form-input" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Otro</option></select></div></div>
         <div class="form-group"><label class="form-label">Email corporativo</label><input type="email" class="form-input" placeholder="contacto@miempresa.com" required></div>
@@ -663,9 +670,12 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <a class="sb-link" onclick="cView('c-track')"><i class="fas fa-history"></i> Mis Solicitudes</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Operaciones</div>
-        <a class="sb-link"><i class="fas fa-box"></i> Mis Pedidos<span class="cnt">2</span></a>
-        <a class="sb-link"><i class="fas fa-file-invoice"></i> Facturas</a>
-        <a class="sb-link"><i class="fas fa-headset"></i> Soporte</a>
+        <a class="sb-link" onclick="cView('c-orders')"><i class="fas fa-box"></i> Mis Pedidos<span class="cnt">2</span></a>
+        <a class="sb-link" onclick="cView('c-invoices')"><i class="fas fa-file-invoice"></i> Facturas</a>
+        <a class="sb-link" onclick="cView('c-support')"><i class="fas fa-headset"></i> Soporte</a>
+      </div>
+      <div class="sb-section"><div class="sb-section-title">Registro</div>
+        <a class="sb-link" onclick="cView('c-history')"><i class="fas fa-clock"></i> Historial</a>
       </div>
     </nav>
     <div class="sb-footer"><div class="sb-user"><div class="av">JP</div><div><div class="name">Juan Pérez</div><div class="email">juan@empresa.com</div></div></div></div>
@@ -736,6 +746,97 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         </div>
       </div>
     </div>
+
+    <!-- CLIENT: Mis Pedidos -->
+    <div class="page-body" id="c-orders" style="display:none">
+      <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Total pedidos</div><div class="s-val">4</div></div>
+        <div class="stat-card"><div class="s-label">En tránsito</div><div class="s-val">1</div></div>
+        <div class="stat-card"><div class="s-label">Completados</div><div class="s-val">2</div></div>
+        <div class="stat-card"><div class="s-label">Monto total</div><div class="s-val">$42K</div></div>
+      </div>
+      <div class="dtable-wrap">
+        <div class="dtable-header"><h3>Mis Pedidos</h3></div>
+        <table class="dtable"><thead><tr><th>ID</th><th>Producto</th><th>Cantidad</th><th>Monto</th><th>Etapa</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="c-orders-body">
+          <tr><td style="font-weight:600">#PED-001</td><td>Luminarias LED</td><td>1,200 un</td><td>$16,800</td><td>5/9 — Producción</td><td><span class="badge badge-success"><i class="fas fa-cog"></i> Producción</span></td><td><button class="btn btn-outline btn-sm" onclick="cView('c-track')">Timeline</button></td></tr>
+          <tr><td style="font-weight:600">#PED-002</td><td>Cojines Premium</td><td>8,000 un</td><td>$12,000</td><td>9/9 — Entregado</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+          <tr><td style="font-weight:600">#PED-003</td><td>Textiles Hogar</td><td>3,000 un</td><td>$8,400</td><td>7/9 — En tránsito</td><td><span class="badge badge-info"><i class="fas fa-truck"></i> Tránsito</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+          <tr><td style="font-weight:600">#PED-004</td><td>Herramientas</td><td>500 un</td><td>$4,500</td><td>9/9 — Entregado</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- CLIENT: Facturas -->
+    <div class="page-body" id="c-invoices" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="window.open('/api/facturas/export?template_only=true')"><i class="fas fa-download"></i> Plantilla</button>
+          <button class="btn btn-outline btn-sm" onclick="importBulk('facturas')"><i class="fas fa-upload"></i> Importar</button>
+          <button class="btn btn-dark btn-sm" onclick="simUpload('cInvUp')"><i class="fas fa-plus"></i> Subir factura PDF</button>
+        </div>
+      </div>
+      <div class="upload-preview" id="cInvUp" style="margin-bottom:16px"></div>
+      <div class="dtable-wrap">
+        <div class="dtable-header"><h3>Mis Facturas</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">Pagadas</button><button class="chip">Pendientes</button></div></div>
+        <table class="dtable"><thead><tr><th>N°</th><th>Pedido</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th>Estado</th><th>Archivo</th></tr></thead>
+        <tbody id="c-invoices-body">
+          <tr><td style="font-weight:600">FAC-001</td><td>#PED-001</td><td><span class="badge badge-success" style="font-size:10px">Ingreso</span></td><td class="exp-amt in">+$8,400</td><td style="color:var(--text-muted)">20 Mar</td><td><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></td><td><a href="#" style="color:var(--danger)"><i class="fas fa-file-pdf"></i> PDF</a></td></tr>
+          <tr><td style="font-weight:600">FAC-002</td><td>#PED-002</td><td><span class="badge badge-success" style="font-size:10px">Ingreso</span></td><td class="exp-amt in">+$12,000</td><td style="color:var(--text-muted)">08 Mar</td><td><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></td><td><a href="#" style="color:var(--danger)"><i class="fas fa-file-pdf"></i> PDF</a></td></tr>
+          <tr><td style="font-weight:600">FAC-003</td><td>#PED-003</td><td><span class="badge badge-success" style="font-size:10px">Ingreso</span></td><td class="exp-amt">$5,460</td><td style="color:var(--text-muted)">01 Abr</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></td><td style="color:var(--text-muted)">—</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- CLIENT: Soporte -->
+    <div class="page-body" id="c-support" style="display:none">
+      <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
+      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px">
+        <div class="card" style="padding:28px">
+          <h3 style="font-size:16px;font-weight:600;margin-bottom:16px">Preguntas Frecuentes</h3>
+          <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-q"><i class="fas fa-chevron-right"></i> ¿Cuánto tarda una cotización?</div><div class="faq-a">Normalmente entre 24-48 horas hábiles recibimos propuestas de nuestros proveedores en China.</div></div>
+          <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-q"><i class="fas fa-chevron-right"></i> ¿Cuál es el MOQ mínimo?</div><div class="faq-a">Depende del producto, pero generalmente desde 500 unidades. Consultanos por tu caso específico.</div></div>
+          <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-q"><i class="fas fa-chevron-right"></i> ¿Cómo funciona el pago?</div><div class="faq-a">Esquema 50/50: 50% anticipo al confirmar producción, 50% antes del embarque.</div></div>
+          <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-q"><i class="fas fa-chevron-right"></i> ¿Realizan control de calidad?</div><div class="faq-a">Sí, inspecciones pre-embarque en fábrica con reporte fotográfico incluido.</div></div>
+          <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-q"><i class="fas fa-chevron-right"></i> ¿Cuánto demora el envío marítimo?</div><div class="faq-a">Entre 30-45 días desde China a Chile, dependiendo del puerto de origen y destino.</div></div>
+        </div>
+        <div>
+          <div class="card" style="padding:24px;margin-bottom:16px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:14px"><i class="fas fa-envelope" style="color:var(--text-muted);margin-right:6px"></i>Contacto directo</h3>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:2"><div><i class="fas fa-envelope" style="width:18px;color:var(--text-muted)"></i> contacto@mipquality.com</div><div><i class="fas fa-phone" style="width:18px;color:var(--text-muted)"></i> +56 2 2345 6789</div><div><i class="fab fa-whatsapp" style="width:18px;color:var(--success)"></i> +56 9 8765 4321</div></div>
+          </div>
+          <div class="card" style="padding:24px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:14px">Enviar consulta</h3>
+            <form onsubmit="event.preventDefault();toast('success','Enviado','Tu consulta fue enviada correctamente.')">
+              <div class="form-group"><label class="form-label">Asunto</label><select class="form-input"><option>Cotización</option><option>Seguimiento pedido</option><option>Facturación</option><option>Otro</option></select></div>
+              <div class="form-group"><label class="form-label">Mensaje</label><textarea class="form-input" placeholder="Describe tu consulta..." required></textarea></div>
+              <div class="form-group"><label class="form-label">Adjuntar archivo</label><div class="upload-zone" onclick="simUpload('supUp')" style="padding:14px"><i class="fas fa-paperclip" style="font-size:16px"></i><h4 style="font-size:12px">Adjuntar</h4></div><div class="upload-preview" id="supUp"></div></div>
+              <button type="submit" class="btn btn-dark btn-block"><i class="fas fa-paper-plane"></i> Enviar</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT: Historial -->
+    <div class="page-body" id="c-history" style="display:none">
+      <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
+      <div class="card" style="padding:28px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h3 style="font-size:16px;font-weight:600">Historial de actividad</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Cotizaciones</button><button class="chip">Pedidos</button><button class="chip">Facturas</button></div></div>
+        <div class="timeline" id="c-history-timeline">
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Factura FAC-002 pagada — $12,000</h4><p>08 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-002 entregado</h4><p>05 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Archivo subido: Comprobante_transferencia.jpg</h4><p>20 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización #SOL-047 enviada</h4><p>28 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-001 en producción (etapa 5/9)</h4><p>22 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pago anticipo 50% — $8,400</h4><p>20 Mar 2026</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cuenta creada — Bienvenido a MIP Q&L</h4><p>01 Ene 2026</p></div></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 </section>
@@ -751,12 +852,14 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <a class="sb-link active" onclick="aView('a-req')"><i class="fas fa-inbox"></i> Solicitudes<span class="cnt">5</span></a>
         <a class="sb-link" onclick="aView('a-ops')"><i class="fas fa-project-diagram"></i> Gestión Operacional</a>
         <a class="sb-link" onclick="aView('a-acc')"><i class="fas fa-calculator"></i> Contabilidad</a>
-        <a class="sb-link"><i class="fas fa-users"></i> Clientes</a>
-        <a class="sb-link"><i class="fas fa-chart-bar"></i> Reportes</a>
+        <a class="sb-link" onclick="aView('a-clients')"><i class="fas fa-users"></i> Clientes</a>
+        <a class="sb-link" onclick="aView('a-reports')"><i class="fas fa-chart-bar"></i> Reportes</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Sistema</div>
-        <a class="sb-link"><i class="fas fa-cog"></i> Configuración</a>
-        <a class="sb-link"><i class="fas fa-plug"></i> Integraciones</a>
+        <a class="sb-link" onclick="aView('a-config')"><i class="fas fa-cog"></i> Configuración</a>
+        <a class="sb-link" onclick="aView('a-integrations')"><i class="fas fa-plug"></i> Integraciones</a>
+        <a class="sb-link" onclick="aView('a-editor')"><i class="fas fa-paint-brush"></i> Editor Web</a>
+        <a class="sb-link" onclick="aView('a-history')"><i class="fas fa-clock"></i> Historial</a>
       </div>
     </nav>
     <div class="sb-footer"><div class="sb-user"><div class="av" style="background:var(--danger-bg);color:var(--danger)">A</div><div><div class="name">Admin MIP</div><div class="email">admin@mipquality.com</div></div></div></div>
@@ -881,6 +984,216 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         </div>
       </div>
     </div>
+
+    <!-- ADMIN: Clientes -->
+    <div class="page-body" id="a-clients" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <h2 style="font-size:18px;font-weight:600">Maestra de Clientes</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="window.open('/api/clientes/export?template_only=true')"><i class="fas fa-file-download"></i> Plantilla</button>
+          <button class="btn btn-outline btn-sm" onclick="importBulk('clientes')"><i class="fas fa-file-upload"></i> Importar CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="window.open('/api/clientes/export')"><i class="fas fa-file-export"></i> Exportar</button>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Total clientes</div><div class="s-val" id="ac-total">5</div></div>
+        <div class="stat-card"><div class="s-label">Activos este mes</div><div class="s-val">4</div></div>
+        <div class="stat-card"><div class="s-label">Nuevos Q1</div><div class="s-val">3</div></div>
+        <div class="stat-card"><div class="s-label">Con pedidos activos</div><div class="s-val">2</div></div>
+      </div>
+      <div class="dtable-wrap">
+        <div class="dtable-header"><h3>Clientes registrados</h3><div class="topbar-search" style="width:200px"><i class="fas fa-search"></i><input placeholder="Buscar cliente..." oninput="filterClients(this.value)"></div></div>
+        <table class="dtable"><thead><tr><th>ID</th><th>Nombre</th><th>Empresa</th><th>RUT</th><th>Rubro</th><th>Email</th><th>Teléfono</th><th></th></tr></thead>
+        <tbody id="a-clients-body">
+          <tr><td>1</td><td><div class="client-cell"><div class="c-av">JP</div><div style="font-weight:500">Juan Pérez</div></div></td><td>RetailMax SpA</td><td>76.123.456-7</td><td>Retail</td><td style="color:var(--text-muted)">juan@empresa.com</td><td style="color:var(--text-muted)">+56 9 1234 5678</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
+          <tr><td>2</td><td><div class="client-cell"><div class="c-av">MV</div><div style="font-weight:500">María V. Soto</div></div></td><td>HealthPro</td><td>77.654.321-0</td><td>Salud</td><td style="color:var(--text-muted)">maria@healthpro.cl</td><td style="color:var(--text-muted)">+56 9 8765 4321</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
+          <tr><td>3</td><td><div class="client-cell"><div class="c-av">RC</div><div style="font-weight:500">Roberto Cifuentes</div></div></td><td>EcoStore</td><td>76.987.654-3</td><td>Retail</td><td style="color:var(--text-muted)">roberto@ecostore.cl</td><td style="color:var(--text-muted)">+56 9 5555 1234</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
+          <tr><td>4</td><td><div class="client-cell"><div class="c-av">AL</div><div style="font-weight:500">Andrea López</div></div></td><td>LuxHome</td><td>78.111.222-3</td><td>Hogar</td><td style="color:var(--text-muted)">andrea@luxhome.cl</td><td style="color:var(--text-muted)">+56 9 3333 4444</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
+          <tr><td>5</td><td><div class="client-cell"><div class="c-av">CS</div><div style="font-weight:500">Carlos Sepúlveda</div></div></td><td>SportMax</td><td>79.222.333-4</td><td>Deportes</td><td style="color:var(--text-muted)">carlos@sportmax.cl</td><td style="color:var(--text-muted)">+56 9 6666 7777</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <!-- ADMIN: Reportes -->
+    <div class="page-body" id="a-reports" style="display:none">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Reportes & Análisis</h2>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Tasa conversión</div><div class="s-val">68%</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +5% vs Q4</div></div>
+        <div class="stat-card"><div class="s-label">Ticket promedio</div><div class="s-val">$14.2K</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +12%</div></div>
+        <div class="stat-card"><div class="s-label">Crecimiento YoY</div><div class="s-val">+22%</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> Sostenido</div></div>
+        <div class="stat-card"><div class="s-label">Retención clientes</div><div class="s-val">94%</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +3%</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:20px">
+        <div class="dtable-wrap">
+          <div class="dtable-header"><h3>Resumen mensual 2026</h3></div>
+          <table class="dtable"><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Utilidad</th><th>Margen</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:500">Enero</td><td class="exp-amt in">$98,200</td><td class="exp-amt out">$72,100</td><td style="font-weight:600;color:var(--success)">$26,100</td><td>26.6%</td></tr>
+            <tr><td style="font-weight:500">Febrero</td><td class="exp-amt in">$120,800</td><td class="exp-amt out">$85,400</td><td style="font-weight:600;color:var(--success)">$35,400</td><td>29.3%</td></tr>
+            <tr><td style="font-weight:500">Marzo</td><td class="exp-amt in">$142,800</td><td class="exp-amt out">$98,450</td><td style="font-weight:600;color:var(--success)">$44,350</td><td>31.1%</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card" style="padding:24px;border-left:3px solid var(--info)">
+          <h3 style="font-size:14px;font-weight:600;margin-bottom:14px"><i class="fas fa-robot" style="color:var(--info);margin-right:6px"></i>IA Copilot — Insights</h3>
+          <div style="margin-bottom:16px;padding:12px;background:var(--success-bg);border-radius:var(--radius);font-size:12px"><span class="badge badge-success" style="font-size:9px;margin-bottom:6px">OPORTUNIDAD</span><p style="color:var(--text-secondary);margin-top:4px">RetailMax muestra un +40% en volumen. Recomendar aumento de MOQ para reducir costo unitario en próxima OC.</p></div>
+          <div style="margin-bottom:16px;padding:12px;background:var(--warning-bg);border-radius:var(--radius);font-size:12px"><span class="badge badge-warning" style="font-size:9px;margin-bottom:6px">ALERTA</span><p style="color:var(--text-secondary);margin-top:4px">Costos de flete marítimo subieron 15% en Q1. Considerar consolidar envíos o negociar contratos anuales.</p></div>
+          <div style="padding:12px;background:var(--info-bg);border-radius:var(--radius);font-size:12px"><span class="badge badge-info" style="font-size:9px;margin-bottom:6px">TENDENCIA</span><p style="color:var(--text-secondary);margin-top:4px">Sector Hogar & Deco crece 35% interanual. Potencial para ampliar catálogo de proveedores en esta categoría.</p></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="dtable-wrap"><div class="dtable-header"><h3>Top Clientes</h3></div><table class="dtable"><thead><tr><th>Cliente</th><th>Pedidos</th><th>Monto</th></tr></thead><tbody><tr><td style="font-weight:500">RetailMax SpA</td><td>8</td><td style="font-weight:600">$42,000</td></tr><tr><td style="font-weight:500">LuxHome</td><td>5</td><td style="font-weight:600">$28,400</td></tr><tr><td style="font-weight:500">SportMax</td><td>4</td><td style="font-weight:600">$18,500</td></tr></tbody></table></div>
+        <div class="dtable-wrap"><div class="dtable-header"><h3>Top Productos</h3></div><table class="dtable"><thead><tr><th>Producto</th><th>Pedidos</th><th>Monto</th></tr></thead><tbody><tr><td style="font-weight:500">Zapatillas Running</td><td>12</td><td style="font-weight:600">$51,000</td></tr><tr><td style="font-weight:500">Luminarias LED</td><td>8</td><td style="font-weight:600">$33,600</td></tr><tr><td style="font-weight:500">Textiles Hogar</td><td>6</td><td style="font-weight:600">$16,800</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: Configuración -->
+    <div class="page-body" id="a-config" style="display:none">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Configuración</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="card" style="padding:24px">
+          <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-building" style="color:var(--text-muted);margin-right:6px"></i>Información de la empresa</h3>
+          <div class="form-group"><label class="form-label">Nombre empresa</label><input class="form-input" value="MIP Quality & Logistics"></div>
+          <div class="form-group"><label class="form-label">RUT</label><input class="form-input" value="76.543.210-K"></div>
+          <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" value="Av. Providencia 1234, Of. 801, Santiago"></div>
+          <div class="form-group"><label class="form-label">Email contacto</label><input class="form-input" value="contacto@mipquality.com"></div>
+          <div class="form-group"><label class="form-label">Logo empresa</label><div class="upload-zone" onclick="simUpload('cfgLogo')" style="padding:14px"><i class="fas fa-image" style="font-size:16px"></i><h4 style="font-size:12px">Subir logo</h4></div><div class="upload-preview" id="cfgLogo"></div></div>
+          <button class="btn btn-dark btn-sm" onclick="toast('success','Guardado','Configuración actualizada')"><i class="fas fa-save"></i> Guardar</button>
+        </div>
+        <div>
+          <div class="card" style="padding:24px;margin-bottom:16px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-bell" style="color:var(--text-muted);margin-right:6px"></i>Notificaciones</h3>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div class="switch-wrap"><div class="switch on" onclick="this.classList.toggle('on')"></div><span style="font-size:13px">Email al recibir cotización</span></div>
+              <div class="switch-wrap"><div class="switch on" onclick="this.classList.toggle('on')"></div><span style="font-size:13px">Email al recibir pago</span></div>
+              <div class="switch-wrap"><div class="switch" onclick="this.classList.toggle('on')"></div><span style="font-size:13px">Email al cambiar estado pedido</span></div>
+              <div class="switch-wrap"><div class="switch on" onclick="this.classList.toggle('on')"></div><span style="font-size:13px">Resumen semanal</span></div>
+            </div>
+          </div>
+          <div class="card" style="padding:24px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-sliders-h" style="color:var(--text-muted);margin-right:6px"></i>Preferencias</h3>
+            <div class="form-group"><label class="form-label">Moneda predeterminada</label><select class="form-input"><option>USD — Dólar americano</option><option>CLP — Peso chileno</option></select></div>
+            <div class="form-group"><label class="form-label">Idioma</label><select class="form-input"><option>Español</option><option>English</option></select></div>
+            <div class="form-group"><label class="form-label">Zona horaria</label><select class="form-input"><option>America/Santiago (UTC-4)</option><option>America/Lima (UTC-5)</option></select></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN: Integraciones -->
+    <div class="page-body" id="a-integrations" style="display:none">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Integraciones</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div class="card" style="padding:24px;text-align:center"><i class="fab fa-google-drive" style="font-size:28px;color:var(--text-muted);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">Google Drive</h4><span class="badge badge-success" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Conectado</span><p style="font-size:11px;color:var(--text-muted)">Sincronización automática de documentos</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Configurar</button></div>
+        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-robot" style="font-size:28px;color:var(--info);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">IA Copilot</h4><span class="badge badge-info" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Activo</span><p style="font-size:11px;color:var(--text-muted)">Generación de emails y análisis</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Configurar</button></div>
+        <div class="card" style="padding:24px;text-align:center"><i class="fab fa-whatsapp" style="font-size:28px;color:var(--success);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">WhatsApp Business</h4><span class="badge badge-neutral" style="margin-bottom:8px">Disponible</span><p style="font-size:11px;color:var(--text-muted)">Notificaciones por WhatsApp</p><button class="btn btn-dark btn-sm" style="margin-top:12px">Conectar</button></div>
+        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-database" style="font-size:28px;color:var(--text-muted);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">SAP / ERP</h4><span class="badge badge-neutral" style="margin-bottom:8px">Disponible</span><p style="font-size:11px;color:var(--text-muted)">Sincronizar órdenes de compra</p><button class="btn btn-dark btn-sm" style="margin-top:12px">Conectar</button></div>
+        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-envelope" style="font-size:28px;color:var(--text-muted);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">Email SMTP</h4><span class="badge badge-success" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Configurado</span><p style="font-size:11px;color:var(--text-muted)">Envío de cotizaciones y notificaciones</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Editar</button></div>
+        <div class="card" style="padding:24px;text-align:center"><i class="fas fa-file-excel" style="font-size:28px;color:var(--success);margin-bottom:10px"></i><h4 style="font-size:14px;font-weight:600;margin-bottom:4px">Excel / Sheets</h4><span class="badge badge-success" style="margin-bottom:8px"><i class="fas fa-check-circle"></i> Activo</span><p style="font-size:11px;color:var(--text-muted)">Import/Export CSV y Excel</p><button class="btn btn-outline btn-sm" style="margin-top:12px">Configurar</button></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: Editor Web -->
+    <div class="page-body" id="a-editor" style="display:none">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:4px">Editor Web — Landing Page</h2>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Edita el contenido de la landing page en tiempo real.</p>
+      <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap" id="editorTabs">
+        <button class="chip active" onclick="editorTab('ed-hero',this)">Hero</button>
+        <button class="chip" onclick="editorTab('ed-adn',this)">ADN de Marca</button>
+        <button class="chip" onclick="editorTab('ed-process',this)">Proceso</button>
+        <button class="chip" onclick="editorTab('ed-sectors',this)">Sectores</button>
+        <button class="chip" onclick="editorTab('ed-testimonials',this)">Testimonios</button>
+        <button class="chip" onclick="editorTab('ed-footer',this)">Footer</button>
+      </div>
+      <!-- Editor: Hero -->
+      <div class="card" style="padding:24px" id="ed-hero">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Sección Hero</h3>
+        <div class="form-group"><label class="form-label">Overline (badge superior)</label><input class="form-input" id="ed-hero-overline" value="Broker de importación desde China"></div>
+        <div class="form-group"><label class="form-label">Headline principal</label><input class="form-input" id="ed-hero-headline" value="Tu socio estratégico en importación y logística"></div>
+        <div class="form-group"><label class="form-label">Subtítulo</label><textarea class="form-input" id="ed-hero-subtitle" style="min-height:60px">Conectamos tu negocio con los mejores fabricantes de China. Gestión integral desde la cotización hasta la entrega en tu bodega.</textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Stat 1 — Valor</label><input class="form-input" id="ed-hero-stat1v" value="500+"></div>
+          <div class="form-group"><label class="form-label">Stat 1 — Label</label><input class="form-input" id="ed-hero-stat1l" value="Productos importados"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Stat 2 — Valor</label><input class="form-input" id="ed-hero-stat2v" value="120+"></div>
+          <div class="form-group"><label class="form-label">Stat 2 — Label</label><input class="form-input" id="ed-hero-stat2l" value="Clientes activos"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Stat 3 — Valor</label><input class="form-input" id="ed-hero-stat3v" value="98%"></div>
+          <div class="form-group"><label class="form-label">Stat 3 — Label</label><input class="form-input" id="ed-hero-stat3l" value="Tasa de satisfacción"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Imagen Hero</label><div class="upload-zone" onclick="simUpload('edHeroImg')" style="padding:14px"><i class="fas fa-image" style="font-size:16px"></i><h4 style="font-size:12px">Subir imagen</h4></div><div class="upload-preview" id="edHeroImg"></div></div>
+        <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar cambios</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Preview en vivo</button></div>
+      </div>
+      <!-- Editor: ADN -->
+      <div class="card" style="padding:24px;display:none" id="ed-adn">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">ADN de Marca — 3 Pilares</h3>
+        <div style="display:grid;gap:16px">
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 1 — Título</label><input class="form-input" value="Sourcing Estratégico"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input">Identificamos y validamos los mejores proveedores según tus requerimientos de calidad, precio y volumen.</textarea></div></div>
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 2 — Título</label><input class="form-input" value="Control de Calidad"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input">Inspecciones en fábrica, control pre-embarque y certificaciones internacionales para tu tranquilidad.</textarea></div></div>
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 3 — Título</label><input class="form-input" value="Logística Integral"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input">Coordinamos flete marítimo y aéreo, internación aduanera y entrega final puerta a puerta.</textarea></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Preview</button></div>
+      </div>
+      <!-- Editor: Proceso -->
+      <div class="card" style="padding:24px;display:none" id="ed-process">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Proceso — 5 Pasos</h3>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 1</label><input class="form-input" value="Solicitud"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Describe tu producto"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 2</label><input class="form-input" value="Cotización"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Recibe propuestas reales"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 3</label><input class="form-input" value="Muestras"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Aprueba antes de producir"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 4</label><input class="form-input" value="Producción"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Fabricación con QC"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 5</label><input class="form-input" value="Entrega"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Recibe en tu bodega"></div></div>
+        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+      <!-- Editor: Sectores -->
+      <div class="card" style="padding:24px;display:none" id="ed-sectors">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Sectores</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Edita los sectores que atiende la empresa.</p>
+        <div class="form-row"><div class="form-group"><label class="form-label">Sector 1</label><input class="form-input" value="Retail & Moda"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Ropa, calzado, accesorios"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Sector 2</label><input class="form-input" value="Industrial"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Equipos, repuestos, herramientas"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Sector 3</label><input class="form-input" value="Hospitality"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Hotelería, restaurant, amenities"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Sector 4</label><input class="form-input" value="Salud"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Insumos médicos, equipamiento"></div></div>
+        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+      <!-- Editor: Testimonios -->
+      <div class="card" style="padding:24px;display:none" id="ed-testimonials">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Testimonios</h3>
+        <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:16px"><h4 style="font-size:13px;font-weight:600;margin-bottom:10px">Testimonio Destacado</h4>
+          <div class="form-group"><label class="form-label">Cita</label><textarea class="form-input">MIP nos permitió ingresar al mercado asiático con total confianza. Redujimos costos de importación en un 35%.</textarea></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Nombre</label><input class="form-input" value="Roberto Cifuentes"></div><div class="form-group"><label class="form-label">Cargo</label><input class="form-input" value="Gerente de Compras"></div></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Empresa</label><input class="form-input" value="Grupo Retail — Falabella"></div><div class="form-group"><label class="form-label">Foto</label><div class="upload-zone" onclick="simUpload('edTestiImg')" style="padding:8px"><i class="fas fa-camera" style="font-size:14px"></i></div><div class="upload-preview" id="edTestiImg"></div></div></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Métrica 1</label><input class="form-input" value="-35%"></div><div class="form-group"><label class="form-label">Label 1</label><input class="form-input" value="Reducción en costos"></div></div>
+        </div>
+        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+      <!-- Editor: Footer -->
+      <div class="card" style="padding:24px;display:none" id="ed-footer">
+        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Footer</h3>
+        <div class="form-group"><label class="form-label">Descripción empresa</label><textarea class="form-input">Tu socio estratégico en importación y logística. Conectamos tu negocio con los mejores fabricantes de China.</textarea></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">LinkedIn URL</label><input class="form-input" value="https://linkedin.com/company/mipquality"></div><div class="form-group"><label class="form-label">Instagram URL</label><input class="form-input" value="https://instagram.com/mipquality"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" value="+56 9 8765 4321"></div><div class="form-group"><label class="form-label">Email</label><input class="form-input" value="contacto@mipquality.com"></div></div>
+        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+    </div>
+
+    <!-- ADMIN: Historial -->
+    <div class="page-body" id="a-history" style="display:none">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Historial del Sistema</h2>
+      <div class="card" style="padding:28px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h3 style="font-size:14px;font-weight:600">Todos los eventos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Clientes</button><button class="chip">Cotizaciones</button><button class="chip">Pedidos</button><button class="chip">Facturas</button></div></div>
+        <div class="timeline" id="a-history-timeline">
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Nuevo cliente registrado: juan@empresa.com</h4><p>07 Abr 2026 — Sistema</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización #SOL-047 creada — Zapatillas Running</h4><p>28 Mar 2026 — Juan Pérez</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Factura FAC-002 pagada — $12,000</h4><p>08 Mar 2026 — Admin</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-001 actualizado: etapa 5/9 (Producción)</h4><p>22 Mar 2026 — Admin</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Archivo subido: Factura_SOL038_anticipo.pdf</h4><p>20 Mar 2026 — Admin</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización #SOL-043 estado → Cotizado</h4><p>15 Mar 2026 — Admin</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-002 completado — Cojines Premium</h4><p>05 Mar 2026 — Sistema</p></div></div>
+          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Nuevo cliente registrado: maria@healthpro.cl</h4><p>01 Mar 2026 — Sistema</p></div></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 </section>
@@ -1052,12 +1365,12 @@ async function loadClientDashboard() {
 
 // ─── Client Views ───
 function cView(id) {
-  ['c-dash', 'c-quote', 'c-track'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
-  const t = { 'c-dash': 'Dashboard', 'c-quote': 'Nueva Cotización', 'c-track': 'Seguimiento' };
+  ['c-dash', 'c-quote', 'c-track', 'c-orders', 'c-invoices', 'c-support', 'c-history'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  const t = { 'c-dash': 'Dashboard', 'c-quote': 'Nueva Cotización', 'c-track': 'Seguimiento', 'c-orders': 'Mis Pedidos', 'c-invoices': 'Facturas', 'c-support': 'Soporte', 'c-history': 'Historial' };
   document.getElementById('cTitle').textContent = t[id] || 'Dashboard';
   const links = document.querySelectorAll('#page-client .sb-link');
   links.forEach(l => l.classList.remove('active'));
-  const idx = { 'c-dash': 0, 'c-quote': 1, 'c-track': 2 };
+  const idx = { 'c-dash': 0, 'c-quote': 1, 'c-track': 2, 'c-orders': 3, 'c-invoices': 4, 'c-support': 5, 'c-history': 6 };
   if (links[idx[id]]) links[idx[id]].classList.add('active');
   if (id === 'c-dash') loadClientDashboard();
 }
@@ -1091,14 +1404,15 @@ async function doQuote(e) {
 
 // ─── Admin ───
 function aView(id) {
-  ['a-req', 'a-ops', 'a-acc'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
-  const t = { 'a-req': 'Solicitudes entrantes', 'a-ops': 'Gestión Operacional', 'a-acc': 'Contabilidad & Gastos' };
+  ['a-req', 'a-ops', 'a-acc', 'a-clients', 'a-reports', 'a-config', 'a-integrations', 'a-editor', 'a-history'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  const t = { 'a-req': 'Solicitudes entrantes', 'a-ops': 'Gestión Operacional', 'a-acc': 'Contabilidad & Gastos', 'a-clients': 'Maestra de Clientes', 'a-reports': 'Reportes & Análisis', 'a-config': 'Configuración', 'a-integrations': 'Integraciones', 'a-editor': 'Editor Web', 'a-history': 'Historial del Sistema' };
   document.getElementById('aTitle').textContent = t[id] || 'Admin';
-  const links = document.querySelectorAll('#page-admin .sb-section:first-child .sb-link');
+  const links = document.querySelectorAll('#page-admin .sb-link');
   links.forEach(l => l.classList.remove('active'));
-  const idx = { 'a-req': 0, 'a-ops': 1, 'a-acc': 2 };
+  const idx = { 'a-req': 0, 'a-ops': 1, 'a-acc': 2, 'a-clients': 3, 'a-reports': 4, 'a-config': 5, 'a-integrations': 6, 'a-editor': 7, 'a-history': 8 };
   if (links[idx[id]]) links[idx[id]].classList.add('active');
   if (id === 'a-acc') loadContabilidad();
+  if (id === 'a-clients') loadAdminClients();
 }
 
 async function loadAdminData() {
@@ -1241,17 +1555,109 @@ function initGoogleSignIn() {
     client_id: GOOGLE_CLIENT_ID,
     callback: handleGoogleCredential,
   });
-  const btnContainer = document.getElementById('googleSignInBtn');
+  const btnContainer = document.getElementById('googleRegisterBtn');
   if (btnContainer) {
     google.accounts.id.renderButton(btnContainer, {
       theme: 'outline',
       size: 'large',
       width: '100%',
-      text: 'signin_with',
+      text: 'signup_with',
       shape: 'rectangular',
       logo_alignment: 'center',
     });
   }
+}
+
+// ─── Admin Clients ───
+async function loadAdminClients() {
+  try {
+    const clientes = await api('/api/clientes');
+    const tbody = document.getElementById('a-clients-body');
+    if (tbody && clientes.length > 0) {
+      tbody.innerHTML = clientes.map(c => {
+        const initials = c.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        return `<tr><td>${c.id}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div style="font-weight:500">${c.nombre}</div></div></td><td>${c.empresa}</td><td>${c.rut}</td><td>${c.rubro}</td><td style="color:var(--text-muted)">${c.email}</td><td style="color:var(--text-muted)">${c.telefono}</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>`;
+      }).join('');
+      const total = document.getElementById('ac-total');
+      if (total) total.textContent = clientes.length;
+    }
+  } catch (err) { console.error('Load clients error:', err); }
+}
+
+function filterClients(query) {
+  const rows = document.querySelectorAll('#a-clients-body tr');
+  rows.forEach(r => { r.style.display = r.textContent.toLowerCase().includes(query.toLowerCase()) ? '' : 'none'; });
+}
+
+// ─── Bulk Import/Export ───
+function downloadCSV(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importBulk(entity) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.csv';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const text = await file.text();
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const rows = lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = vals[i] || '');
+      if (obj.monto) obj.monto = parseFloat(obj.monto) || 0;
+      if (obj.fecha) obj.fecha = new Date(obj.fecha).toISOString();
+      return obj;
+    });
+    try {
+      const result = await api(`/api/${entity}/bulk`, { method: 'POST', body: JSON.stringify(rows) });
+      toast('success', 'Importado', `${result.created} registros importados`);
+      if (entity === 'clientes') loadAdminClients();
+    } catch (err) { toast('error', 'Error', err.message); }
+  };
+  input.click();
+}
+
+// ─── Editor Web ───
+function editorTab(id, btn) {
+  ['ed-hero', 'ed-adn', 'ed-process', 'ed-sectors', 'ed-testimonials', 'ed-footer'].forEach(t => {
+    const el = document.getElementById(t); if (el) el.style.display = t === id ? 'block' : 'none';
+  });
+  document.querySelectorAll('#editorTabs .chip').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+async function saveEditorContent() {
+  const items = [];
+  const fields = { 'ed-hero-overline': ['hero', 'overline'], 'ed-hero-headline': ['hero', 'headline'], 'ed-hero-subtitle': ['hero', 'subtitle'],
+    'ed-hero-stat1v': ['hero', 'stat1_value'], 'ed-hero-stat1l': ['hero', 'stat1_label'], 'ed-hero-stat2v': ['hero', 'stat2_value'],
+    'ed-hero-stat2l': ['hero', 'stat2_label'], 'ed-hero-stat3v': ['hero', 'stat3_value'], 'ed-hero-stat3l': ['hero', 'stat3_label'] };
+  for (const [elId, [section, key]] of Object.entries(fields)) {
+    const el = document.getElementById(elId);
+    if (el) items.push({ section, key, value: el.value, content_type: 'text' });
+  }
+  try {
+    await api('/api/site-content', { method: 'PUT', body: JSON.stringify(items) });
+    toast('success', 'Guardado', 'Contenido del sitio actualizado');
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function previewEditorContent() {
+  const h = document.getElementById('ed-hero-headline');
+  const s = document.getElementById('ed-hero-subtitle');
+  const o = document.getElementById('ed-hero-overline');
+  if (h) { const el = document.querySelector('.hero h1'); if (el) el.innerHTML = h.value.replace(/importación y logística/gi, '<em>$&</em>'); }
+  if (s) { const el = document.querySelector('.hero .subtitle'); if (el) el.textContent = s.value; }
+  if (o) { const el = document.querySelector('.hero .overline'); if (el) el.innerHTML = `<i class="fas fa-gem"></i> ${o.value}`; }
+  const stats = document.querySelectorAll('.hero-stat');
+  ['ed-hero-stat1v', 'ed-hero-stat2v', 'ed-hero-stat3v'].forEach((id, i) => { const el = document.getElementById(id); if (el && stats[i]) stats[i].querySelector('.num').textContent = el.value; });
+  ['ed-hero-stat1l', 'ed-hero-stat2l', 'ed-hero-stat3l'].forEach((id, i) => { const el = document.getElementById(id); if (el && stats[i]) stats[i].querySelector('.label').textContent = el.value; });
+  toast('info', 'Preview', 'Cambios aplicados en la landing (sin guardar)');
+  go('page-landing');
 }
 
 // ─── Init ───
