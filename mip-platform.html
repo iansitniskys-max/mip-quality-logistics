@@ -645,14 +645,14 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
         <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
       </form>
       <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
-        <div id="googleRegisterBtn" style="display:flex;justify-content:center;margin-bottom:16px"></div>
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o completa el formulario</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
         <div class="form-row"><div class="form-group"><label class="form-label">Nombre completo</label><input type="text" class="form-input" placeholder="Juan Pérez" required></div><div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" placeholder="Mi Empresa SpA" required></div></div>
         <div class="form-row"><div class="form-group"><label class="form-label">RUT Empresa</label><input type="text" class="form-input" placeholder="76.123.456-7"></div><div class="form-group"><label class="form-label">Rubro</label><select class="form-input" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Otro</option></select></div></div>
         <div class="form-group"><label class="form-label">Email corporativo</label><input type="email" class="form-input" placeholder="contacto@miempresa.com" required></div>
         <div class="form-row"><div class="form-group"><label class="form-label">Teléfono</label><input type="tel" class="form-input" placeholder="+56 9 1234 5678"></div><div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="Min. 8 caracteres" required></div></div>
         <div style="margin-bottom:20px"><label style="display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark);margin-top:2px" required> Acepto los términos y condiciones y la política de privacidad.</label></div>
         <button type="submit" class="btn btn-dark btn-block btn-lg">Crear cuenta</button>
+        <div style="display:flex;align-items:center;gap:12px;margin:16px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o regístrate con</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+        <div id="googleRegisterBtn" style="display:flex;justify-content:center"></div>
       </form>
     </div>
     <p style="text-align:center;margin-top:14px;font-size:12px;color:var(--text-muted)"><a href="#" onclick="go('page-landing');return false" style="color:var(--text-secondary)"><i class="fas fa-arrow-left"></i> Volver al inicio</a></p>
