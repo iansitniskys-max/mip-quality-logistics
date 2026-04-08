@@ -13,6 +13,10 @@ class Cliente(Base):
     email = Column(String(200), unique=True, nullable=False)
     telefono = Column(String(30))
     password_hash = Column(String(200))
+    num_empleados = Column(String(30))
+    referido_por = Column(String(100))
+    vendedor_asignado = Column(String(200))
+    sitio_web = Column(String(300))
     created_at = Column(DateTime, server_default=func.now())
 
     cotizaciones = relationship("Cotizacion", back_populates="cliente")

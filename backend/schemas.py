@@ -12,6 +12,10 @@ class ClienteCreate(BaseModel):
     email: str
     telefono: str = ""
     password: str = ""
+    num_empleados: str = ""
+    referido_por: str = ""
+    vendedor_contacto: str = ""
+    sitio_web: str = ""
 
 class ClienteOut(BaseModel):
     id: int
@@ -21,6 +25,10 @@ class ClienteOut(BaseModel):
     rubro: str
     email: str
     telefono: str
+    num_empleados: Optional[str] = ""
+    referido_por: Optional[str] = ""
+    vendedor_asignado: Optional[str] = ""
+    sitio_web: Optional[str] = ""
     created_at: datetime
     class Config:
         from_attributes = True
@@ -151,6 +159,10 @@ class ClienteUpdate(BaseModel):
     rut: Optional[str] = None
     rubro: Optional[str] = None
     telefono: Optional[str] = None
+    num_empleados: Optional[str] = None
+    referido_por: Optional[str] = None
+    vendedor_asignado: Optional[str] = None
+    sitio_web: Optional[str] = None
 
 
 # --- Historial ---

@@ -34,6 +34,16 @@ def on_startup():
     try:
         Base.metadata.create_all(bind=engine)
         print("Database tables created successfully")
+        # Migrate: add new columns if missing
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            for col, col_type in [("num_empleados", "VARCHAR(30)"), ("referido_por", "VARCHAR(100)"), ("vendedor_asignado", "VARCHAR(200)"), ("sitio_web", "VARCHAR(300)")]:
+                try:
+                    conn.execute(text(f"ALTER TABLE clientes ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column clientes.{col}")
+                except Exception:
+                    conn.rollback()
     except Exception as e:
         print(f"Warning: Could not create tables: {e}")
 
@@ -83,13 +93,19 @@ def google_login(request_body: dict, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(cliente)
 
+    profile_complete = bool(cliente.empresa and cliente.telefono and cliente.num_empleados)
     return {
         "id": cliente.id,
         "nombre": cliente.nombre,
         "email": cliente.email,
         "empresa": cliente.empresa,
+        "telefono": cliente.telefono or "",
+        "rubro": cliente.rubro or "",
+        "num_empleados": cliente.num_empleados or "",
+        "referido_por": cliente.referido_por or "",
         "picture": picture,
         "role": "client",
+        "profile_complete": profile_complete,
     }
 
 
@@ -98,7 +114,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     cliente = db.query(Cliente).filter(Cliente.email == data.email).first()
     if not cliente:
         raise HTTPException(404, "Cliente no encontrado")
-    return {"id": cliente.id, "nombre": cliente.nombre, "email": cliente.email, "empresa": cliente.empresa, "role": "client"}
+    profile_complete = bool(cliente.empresa and cliente.telefono and cliente.num_empleados)
+    return {"id": cliente.id, "nombre": cliente.nombre, "email": cliente.email, "empresa": cliente.empresa, "telefono": cliente.telefono or "", "rubro": cliente.rubro or "", "num_empleados": cliente.num_empleados or "", "referido_por": cliente.referido_por or "", "role": "client", "profile_complete": profile_complete}
 
 
 @app.post("/api/auth/register")
@@ -109,12 +126,54 @@ def register(data: ClienteCreate, db: Session = Depends(get_db)):
     cliente = Cliente(
         nombre=data.nombre, empresa=data.empresa, rut=data.rut,
         rubro=data.rubro, email=data.email, telefono=data.telefono,
-        password_hash=data.password,
+        password_hash=data.password, num_empleados=data.num_empleados,
+        referido_por=data.referido_por,
     )
     db.add(cliente)
     db.commit()
     db.refresh(cliente)
-    return {"id": cliente.id, "nombre": cliente.nombre, "email": cliente.email}
+    return {"id": cliente.id, "nombre": cliente.nombre, "email": cliente.email, "profile_complete": True}
+
+
+VENDEDORES_DEFAULT = ["Rodrigo Muñoz", "Camila Fuentes", "Andrés Lagos", "Valentina Reyes"]
+
+
+@app.put("/api/auth/complete-profile")
+def complete_profile(data: dict, db: Session = Depends(get_db)):
+    """Complete user profile after Google Sign-In"""
+    user_id = data.get("id")
+    if not user_id:
+        raise HTTPException(400, "ID de usuario requerido")
+    cliente = db.query(Cliente).get(user_id)
+    if not cliente:
+        raise HTTPException(404, "Cliente no encontrado")
+
+    cliente.nombre = data.get("nombre", cliente.nombre)
+    cliente.telefono = data.get("telefono", cliente.telefono)
+    cliente.empresa = data.get("empresa", cliente.empresa)
+    cliente.rubro = data.get("rubro", cliente.rubro)
+    cliente.num_empleados = data.get("num_empleados", cliente.num_empleados)
+    cliente.referido_por = data.get("referido_por", cliente.referido_por)
+    cliente.sitio_web = data.get("sitio_web", cliente.sitio_web)
+
+    # Assign sales rep: if user provided a name, use it; otherwise random
+    vendedor_contacto = data.get("vendedor_contacto", "").strip()
+    if vendedor_contacto:
+        cliente.vendedor_asignado = vendedor_contacto
+    elif not cliente.vendedor_asignado:
+        import random
+        cliente.vendedor_asignado = random.choice(VENDEDORES_DEFAULT)
+
+    db.commit()
+    db.refresh(cliente)
+    return {
+        "id": cliente.id, "nombre": cliente.nombre, "email": cliente.email,
+        "empresa": cliente.empresa, "telefono": cliente.telefono,
+        "rubro": cliente.rubro, "num_empleados": cliente.num_empleados,
+        "referido_por": cliente.referido_por, "vendedor_asignado": cliente.vendedor_asignado,
+        "sitio_web": cliente.sitio_web,
+        "role": "client", "profile_complete": True,
+    }
 
 
 # ─── Clientes ───

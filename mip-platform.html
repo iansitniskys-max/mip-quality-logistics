@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MIP Quality & Logistics — Tu socio estratégico en importación y logística</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230f1419' stroke='%23e8af43' stroke-width='1.2'/%3E%3Cellipse cx='16' cy='16' rx='14' ry='7' fill='none' stroke='%23e8af43' stroke-width='.8' opacity='.5'/%3E%3Cellipse cx='16' cy='16' rx='8' ry='14' fill='none' stroke='%23e8af43' stroke-width='.8' opacity='.35'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23e8af43' opacity='.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -704,10 +705,16 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
       </form>
       <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
-        <div class="form-row"><div class="form-group"><label class="form-label">Nombre completo</label><input type="text" class="form-input" placeholder="Juan Pérez" required></div><div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" placeholder="Mi Empresa SpA" required></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">RUT Empresa</label><input type="text" class="form-input" placeholder="76.123.456-7"></div><div class="form-group"><label class="form-label">Rubro</label><select class="form-input" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Otro</option></select></div></div>
-        <div class="form-group"><label class="form-label">Email corporativo</label><input type="email" class="form-input" placeholder="contacto@miempresa.com" required></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Teléfono</label><input type="tel" class="form-input" placeholder="+56 9 1234 5678"></div><div class="form-group"><label class="form-label">Contraseña</label><input type="password" class="form-input" placeholder="Min. 8 caracteres" required></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Nombre completo *</label><input type="text" class="form-input" id="reg-nombre" placeholder="Juan Pérez" required></div><div class="form-group"><label class="form-label">Empresa *</label><input type="text" class="form-input" id="reg-empresa" placeholder="Mi Empresa SpA" required></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">RUT Empresa</label><input type="text" class="form-input" id="reg-rut" placeholder="76.123.456-7"></div><div class="form-group"><label class="form-label">Rubro *</label><select class="form-input" id="reg-rubro" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Otro</option></select></div></div>
+        <div class="form-group"><label class="form-label">Email corporativo *</label><input type="email" class="form-input" id="reg-email" placeholder="contacto@miempresa.com" required></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Teléfono *</label><input type="tel" class="form-input" id="reg-telefono" placeholder="+56 9 1234 5678" required></div><div class="form-group"><label class="form-label">Contraseña *</label><input type="password" class="form-input" id="reg-password" placeholder="Min. 8 caracteres" required></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Cantidad de empleados *</label><select class="form-input" id="reg-empleados" required><option value="">Seleccionar...</option><option value="1-10">1 - 10</option><option value="11-50">11 - 50</option><option value="51-200">51 - 200</option><option value="201-500">201 - 500</option><option value="501-1000">501 - 1,000</option><option value="1001+">Más de 1,000</option></select></div><div class="form-group"><label class="form-label">Sitio web</label><input type="url" class="form-input" id="reg-web" placeholder="https://www.miempresa.com"></div></div>
+        <div class="form-group"><label class="form-label">¿Cómo conociste nuestra plataforma? *</label><select class="form-input" id="reg-referido" required><option value="">Seleccionar...</option><option value="Un amigo me lo recomendó">Un amigo me lo recomendó</option><option value="Google u otro motor de búsqueda">Google u otro motor de búsqueda</option><option value="Instagram">Instagram</option><option value="Me contactaron desde MIP">Me contactaron desde MIP</option><option value="Otro">Otro</option></select></div>
+        <div class="form-group"><label class="form-label">¿Ya estás en contacto con uno de nuestros vendedores?</label>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div class="switch" id="sw-reg-vendedor" onclick="toggleSw('sw-reg-vendedor','reg-vendedor-wrap')"></div><span style="font-size:13px;color:var(--text-secondary)">Sí, ya tengo un contacto</span></div>
+          <div id="reg-vendedor-wrap" style="display:none"><input type="text" class="form-input" id="reg-vendedor" placeholder="Nombre del vendedor"></div>
+        </div>
         <div style="margin-bottom:20px"><label style="display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--text-secondary)"><input type="checkbox" style="accent-color:var(--bg-dark);margin-top:2px" required> Acepto los términos y condiciones y la política de privacidad.</label></div>
         <button type="submit" class="btn btn-dark btn-block btn-lg">Crear cuenta</button>
         <div style="display:flex;align-items:center;gap:12px;margin:16px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o regístrate con</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
@@ -718,6 +725,33 @@ html,body{overflow-x:hidden;max-width:100vw}
   </div>
 </div>
 </section>
+
+<!-- ═══════ PROFILE COMPLETION MODAL ═══════ -->
+<div class="modal-bg" id="profileModal">
+  <div class="modal-box" style="max-width:520px;max-height:90vh;overflow-y:auto">
+    <h2 style="font-size:18px;font-weight:600;margin-bottom:4px;text-align:center"><i class="fas fa-user-edit" style="margin-right:6px"></i> Completa tu perfil</h2>
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:24px;text-align:center">Necesitamos algunos datos para brindarte una mejor experiencia.</p>
+    <form onsubmit="doCompleteProfile(event)">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="pf-nombre" placeholder="Juan" required></div>
+        <div class="form-group"><label class="form-label">Apellido *</label><input type="text" class="form-input" id="pf-apellido" placeholder="Pérez" required></div>
+      </div>
+      <div class="form-group"><label class="form-label">Teléfono de contacto *</label><input type="tel" class="form-input" id="pf-telefono" placeholder="+56 9 1234 5678" required></div>
+      <div class="form-group"><label class="form-label">Nombre de tu empresa *</label><input type="text" class="form-input" id="pf-empresa" placeholder="Mi Empresa SpA" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Rubro *</label><select class="form-input" id="pf-rubro" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Otro</option></select></div>
+        <div class="form-group"><label class="form-label">Cantidad de empleados *</label><select class="form-input" id="pf-empleados" required><option value="">Seleccionar...</option><option value="1-10">1 - 10</option><option value="11-50">11 - 50</option><option value="51-200">51 - 200</option><option value="201-500">201 - 500</option><option value="501-1000">501 - 1,000</option><option value="1001+">Más de 1,000</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Sitio web de tu empresa</label><input type="url" class="form-input" id="pf-web" placeholder="https://www.miempresa.com"></div>
+      <div class="form-group"><label class="form-label">¿Cómo conociste nuestra plataforma? *</label><select class="form-input" id="pf-referido" required><option value="">Seleccionar...</option><option value="Un amigo me lo recomendó">Un amigo me lo recomendó</option><option value="Google u otro motor de búsqueda">Google u otro motor de búsqueda</option><option value="Instagram">Instagram</option><option value="Me contactaron desde MIP">Me contactaron desde MIP</option><option value="Otro">Otro</option></select></div>
+      <div class="form-group"><label class="form-label">¿Ya estás en contacto con uno de nuestros vendedores?</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div class="switch" id="sw-vendedor" onclick="toggleSw('sw-vendedor','pf-vendedor-wrap')"></div><span style="font-size:13px;color:var(--text-secondary)">Sí, ya tengo un contacto</span></div>
+        <div id="pf-vendedor-wrap" style="display:none"><input type="text" class="form-input" id="pf-vendedor" placeholder="Nombre del vendedor que te atiende"></div>
+      </div>
+      <button type="submit" class="btn btn-dark btn-block btn-lg" style="margin-top:8px"><i class="fas fa-check"></i> Guardar y continuar</button>
+    </form>
+  </div>
+</div>
 
 <!-- ═══════ 3. CLIENT PORTAL ═══════ -->
 <section class="page-section" id="page-client">
@@ -1404,21 +1438,51 @@ function doAdmin() {
 
 async function doRegister(e) {
   e.preventDefault();
-  const form = e.target;
-  const inputs = form.querySelectorAll('.form-input');
   const data = {
-    nombre: inputs[0].value,
-    empresa: inputs[1].value,
-    rut: inputs[2].value,
-    rubro: inputs[3].value,
-    email: inputs[4].value,
-    telefono: inputs[5].value,
-    password: inputs[6].value,
+    nombre: document.getElementById('reg-nombre').value,
+    empresa: document.getElementById('reg-empresa').value,
+    rut: document.getElementById('reg-rut').value,
+    rubro: document.getElementById('reg-rubro').value,
+    email: document.getElementById('reg-email').value,
+    telefono: document.getElementById('reg-telefono').value,
+    password: document.getElementById('reg-password').value,
+    num_empleados: document.getElementById('reg-empleados').value,
+    referido_por: document.getElementById('reg-referido').value,
+    vendedor_contacto: document.getElementById('reg-vendedor')?.value || '',
+    sitio_web: document.getElementById('reg-web')?.value || '',
   };
   try {
     await api('/api/auth/register', { method: 'POST', body: JSON.stringify(data) });
     toast('success', 'Cuenta creada', 'Registro exitoso. Ahora inicia sesión.');
     setTimeout(() => authTab('login'), 1200);
+  } catch (err) {
+    toast('error', 'Error', err.message);
+  }
+}
+
+async function doCompleteProfile(e) {
+  e.preventDefault();
+  if (!currentUser) return;
+  const nombre = document.getElementById('pf-nombre').value + ' ' + document.getElementById('pf-apellido').value;
+  const data = {
+    id: currentUser.id,
+    nombre: nombre.trim(),
+    telefono: document.getElementById('pf-telefono').value,
+    empresa: document.getElementById('pf-empresa').value,
+    rubro: document.getElementById('pf-rubro').value,
+    num_empleados: document.getElementById('pf-empleados').value,
+    referido_por: document.getElementById('pf-referido').value,
+    vendedor_contacto: document.getElementById('pf-vendedor')?.value || '',
+    sitio_web: document.getElementById('pf-web')?.value || '',
+  };
+  try {
+    const user = await api('/api/auth/complete-profile', { method: 'PUT', body: JSON.stringify(data) });
+    currentUser = { ...currentUser, ...user };
+    localStorage.setItem('mip_user', JSON.stringify(currentUser));
+    updateUserUI();
+    document.getElementById('profileModal').classList.remove('open');
+    toast('success', 'Perfil completado', `Bienvenido ${user.nombre}`);
+    setTimeout(() => go('page-client'), 600);
   } catch (err) {
     toast('error', 'Error', err.message);
   }
@@ -1640,8 +1704,21 @@ async function handleGoogleCredential(response) {
     currentUser = user;
     localStorage.setItem('mip_user', JSON.stringify(user));
     updateUserUI();
-    toast('success', 'Bienvenido', `Hola ${user.nombre}`);
-    setTimeout(() => go('page-client'), 800);
+    if (!user.profile_complete) {
+      // Pre-fill name if available
+      const parts = (user.nombre || '').split(' ');
+      const pfNombre = document.getElementById('pf-nombre');
+      const pfApellido = document.getElementById('pf-apellido');
+      if (pfNombre && parts[0]) pfNombre.value = parts[0];
+      if (pfApellido && parts.length > 1) pfApellido.value = parts.slice(1).join(' ');
+      if (user.telefono) document.getElementById('pf-telefono').value = user.telefono;
+      if (user.empresa) document.getElementById('pf-empresa').value = user.empresa;
+      document.getElementById('profileModal').classList.add('open');
+      toast('info', 'Completa tu perfil', 'Necesitamos algunos datos adicionales.');
+    } else {
+      toast('success', 'Bienvenido', `Hola ${user.nombre}`);
+      setTimeout(() => go('page-client'), 800);
+    }
   } catch (err) {
     toast('error', 'Error', err.message);
   }
