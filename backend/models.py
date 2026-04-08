@@ -112,6 +112,22 @@ class HistorialEvento(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class Ticket(Base):
+    __tablename__ = "tickets"
+    id = Column(Integer, primary_key=True, index=True)
+    usuario = Column(String(200), nullable=False)
+    email = Column(String(200))
+    urgencia = Column(String(20), nullable=False)  # baja, media, alta, critica
+    tipo_error = Column(String(50), nullable=False)  # bug, ui, funcionalidad, rendimiento, otro
+    seccion = Column(String(100), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    screenshot_url = Column(String(500))
+    estado = Column(String(20), default="abierto")  # abierto, en_progreso, resuelto
+    respuesta_admin = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    resolved_at = Column(DateTime)
+
+
 class SiteContent(Base):
     __tablename__ = "site_content"
     id = Column(Integer, primary_key=True, index=True)

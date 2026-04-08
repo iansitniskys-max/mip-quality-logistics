@@ -11,7 +11,7 @@ from sqlalchemy import func, extract
 
 from database import engine, get_db, Base
 from fastapi.responses import StreamingResponse
-from models import Cliente, Cotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent
+from models import Cliente, Cotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent, Ticket
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
     PedidoCreate, PedidoUpdate, PedidoOut, FacturaCreate, FacturaOut,
@@ -212,6 +212,58 @@ def crear_cotizacion(data: CotizacionCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(cot)
     return cot
+
+
+@app.post("/api/cotizaciones/notify")
+def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
+    """Send email notification for new quotation"""
+    cot_id = data.get("cotizacion_id")
+    cliente_nombre = data.get("cliente_nombre", "Cliente")
+    cliente_email = data.get("cliente_email", "")
+    cot = db.query(Cotizacion).get(cot_id) if cot_id else None
+    if not cot:
+        return {"sent": False, "reason": "Cotización no encontrada"}
+
+    subject = f"Nueva cotización #{cot.id} — {cot.producto} — {cliente_nombre}"
+    body = (
+        f"Nueva solicitud de cotización recibida:\n\n"
+        f"Cliente: {cliente_nombre} ({cliente_email})\n"
+        f"Producto: {cot.producto}\n"
+        f"Especificaciones: {cot.descripcion}\n"
+        f"Cantidad: {cot.cantidad}\n"
+        f"Precio objetivo: {cot.precio_objetivo}\n"
+        f"Plazo: {cot.plazo}\n"
+        f"Uso final: {cot.uso_final}\n"
+        f"Personalización: {cot.personalizacion or 'No'}\n\n"
+        f"— MIP Quality & Logistics Platform"
+    )
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+        SMTP_USER = os.getenv("SMTP_USER", "")
+        SMTP_PASS = os.getenv("SMTP_PASS", "")
+        TO_EMAIL = "Paul@emonkonline.com"
+        CC_EMAIL = "iansitniskys@gmail.com"
+
+        if SMTP_USER and SMTP_PASS:
+            msg = MIMEText(body, "plain", "utf-8")
+            msg["Subject"] = subject
+            msg["From"] = SMTP_USER
+            msg["To"] = TO_EMAIL
+            msg["Cc"] = CC_EMAIL
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASS)
+                s.sendmail(SMTP_USER, [TO_EMAIL, CC_EMAIL], msg.as_string())
+            return {"sent": True}
+        else:
+            print(f"EMAIL NOTIFICATION (SMTP not configured):\nTo: {TO_EMAIL}\nCc: {CC_EMAIL}\nSubject: {subject}\n{body}")
+            return {"sent": False, "reason": "SMTP no configurado, email logged en consola"}
+    except Exception as e:
+        print(f"Email send error: {e}")
+        return {"sent": False, "reason": str(e)}
 
 
 @app.get("/api/cotizaciones/{id}", response_model=CotizacionOut)
@@ -590,6 +642,48 @@ async def upload_site_image(file: UploadFile = File(...), section: str = Query("
             f.write(content)
         url = f"/uploads/site/{section}_{key}_{file.filename}"
     return {"url": url, "section": section, "key": key}
+
+
+# ─── Tickets / Feedback ───
+@app.get("/api/tickets")
+def listar_tickets(estado: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(Ticket)
+    if estado:
+        q = q.filter(Ticket.estado == estado)
+    return q.order_by(Ticket.created_at.desc()).all()
+
+
+@app.post("/api/tickets")
+def crear_ticket(data: dict, db: Session = Depends(get_db)):
+    t = Ticket(
+        usuario=data.get("usuario", ""),
+        email=data.get("email", ""),
+        urgencia=data.get("urgencia", "media"),
+        tipo_error=data.get("tipo_error", "bug"),
+        seccion=data.get("seccion", ""),
+        descripcion=data.get("descripcion", ""),
+        screenshot_url=data.get("screenshot_url", ""),
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "estado": t.estado}
+
+
+@app.put("/api/tickets/{id}")
+def update_ticket(id: int, data: dict, db: Session = Depends(get_db)):
+    t = db.query(Ticket).get(id)
+    if not t:
+        raise HTTPException(404, "Ticket no encontrado")
+    if "estado" in data:
+        t.estado = data["estado"]
+    if "respuesta_admin" in data:
+        t.respuesta_admin = data["respuesta_admin"]
+    if data.get("estado") == "resuelto":
+        t.resolved_at = datetime.now()
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "estado": t.estado}
 
 
 # ─── Serve Frontend ───
