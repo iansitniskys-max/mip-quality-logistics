@@ -847,7 +847,6 @@ html,body{overflow-x:hidden;max-width:100vw}
       <img src="/images/office-china.jpg" alt="Oficina China - Shenzhen y Guangzhou" loading="lazy" />
       <div class="office-overlay"></div>
       <div class="office-content">
-        <span class="office-flag">&#x1F1E8;&#x1F1F3;</span>
         <h3>Oficina China</h3>
         <p class="office-location">Shenzhen & Guangzhou</p>
         <div class="office-stats">
@@ -862,7 +861,6 @@ html,body{overflow-x:hidden;max-width:100vw}
       <img src="/images/office-santiago.jpg" alt="Oficina Santiago - Chile" loading="lazy" />
       <div class="office-overlay"></div>
       <div class="office-content">
-        <span class="office-flag">&#x1F1E8;&#x1F1F1;</span>
         <h3>Oficina Santiago</h3>
         <p class="office-location">Santiago, Chile</p>
         <div class="office-stats">
@@ -923,7 +921,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="form-row"><div class="form-group"><label class="form-label">RUT Empresa</label><input type="text" class="form-input" id="reg-rut" placeholder="76.123.456-7"></div><div class="form-group"><label class="form-label">Rubro *</label><select class="form-input" id="reg-rubro" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Otro</option></select></div></div>
         <div class="form-group"><label class="form-label">Email corporativo *</label><input type="email" class="form-input" id="reg-email" placeholder="contacto@miempresa.com" required></div>
         <div class="form-row"><div class="form-group"><label class="form-label">Teléfono *</label><input type="tel" class="form-input" id="reg-telefono" placeholder="+56 9 1234 5678" required></div><div class="form-group"><label class="form-label">Contraseña *</label><input type="password" class="form-input" id="reg-password" placeholder="Min. 8 caracteres" required></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Cantidad de empleados *</label><select class="form-input" id="reg-empleados" required><option value="">Seleccionar...</option><option value="1-10">1 - 10</option><option value="11-50">11 - 50</option><option value="51-200">51 - 200</option><option value="201-500">201 - 500</option><option value="501-1000">501 - 1,000</option><option value="1001+">Más de 1,000</option></select></div><div class="form-group"><label class="form-label">Sitio web</label><input type="url" class="form-input" id="reg-web" placeholder="https://www.miempresa.com"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Cantidad de empleados *</label><select class="form-input" id="reg-empleados" required><option value="">Seleccionar...</option><option value="1-10">1 - 10</option><option value="11-50">11 - 50</option><option value="51-200">51 - 200</option><option value="201-500">201 - 500</option><option value="501-1000">501 - 1,000</option><option value="1001+">Más de 1,000</option></select></div><div class="form-group"><label class="form-label">Sitio web</label><input type="text" class="form-input" id="reg-web" placeholder="www.miempresa.com"></div></div>
         <div class="form-group"><label class="form-label">¿Cómo conociste nuestra plataforma? *</label><select class="form-input" id="reg-referido" required><option value="">Seleccionar...</option><option value="Un amigo me lo recomendó">Un amigo me lo recomendó</option><option value="Google u otro motor de búsqueda">Google u otro motor de búsqueda</option><option value="Instagram">Instagram</option><option value="Me contactaron desde MIP">Me contactaron desde MIP</option><option value="Otro">Otro</option></select></div>
         <div class="form-group"><label class="form-label">¿Ya estás en contacto con uno de nuestros vendedores?</label>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div class="switch" id="sw-reg-vendedor" onclick="toggleSw('sw-reg-vendedor','reg-vendedor-wrap')"></div><span style="font-size:13px;color:var(--text-secondary)">Sí, ya tengo un contacto</span></div>
@@ -956,7 +954,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="form-group"><label class="form-label">Rubro *</label><select class="form-input" id="pf-rubro" required><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Otro</option></select></div>
         <div class="form-group"><label class="form-label">Cantidad de empleados *</label><select class="form-input" id="pf-empleados" required><option value="">Seleccionar...</option><option value="1-10">1 - 10</option><option value="11-50">11 - 50</option><option value="51-200">51 - 200</option><option value="201-500">201 - 500</option><option value="501-1000">501 - 1,000</option><option value="1001+">Más de 1,000</option></select></div>
       </div>
-      <div class="form-group"><label class="form-label">Sitio web de tu empresa</label><input type="url" class="form-input" id="pf-web" placeholder="https://www.miempresa.com"></div>
+      <div class="form-group"><label class="form-label">Sitio web de tu empresa</label><input type="text" class="form-input" id="pf-web" placeholder="www.miempresa.com"></div>
       <div class="form-group"><label class="form-label">¿Cómo conociste nuestra plataforma? *</label><select class="form-input" id="pf-referido" required><option value="">Seleccionar...</option><option value="Un amigo me lo recomendó">Un amigo me lo recomendó</option><option value="Google u otro motor de búsqueda">Google u otro motor de búsqueda</option><option value="Instagram">Instagram</option><option value="Me contactaron desde MIP">Me contactaron desde MIP</option><option value="Otro">Otro</option></select></div>
       <div class="form-group"><label class="form-label">¿Ya estás en contacto con uno de nuestros vendedores?</label>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div class="switch" id="sw-vendedor" onclick="toggleSw('sw-vendedor','pf-vendedor-wrap')"></div><span style="font-size:13px;color:var(--text-secondary)">Sí, ya tengo un contacto</span></div>
