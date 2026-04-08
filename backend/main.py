@@ -24,6 +24,7 @@ import io
 app = FastAPI(title="MIP Q&L API", version="1.0.0")
 
 STATIC_DIR = os.getenv("STATIC_DIR", "/app/frontend")
+IMAGES_DIR = os.path.join(STATIC_DIR, "images")
 
 # Serve uploaded files
 os.makedirs("/app/uploads", exist_ok=True)
@@ -690,6 +691,11 @@ def update_ticket(id: int, data: dict, db: Session = Depends(get_db)):
 @app.get("/health")
 def health_nginx():
     return {"status": "ok"}
+
+
+# Mount static images directory
+if os.path.isdir(IMAGES_DIR):
+    app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
 
 
 @app.get("/{full_path:path}")

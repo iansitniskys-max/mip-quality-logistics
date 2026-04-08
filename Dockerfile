@@ -13,8 +13,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ /app/backend/
 
 # Copy frontend
-RUN mkdir -p /app/frontend
+RUN mkdir -p /app/frontend/images
 COPY mip-platform.html /app/frontend/index.html
+COPY images/ /app/frontend/images/
 
 EXPOSE 8080
 
