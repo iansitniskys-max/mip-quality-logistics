@@ -132,7 +132,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 .section-header-center{text-align:center;margin-bottom:48px}
 .section-header-center .section-desc{margin:0 auto}
 
-.adn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-top:40px}
+.adn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-top:40px}
 .adn-item{background:var(--bg-white);padding:32px 28px}
 .adn-item .adn-num{font-size:11px;color:var(--text-faint);letter-spacing:1px;margin-bottom:12px}
 .adn-item h3{font-size:15px;font-weight:600;margin-bottom:8px}
@@ -505,9 +505,11 @@ html,body{overflow-x:hidden;max-width:100vw}
   .hero-actions .btn{width:100%}
   .hero-stats{gap:16px}
   .stat-grid,.acc-grid{grid-template-columns:1fr}
-  .l-nav-actions{display:none}
+  .l-nav-actions{display:flex}
+  .l-nav-actions .btn:last-child{display:none}
+  .l-nav-actions .btn:first-child{padding:6px 10px;font-size:11px}
   .mobile-btn{display:block}
-  .adn-item{padding:20px 16px}
+  .adn-item{padding:0}
   .step{padding:0 6px}
   .step h4{font-size:12px}
   .testi-card{padding:16px}
@@ -749,7 +751,7 @@ html,body{overflow-x:hidden;max-width:100vw}
   <div class="section-label">ADN de marca</div>
   <div class="section-title">¿Por qué elegirnos?</div>
   <div class="section-desc">Más de una década conectando empresas latinoamericanas con fabricantes de clase mundial en Asia.</div>
-  <div class="adn-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="adn-grid">
     <div class="adn-item"><div class="pillar-image"><img src="/images/pillar-sourcing.jpg" alt="Línea de producción en fábrica" loading="lazy" /></div><div class="adn-item-text"><div class="adn-num">01</div><h3>Sourcing Estratégico</h3><p>Identificamos y validamos los mejores proveedores según tus requerimientos de calidad, precio y volumen.</p></div></div>
     <div class="adn-item"><div class="pillar-image"><img src="/images/pillar-quality.jpg" alt="Inspección de calidad" loading="lazy" /></div><div class="adn-item-text"><div class="adn-num">02</div><h3>Control de Calidad</h3><p>Inspecciones en fábrica, control pre-embarque y certificaciones internacionales para tu tranquilidad.</p></div></div>
     <div class="adn-item"><div class="pillar-image"><img src="/images/pillar-logistics.jpg" alt="Bodega de logística" loading="lazy" /></div><div class="adn-item-text"><div class="adn-num">03</div><h3>Logística Integral</h3><p>Coordinamos flete marítimo y aéreo, internación aduanera y entrega final puerta a puerta.</p></div></div>
