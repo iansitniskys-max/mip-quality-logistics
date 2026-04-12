@@ -191,6 +191,93 @@ def get_me(email: str = Query(...), db: Session = Depends(get_db)):
     }
 
 
+# ─── Admin: Role Management ───
+@app.get("/api/admin/users")
+def admin_list_users(db: Session = Depends(get_db)):
+    """List all users with their roles (admin only)"""
+    users = db.query(Cliente).order_by(Cliente.created_at.desc()).all()
+    return [{"id": c.id, "nombre": c.nombre, "email": c.email, "empresa": c.empresa, "role": c.role or "client", "created_at": str(c.created_at)} for c in users]
+
+
+@app.put("/api/admin/users/{user_id}/role")
+def admin_update_role(user_id: int, data: dict, db: Session = Depends(get_db)):
+    """Update a user's role (admin only)"""
+    new_role = data.get("role", "client")
+    if new_role not in ("client", "admin"):
+        raise HTTPException(400, "Role must be 'client' or 'admin'")
+    cliente = db.query(Cliente).get(user_id)
+    if not cliente:
+        raise HTTPException(404, "Usuario no encontrado")
+    cliente.role = new_role
+    db.commit()
+    return {"id": cliente.id, "email": cliente.email, "role": new_role}
+
+
+@app.post("/api/admin/invite")
+def admin_invite(data: dict, db: Session = Depends(get_db)):
+    """Invite a user as admin by email. Creates account if needed and sends invitation email."""
+    email = data.get("email", "").strip().lower()
+    nombre = data.get("nombre", "").strip()
+    if not email:
+        raise HTTPException(400, "Email requerido")
+
+    # Find or create user
+    cliente = db.query(Cliente).filter(Cliente.email == email).first()
+    if cliente:
+        # User exists - promote to admin
+        cliente.role = "admin"
+        db.commit()
+        action = "promoted"
+    else:
+        # Create new admin user
+        cliente = Cliente(nombre=nombre or email.split("@")[0], email=email, empresa="", rut="", rubro="", telefono="", role="admin")
+        db.add(cliente)
+        db.commit()
+        db.refresh(cliente)
+        action = "created"
+
+    # Generate invite link
+    import hashlib
+    token = hashlib.sha256(f"{email}:{cliente.id}:mip-admin-invite".encode()).hexdigest()[:32]
+    APP_URL = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    invite_link = f"{APP_URL}#invite={token}&email={email}"
+
+    # Send invitation email
+    subject = "Invitaci\u00f3n Admin \u2014 MIP Quality & Logistics"
+    body = (
+        f"Hola {nombre or email},\n\n"
+        f"Has sido invitado/a como administrador en la plataforma MIP Quality & Logistics.\n\n"
+        f"Para acceder, ingresa con tu cuenta de Google o reg\u00edstrate en el siguiente enlace:\n"
+        f"{invite_link}\n\n"
+        f"Tu rol de administrador ya est\u00e1 activo.\n\n"
+        f"\u2014 MIP Quality & Logistics Platform"
+    )
+    email_sent = False
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+        SMTP_USER = os.getenv("SMTP_USER", "")
+        SMTP_PASS = os.getenv("SMTP_PASS", "")
+        if SMTP_USER and SMTP_PASS:
+            msg = MIMEText(body, "plain", "utf-8")
+            msg["Subject"] = subject
+            msg["From"] = SMTP_USER
+            msg["To"] = email
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASS)
+                s.sendmail(SMTP_USER, [email], msg.as_string())
+            email_sent = True
+        else:
+            print(f"ADMIN INVITE (SMTP not configured):\nTo: {email}\n{body}")
+    except Exception as e:
+        print(f"Invite email error: {e}")
+
+    return {"action": action, "email": email, "role": "admin", "email_sent": email_sent, "invite_link": invite_link}
+
+
 # ─── Clientes ───
 @app.get("/api/clientes", response_model=list[ClienteOut])
 def listar_clientes(db: Session = Depends(get_db)):
