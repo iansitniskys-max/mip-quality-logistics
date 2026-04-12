@@ -78,9 +78,13 @@ class Archivo(Base):
     __tablename__ = "archivos"
     id = Column(Integer, primary_key=True, index=True)
     pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=True)
     nombre = Column(String(300), nullable=False)
     url = Column(String(500), nullable=False)
     tipo = Column(String(50))  # pdf, jpg, xlsx, etc.
+    categoria = Column(String(50))  # cotizacion_proveedor, cotizacion_formal, factura, comprobante_pago, especificacion, mix_productos, foto_referencia, reporte_qc, doc_logistico, video, otro
+    subido_por = Column(String(20), default="admin")  # admin, client
+    subido_por_email = Column(String(200))
     size = Column(Integer)  # bytes
     created_at = Column(DateTime, server_default=func.now())
 

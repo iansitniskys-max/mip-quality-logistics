@@ -1280,6 +1280,10 @@ html,body{overflow-x:hidden;max-width:100vw}
 
     <!-- ADMIN: Requests -->
     <div class="page-body" id="a-req">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div></div>
+        <button class="btn btn-dark btn-sm" onclick="openNewProjectModal()"><i class="fas fa-plus"></i> Nuevo Proyecto</button>
+      </div>
       <div class="stat-grid">
         <div class="stat-card"><div class="s-label">Pendientes</div><div class="s-val">0</div></div>
         <div class="stat-card"><div class="s-label">Cotizaciones enviadas</div><div class="s-val">0</div></div>
@@ -1291,6 +1295,85 @@ html,body{overflow-x:hidden;max-width:100vw}
         <table class="dtable"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Fecha</th><th>Cant.</th><th>Estado</th><th></th></tr></thead>
         <tbody id="a-req-tbody"></tbody></table>
         <div class="table-pg" id="a-req-pg"></div>
+      </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div class="modal-bg" id="newProjectModal">
+      <div class="modal-box" style="max-width:600px;max-height:90vh;overflow-y:auto">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:4px"><i class="fas fa-folder-plus" style="margin-right:6px;color:var(--success)"></i> Nuevo Proyecto</h3>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:20px">Crear cotización y asignarla a un cliente. Si el email no existe, se creará una cuenta placeholder.</p>
+        <form onsubmit="submitNewProject(event)">
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-user" style="margin-right:4px"></i> DATOS DEL CLIENTE</div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Nombre cliente *</label><input type="text" class="form-input" id="np-nombre" placeholder="Pablo Mackenna" required></div>
+            <div class="form-group"><label class="form-label">Email cliente *</label><input type="email" class="form-input" id="np-email" placeholder="cliente@email.com" required></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" id="np-empresa" placeholder="Empresa SpA"></div>
+            <div class="form-group"><label class="form-label">Teléfono</label><input type="text" class="form-input" id="np-telefono" placeholder="+56 9 1234 5678"></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-box" style="margin-right:4px"></i> PRODUCTO / PROYECTO</div>
+          <div class="form-group"><label class="form-label">Producto / Nombre del proyecto *</label><input type="text" class="form-input" id="np-producto" placeholder="Máquina de hielo, Línea Ironman, etc." required></div>
+          <div class="form-group"><label class="form-label">Descripción / Especificaciones</label><textarea class="form-input" id="np-descripcion" placeholder="Detalles del producto, materiales, certificaciones..." style="min-height:60px"></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Cantidad</label><input type="text" class="form-input" id="np-cantidad" placeholder="5,000 un"></div>
+            <div class="form-group"><label class="form-label">Precio objetivo</label><input type="text" class="form-input" id="np-precio" placeholder="$3.50 USD"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Plazo</label><select class="form-input" id="np-plazo"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>100 días</option><option>Flexible</option></select></div>
+            <div class="form-group"><label class="form-label">Estado</label><select class="form-input" id="np-estado"><option value="pendiente">Pendiente</option><option value="cotizado">Cotizado</option><option value="produccion">En producción</option><option value="entregado">Entregado</option></select></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-truck" style="margin-right:4px"></i> PEDIDO (opcional)</div>
+          <div class="switch-wrap" style="margin-bottom:12px"><div class="switch" id="sw-crear-pedido" onclick="toggleSw('sw-crear-pedido','np-pedido-fields')"></div><span style="font-size:13px;color:var(--text-secondary)">Crear pedido asociado</span></div>
+          <div id="np-pedido-fields" style="display:none">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Monto total (USD)</label><input type="number" step="0.01" class="form-input" id="np-monto" placeholder="11852"></div>
+              <div class="form-group"><label class="form-label">Etapa actual (1-9)</label><select class="form-input" id="np-etapa"><option value="1">1 - Solicitud</option><option value="2">2 - Cotización</option><option value="3">3 - Muestra</option><option value="4">4 - Pago 50%</option><option value="5">5 - Producción</option><option value="6">6 - QC China</option><option value="7">7 - Embarque</option><option value="8">8 - Entrega</option><option value="9">9 - Pago final</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">Condiciones</label><input type="text" class="form-input" id="np-condiciones" placeholder="50/50, FOB, etc."></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+            <button type="button" class="btn btn-outline btn-sm" onclick="closeNewProjectModal()">Cancelar</button>
+            <button type="submit" class="btn btn-dark"><i class="fas fa-save"></i> Crear Proyecto</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Admin: Upload Document Modal -->
+    <div class="modal-bg" id="adminUploadModal">
+      <div class="modal-box" style="max-width:480px">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-file-upload" style="margin-right:6px;color:var(--info)"></i> Subir Documento</h3>
+        <form onsubmit="submitAdminUpload(event)">
+          <div class="form-group"><label class="form-label">Categoría del documento *</label>
+            <select class="form-input" id="au-categoria" required>
+              <option value="">Seleccionar...</option>
+              <optgroup label="Admin / MIP sube">
+                <option value="cotizacion_proveedor">Cotización de proveedor</option>
+                <option value="cotizacion_formal">Cotización formal MIP</option>
+                <option value="factura">Factura MIP</option>
+                <option value="reporte_qc">Reporte QC / Inspección</option>
+                <option value="doc_logistico">Doc logístico (BL, packing list)</option>
+                <option value="mix_productos">Mix de productos</option>
+              </optgroup>
+              <optgroup label="Cliente sube">
+                <option value="comprobante_pago">Comprobante de pago</option>
+                <option value="especificacion">Especificaciones producto (cliente)</option>
+                <option value="foto_referencia">Foto de referencia</option>
+                <option value="video">Video</option>
+              </optgroup>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Archivo *</label><input type="file" class="form-input" id="au-file" required style="padding:8px"></div>
+          <input type="hidden" id="au-cotizacion-id">
+          <input type="hidden" id="au-pedido-id">
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button type="button" class="btn btn-outline btn-sm" onclick="closeAdminUploadModal()">Cancelar</button>
+            <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-cloud-upload-alt"></i> Subir</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -2122,8 +2205,10 @@ async function loadAdminData() {
         const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
         const labels = { pendiente: 'Pendiente', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
         const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
-        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td><button class="btn btn-outline btn-sm" onclick="openDetail()"><i class="fas fa-eye"></i></button></td></tr>`;
+        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)" title="Subir documento"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail()"><i class="fas fa-eye"></i></button></td></tr>`;
       }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px"><i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px"></i>No hay solicitudes. Click "Nuevo Proyecto" para crear una.</td></tr>';
     }
   } catch (err) { console.error('Admin load error:', err); }
 }
@@ -2266,6 +2351,70 @@ function initGoogleSignIn() {
       theme: 'outline', size: 'large', width: '100%', text: 'signup_with', shape: 'rectangular', logo_alignment: 'center',
     });
   }
+}
+
+// ─── Admin: New Project ───
+function openNewProjectModal() { document.getElementById('newProjectModal').classList.add('open'); }
+function closeNewProjectModal() { document.getElementById('newProjectModal').classList.remove('open'); }
+
+async function submitNewProject(e) {
+  e.preventDefault();
+  const crearPedido = document.getElementById('sw-crear-pedido')?.classList.contains('on');
+  const data = {
+    cliente_nombre: document.getElementById('np-nombre').value,
+    cliente_email: document.getElementById('np-email').value,
+    cliente_empresa: document.getElementById('np-empresa').value,
+    cliente_telefono: document.getElementById('np-telefono').value,
+    producto: document.getElementById('np-producto').value,
+    descripcion: document.getElementById('np-descripcion').value,
+    cantidad: document.getElementById('np-cantidad').value,
+    precio_objetivo: document.getElementById('np-precio').value,
+    plazo: document.getElementById('np-plazo').value,
+    estado: document.getElementById('np-estado').value,
+    crear_pedido: crearPedido,
+    monto_total: document.getElementById('np-monto')?.value || 0,
+    etapa_actual: document.getElementById('np-etapa')?.value || 1,
+    condiciones: document.getElementById('np-condiciones')?.value || '',
+  };
+  try {
+    const result = await api('/api/admin/create-project', { method: 'POST', body: JSON.stringify(data) });
+    closeNewProjectModal();
+    toast('success', 'Proyecto creado', `${result.producto} asignado a ${result.cliente_nombre}`);
+    // Reset form
+    e.target.reset();
+    // Reload admin data
+    loadAdminData();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ─── Admin: Upload Document ───
+function openAdminUploadModal(cotId, pedId) {
+  document.getElementById('au-cotizacion-id').value = cotId || '';
+  document.getElementById('au-pedido-id').value = pedId || '';
+  document.getElementById('adminUploadModal').classList.add('open');
+}
+function closeAdminUploadModal() { document.getElementById('adminUploadModal').classList.remove('open'); }
+
+async function submitAdminUpload(e) {
+  e.preventDefault();
+  const file = document.getElementById('au-file').files[0];
+  if (!file) return;
+  const categoria = document.getElementById('au-categoria').value;
+  const cotId = document.getElementById('au-cotizacion-id').value;
+  const pedId = document.getElementById('au-pedido-id').value;
+  const formData = new FormData();
+  formData.append('file', file);
+  let url = `/api/admin/upload?categoria=${categoria}&subido_por_email=${encodeURIComponent(currentUser?.email || 'admin')}`;
+  if (cotId) url += `&cotizacion_id=${cotId}`;
+  if (pedId) url += `&pedido_id=${pedId}`;
+  try {
+    const r = await fetch(API + url, { method: 'POST', body: formData });
+    if (!r.ok) throw new Error('Upload failed');
+    const result = await r.json();
+    closeAdminUploadModal();
+    toast('success', 'Documento subido', `${result.nombre} (${result.categoria})`);
+    e.target.reset();
+  } catch (err) { toast('error', 'Error', 'No se pudo subir el archivo'); }
 }
 
 // ─── Admin: Role Management ───

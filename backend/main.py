@@ -45,6 +45,14 @@ def on_startup():
                     print(f"Added column clientes.{col}")
                 except Exception:
                     conn.rollback()
+            # Migrate archivos table
+            for col, col_type in [("cotizacion_id", "INTEGER"), ("categoria", "VARCHAR(50)"), ("subido_por", "VARCHAR(20) DEFAULT 'admin'"), ("subido_por_email", "VARCHAR(200)")]:
+                try:
+                    conn.execute(text(f"ALTER TABLE archivos ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column archivos.{col}")
+                except Exception:
+                    conn.rollback()
     except Exception as e:
         print(f"Warning: Could not create tables: {e}")
 
@@ -278,6 +286,138 @@ def admin_invite(data: dict, db: Session = Depends(get_db)):
     return {"action": action, "email": email, "role": "admin", "email_sent": email_sent, "invite_link": invite_link}
 
 
+# ─── Admin: Create Project for Client ───
+@app.post("/api/admin/create-project")
+def admin_create_project(data: dict, db: Session = Depends(get_db)):
+    """Admin creates a full project (cotizacion + optional pedido) assigned to a client email.
+    If client doesn't exist, creates a placeholder account they can claim later."""
+    email = data.get("cliente_email", "").strip().lower()
+    nombre = data.get("cliente_nombre", "").strip()
+    empresa = data.get("cliente_empresa", "").strip()
+    if not email:
+        raise HTTPException(400, "Email del cliente requerido")
+
+    # Find or create client
+    cliente = db.query(Cliente).filter(Cliente.email == email).first()
+    if not cliente:
+        cliente = Cliente(
+            nombre=nombre or email.split("@")[0],
+            email=email, empresa=empresa, rut=data.get("cliente_rut", ""),
+            rubro=data.get("cliente_rubro", ""), telefono=data.get("cliente_telefono", ""),
+        )
+        db.add(cliente)
+        db.commit()
+        db.refresh(cliente)
+
+    # Create cotizacion
+    cot = Cotizacion(
+        cliente_id=cliente.id,
+        producto=data.get("producto", ""),
+        descripcion=data.get("descripcion", ""),
+        cantidad=data.get("cantidad", ""),
+        precio_objetivo=data.get("precio_objetivo", ""),
+        plazo=data.get("plazo", ""),
+        uso_final=data.get("uso_final", ""),
+        personalizacion=data.get("personalizacion", ""),
+        estado=data.get("estado", "pendiente"),
+    )
+    db.add(cot)
+    db.commit()
+    db.refresh(cot)
+
+    # Optionally create pedido if estado is produccion or beyond
+    pedido = None
+    if data.get("crear_pedido"):
+        pedido = Pedido(
+            cotizacion_id=cot.id,
+            precio_unitario=float(data.get("precio_unitario", 0) or 0),
+            condiciones=data.get("condiciones", ""),
+            monto_total=float(data.get("monto_total", 0) or 0),
+            estado=data.get("pedido_estado", "activo"),
+            etapa_actual=int(data.get("etapa_actual", 1) or 1),
+        )
+        db.add(pedido)
+        db.commit()
+        db.refresh(pedido)
+
+    log_evento(db, "cotizacion", "creado", f"Proyecto '{cot.producto}' creado para {cliente.nombre} ({email})", usuario="admin", entidad_id=cot.id, cliente_id=cliente.id)
+
+    return {
+        "cliente_id": cliente.id,
+        "cotizacion_id": cot.id,
+        "pedido_id": pedido.id if pedido else None,
+        "cliente_nombre": cliente.nombre,
+        "producto": cot.producto,
+        "estado": cot.estado,
+    }
+
+
+# ─── Admin: Upload file for any project ───
+@app.post("/api/admin/upload")
+async def admin_upload(
+    file: UploadFile = File(...),
+    cotizacion_id: Optional[int] = Query(None),
+    pedido_id: Optional[int] = Query(None),
+    categoria: str = Query("otro"),
+    subido_por_email: str = Query("admin"),
+    db: Session = Depends(get_db),
+):
+    """Admin uploads a document to a cotizacion or pedido with category classification."""
+    content = await file.read()
+    safe_name = os.path.basename(file.filename or "file")
+    filename = f"uploads/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{safe_name}"
+
+    url = ""
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(filename)
+        blob.upload_from_string(content, content_type=file.content_type)
+        url = f"https://storage.googleapis.com/{GCS_BUCKET}/{filename}"
+    except Exception:
+        os.makedirs("/app/uploads", exist_ok=True)
+        local_path = f"/app/uploads/{safe_name}"
+        with open(local_path, "wb") as f:
+            f.write(content)
+        url = f"/uploads/{safe_name}"
+
+    ext = safe_name.rsplit(".", 1)[-1].lower() if "." in safe_name else "unknown"
+    archivo = Archivo(
+        pedido_id=pedido_id,
+        cotizacion_id=cotizacion_id,
+        nombre=safe_name,
+        url=url,
+        tipo=ext,
+        categoria=categoria,
+        subido_por="admin",
+        subido_por_email=subido_por_email,
+        size=len(content),
+    )
+    db.add(archivo)
+    db.commit()
+    db.refresh(archivo)
+    return {"id": archivo.id, "nombre": archivo.nombre, "url": archivo.url, "categoria": categoria, "size": archivo.size}
+
+
+# ─── Archivos: List with category filter ───
+@app.get("/api/archivos")
+def listar_archivos(
+    pedido_id: Optional[int] = None,
+    cotizacion_id: Optional[int] = None,
+    categoria: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Archivo)
+    if pedido_id:
+        q = q.filter(Archivo.pedido_id == pedido_id)
+    if cotizacion_id:
+        q = q.filter(Archivo.cotizacion_id == cotizacion_id)
+    if categoria:
+        q = q.filter(Archivo.categoria == categoria)
+    return q.order_by(Archivo.created_at.desc()).all()
+
+
 # ─── Clientes ───
 @app.get("/api/clientes", response_model=list[ClienteOut])
 def listar_clientes(db: Session = Depends(get_db)):
@@ -481,13 +621,6 @@ async def upload_archivo(
     db.refresh(archivo)
     return {"id": archivo.id, "nombre": archivo.nombre, "url": archivo.url, "size": archivo.size}
 
-
-@app.get("/api/archivos")
-def listar_archivos(pedido_id: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(Archivo)
-    if pedido_id:
-        q = q.filter(Archivo.pedido_id == pedido_id)
-    return q.order_by(Archivo.created_at.desc()).all()
 
 
 # ─── Contabilidad ───
