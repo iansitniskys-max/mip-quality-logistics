@@ -1500,7 +1500,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div style="margin-top:24px">
         <div class="card" style="padding:24px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <h3 style="font-size:16px;font-weight:600"><i class="fas fa-user-shield" style="color:var(--text-muted);margin-right:8px"></i>Gesti\u00f3n de Administradores</h3>
+            <h3 style="font-size:16px;font-weight:600"><i class="fas fa-user-shield" style="color:var(--text-muted);margin-right:8px"></i>Gestión de Administradores</h3>
             <button class="btn btn-dark btn-sm" onclick="openInviteModal()"><i class="fas fa-user-plus"></i> Invitar Admin</button>
           </div>
           <div class="dtable-wrap">
@@ -1513,13 +1513,13 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="modal-bg" id="inviteAdminModal">
         <div class="modal-box" style="max-width:440px">
           <h3 style="font-size:16px;font-weight:600;margin-bottom:4px"><i class="fas fa-user-plus" style="margin-right:6px;color:var(--info)"></i> Invitar Administrador</h3>
-          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:20px">Se enviar\u00e1 un email de invitaci\u00f3n y el usuario tendr\u00e1 acceso admin inmediato.</p>
+          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:20px">Se enviará un email de invitación y el usuario tendrá acceso admin inmediato.</p>
           <form onsubmit="sendAdminInvite(event)">
             <div class="form-group"><label class="form-label">Nombre</label><input type="text" class="form-input" id="invite-nombre" placeholder="Nombre completo"></div>
             <div class="form-group"><label class="form-label">Email *</label><input type="email" class="form-input" id="invite-email" placeholder="email@empresa.com" required></div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
               <button type="button" class="btn btn-outline btn-sm" onclick="closeInviteModal()">Cancelar</button>
-              <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-paper-plane"></i> Enviar invitaci\u00f3n</button>
+              <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-paper-plane"></i> Enviar invitación</button>
             </div>
           </form>
         </div>
@@ -2323,7 +2323,7 @@ async function sendAdminInvite(e) {
     const result = await api('/api/admin/invite', { method: 'POST', body: JSON.stringify({ nombre, email }) });
     closeInviteModal();
     if (result.email_sent) {
-      toast('success', 'Invitaci\u00f3n enviada', `Email enviado a ${email}`);
+      toast('success', 'Invitación enviada', `Email enviado a ${email}`);
     } else {
       toast('info', 'Admin creado', `${email} ahora es admin. Email no enviado (SMTP no configurado). Link: ${result.invite_link}`);
     }
