@@ -1022,10 +1022,10 @@ html,body{overflow-x:hidden;max-width:100vw}
 
     <div class="page-body" id="c-dash">
       <div class="stat-grid">
-        <div class="stat-card"><div class="s-label">Cotizaciones activas</div><div class="s-val">3</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> 1 nueva esta semana</div></div>
-        <div class="stat-card"><div class="s-label">Pedidos en curso</div><div class="s-val">2</div><div class="s-sub up"><i class="fas fa-truck"></i> 1 en tránsito</div></div>
-        <div class="stat-card"><div class="s-label">Completados</div><div class="s-val">12</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +3 vs trim. ant.</div></div>
-        <div class="stat-card"><div class="s-label">Total importado (USD)</div><div class="s-val">$84K</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +22% YoY</div></div>
+        <div class="stat-card"><div class="s-label">Cotizaciones activas</div><div class="s-val">0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Pedidos en curso</div><div class="s-val">0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Completados</div><div class="s-val">0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Total importado (USD)</div><div class="s-val">$0</div><div class="s-sub"></div></div>
       </div>
       <div style="margin-bottom:20px"><button class="btn btn-dark" onclick="cView('c-quote')"><i class="fas fa-plus"></i> Nueva solicitud de cotización</button></div>
       <div class="dtable-wrap">
@@ -1259,7 +1259,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="sb-header"><a class="logo" href="#" onclick="go('page-landing');return false"><svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg><div><div class="logo-name" style="font-size:11px">MIP Q&L</div><div class="logo-sub" style="font-size:8px;color:var(--danger)">Panel Admin</div></div></a></div>
     <nav class="sb-nav">
       <div class="sb-section"><div class="sb-section-title">Administración</div>
-        <a class="sb-link active" onclick="aView('a-req')"><i class="fas fa-inbox"></i> Solicitudes<span class="cnt">5</span></a>
+        <a class="sb-link active" onclick="aView('a-req')"><i class="fas fa-inbox"></i> Solicitudes<span class="cnt" id="admin-pending-cnt">0</span></a>
         <a class="sb-link" onclick="aView('a-ops')"><i class="fas fa-project-diagram"></i> Gestión Operacional</a>
         <a class="sb-link" onclick="aView('a-acc')"><i class="fas fa-calculator"></i> Contabilidad</a>
         <a class="sb-link" onclick="aView('a-clients')"><i class="fas fa-users"></i> Clientes</a>
@@ -1281,10 +1281,10 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- ADMIN: Requests -->
     <div class="page-body" id="a-req">
       <div class="stat-grid">
-        <div class="stat-card"><div class="s-label">Pendientes</div><div class="s-val">5</div></div>
-        <div class="stat-card"><div class="s-label">Cotizaciones enviadas</div><div class="s-val">8</div></div>
-        <div class="stat-card"><div class="s-label">En producción</div><div class="s-val">6</div></div>
-        <div class="stat-card"><div class="s-label">En tránsito</div><div class="s-val">3</div></div>
+        <div class="stat-card"><div class="s-label">Pendientes</div><div class="s-val">0</div></div>
+        <div class="stat-card"><div class="s-label">Cotizaciones enviadas</div><div class="s-val">0</div></div>
+        <div class="stat-card"><div class="s-label">En producción</div><div class="s-val">0</div></div>
+        <div class="stat-card"><div class="s-label">En tránsito</div><div class="s-val">0</div></div>
       </div>
       <div class="dtable-wrap">
         <div class="dtable-header"><h3>Todas las solicitudes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">Pendientes</button><button class="chip">Cotizadas</button><button class="chip">Producción</button></div></div>
@@ -1294,40 +1294,14 @@ html,body{overflow-x:hidden;max-width:100vw}
       </div>
     </div>
 
-    <!-- ADMIN: Operations -->
+    <!-- ADMIN: Operations (Dynamic) -->
     <div class="page-body" id="a-ops" style="display:none">
       <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="aView('a-req')"><i class="fas fa-arrow-left"></i> Volver</button></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div class="card" style="padding:24px">
-          <h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Pedido #SOL-038 — Luminarias LED</h3>
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Andrea López — LuxHome · 1,200 un</p>
-          <div class="timeline">
-            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Solicitud</h4><p>02 Mar</p></div></div>
-            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización</h4><p>05 Mar</p></div></div>
-            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Muestra aprobada</h4><p>18 Mar</p></div></div>
-            <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pago 50% ($8,400)</h4><p>20 Mar</p></div></div>
-            <div class="tl-item"><div class="tl-dot current"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>En producción</h4><p>22 Mar — en curso</p></div></div>
-            <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>QC China</h4></div></div>
-            <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Embarque</h4></div></div>
-            <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Entrega + Pago final</h4></div></div>
-          </div>
-        </div>
-        <div>
-          <div class="card" style="padding:24px;margin-bottom:16px">
-            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-file-upload" style="color:var(--text-muted);margin-right:6px"></i>Facturas & Comprobantes</h3>
-            <div class="upload-zone" onclick="simUpload('aUpPrv')" style="margin-bottom:12px;padding:20px"><i class="fas fa-cloud-upload-alt" style="font-size:18px"></i><h4 style="font-size:12px">Subir factura o comprobante</h4></div>
-            <div class="upload-preview" id="aUpPrv"></div>
-            <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">
-              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px"><i class="fas fa-file-pdf" style="color:var(--danger)"></i><div style="flex:1"><div style="font-weight:500">Factura_SOL038_anticipo.pdf</div><div style="font-size:10px;color:var(--text-muted)">20 Mar — 245 KB</div></div><button style="color:var(--text-muted);font-size:12px"><i class="fas fa-download"></i></button></div>
-              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px"><i class="fas fa-file-image" style="color:var(--info)"></i><div style="flex:1"><div style="font-weight:500">Comprobante_transferencia.jpg</div><div style="font-size:10px;color:var(--text-muted)">20 Mar — 1.2 MB</div></div><button style="color:var(--text-muted);font-size:12px"><i class="fas fa-download"></i></button></div>
-            </div>
-          </div>
-          <div class="card" style="padding:24px">
-            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-plug" style="color:var(--text-muted);margin-right:6px"></i>Integraciones</h3>
-            <div class="integration-tag" style="margin-bottom:8px"><i class="fab fa-google-drive"></i> Google Drive — Sincronizado <i class="fas fa-check-circle" style="margin-left:auto;color:var(--success)"></i></div>
-            <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Sincronización automática a MIP/Clientes/LuxHome/SOL-038</p>
-            <div class="integration-tag"><i class="fas fa-robot"></i> IA Copilot — Activo <i class="fas fa-check-circle" style="margin-left:auto;color:var(--success)"></i></div>
-          </div>
+      <div id="a-ops-content">
+        <div style="text-align:center;padding:60px 20px;color:var(--text-muted)">
+          <i class="fas fa-project-diagram" style="font-size:32px;margin-bottom:12px;display:block"></i>
+          <h3 style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">Sin pedidos activos</h3>
+          <p style="font-size:13px">Los pedidos aparecerán aquí cuando se creen desde cotizaciones aprobadas.</p>
         </div>
       </div>
     </div>
@@ -1339,10 +1313,10 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div style="display:flex;gap:8px"><select class="form-input" style="width:140px;padding:7px 12px;font-size:12px"><option>Marzo 2026</option><option>Febrero 2026</option><option>Enero 2026</option><option>Q1 2026</option></select><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo gasto</button><button class="btn btn-outline btn-sm"><i class="fas fa-file-export"></i> Exportar</button></div>
       </div>
       <div class="acc-grid">
-        <div class="stat-card"><div class="s-label">Ingresos</div><div class="s-val" style="color:var(--success)">$142,800</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +18.3% vs mes ant.</div><div class="mini-bars"><div style="height:45%;background:var(--success);opacity:.4"></div><div style="height:62%;background:var(--success);opacity:.5"></div><div style="height:38%;background:var(--success);opacity:.4"></div><div style="height:55%;background:var(--success);opacity:.5"></div><div style="height:70%;background:var(--success);opacity:.6"></div><div style="height:50%;background:var(--success);opacity:.5"></div><div style="height:85%;background:var(--success);opacity:.7"></div><div style="height:95%;background:var(--success);opacity:.9"></div></div></div>
-        <div class="stat-card"><div class="s-label">Gastos</div><div class="s-val" style="color:var(--danger)">$98,450</div><div class="s-sub down"><i class="fas fa-arrow-up"></i> +5.2%</div><div class="mini-bars"><div style="height:60%;background:var(--danger);opacity:.4"></div><div style="height:55%;background:var(--danger);opacity:.5"></div><div style="height:70%;background:var(--danger);opacity:.5"></div><div style="height:45%;background:var(--danger);opacity:.4"></div><div style="height:50%;background:var(--danger);opacity:.5"></div><div style="height:65%;background:var(--danger);opacity:.6"></div><div style="height:75%;background:var(--danger);opacity:.7"></div><div style="height:80%;background:var(--danger);opacity:.8"></div></div></div>
-        <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val">$44,350</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> Margen 31.1%</div></div>
-        <div class="stat-card"><div class="s-label">Facturas pendientes</div><div class="s-val">14</div><div class="s-sub down"><i class="fas fa-exclamation-triangle"></i> 3 vencidas</div></div>
+        <div class="stat-card"><div class="s-label">Ingresos</div><div class="s-val" id="acc-ingresos" style="color:var(--success)">$0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Gastos</div><div class="s-val" id="acc-gastos" style="color:var(--danger)">$0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val" id="acc-utilidad">$0</div><div class="s-sub" id="acc-margen"></div></div>
+        <div class="stat-card"><div class="s-label">Facturas pendientes</div><div class="s-val" id="acc-pendientes">0</div><div class="s-sub"></div></div>
       </div>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
         <div class="dtable-wrap">
@@ -2119,13 +2093,21 @@ function aView(id) {
 
 async function loadAdminData() {
   try {
-    const stats = await api('/api/dashboard/stats');
-    const cards = document.querySelectorAll('#a-req .stat-card');
-    if (cards[0]) cards[0].querySelector('.s-val').textContent = stats.cotizaciones_activas;
-    if (cards[2]) cards[2].querySelector('.s-val').textContent = stats.pedidos_en_curso;
-    if (cards[3]) cards[3].querySelector('.s-val').textContent = stats.completados;
-
     const cots = await api('/api/cotizaciones');
+    const pendientes = cots.filter(c => c.estado === 'pendiente').length;
+    const cotizados = cots.filter(c => c.estado === 'cotizado').length;
+    const produccion = cots.filter(c => c.estado === 'produccion').length;
+    const transito = cots.filter(c => c.estado === 'transito' || c.estado === 'embarque').length;
+
+    const cards = document.querySelectorAll('#a-req .stat-card');
+    if (cards[0]) cards[0].querySelector('.s-val').textContent = pendientes;
+    if (cards[1]) cards[1].querySelector('.s-val').textContent = cotizados;
+    if (cards[2]) cards[2].querySelector('.s-val').textContent = produccion;
+    if (cards[3]) cards[3].querySelector('.s-val').textContent = transito;
+
+    // Update sidebar badge
+    const badge = document.getElementById('admin-pending-cnt');
+    if (badge) badge.textContent = pendientes || cots.length;
     const tbody = document.querySelector('#a-req .dtable tbody');
     if (tbody && cots.length > 0) {
       const clientes = {};
