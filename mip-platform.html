@@ -943,7 +943,6 @@ html,body{overflow-x:hidden;max-width:100vw}
         <button type="submit" class="btn btn-dark btn-block btn-lg">Ingresar</button>
         <div style="display:flex;align-items:center;gap:12px;margin:16px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--text-muted)">o continúa con</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
         <div id="googleLoginBtn" style="display:flex;justify-content:center"></div>
-        <div style="text-align:center;margin-top:12px"><button type="button" class="btn btn-outline btn-sm" style="font-size:11px" onclick="doAdmin()"><i class="fas fa-lock"></i> Acceso Admin (Demo)</button></div>
       </form>
       <form class="auth-form" id="registerForm" onsubmit="doRegister(event)">
         <div class="form-row"><div class="form-group"><label class="form-label">Nombre completo *</label><input type="text" class="form-input" id="reg-nombre" placeholder="Juan Pérez" required></div><div class="form-group"><label class="form-label">Empresa *</label><input type="text" class="form-input" id="reg-empresa" placeholder="Mi Empresa SpA" required></div></div>
@@ -1032,13 +1031,8 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="dtable-wrap">
         <div class="dtable-header"><h3>Solicitudes recientes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">En revisión</button><button class="chip">Cotizado</button><button class="chip">Producción</button></div></div>
         <table class="dtable"><thead><tr><th>ID</th><th>Producto</th><th>Fecha</th><th>Cantidad</th><th>Estado</th><th></th></tr></thead>
-        <tbody>
-          <tr><td style="font-weight:600">#SOL-047</td><td>Zapatillas Running Custom</td><td style="color:var(--text-muted)">28 Mar 2026</td><td>5,000 prs</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> En revisión</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-          <tr><td style="font-weight:600">#SOL-043</td><td>Bolsas Ecológicas Marca Propia</td><td style="color:var(--text-muted)">15 Mar 2026</td><td>20,000 un</td><td><span class="badge badge-info"><i class="fas fa-dollar-sign"></i> Cotizado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-          <tr><td style="font-weight:600">#SOL-038</td><td>Luminarias LED Industrial</td><td style="color:var(--text-muted)">02 Mar 2026</td><td>1,200 un</td><td><span class="badge badge-success"><i class="fas fa-cog"></i> Producción</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-          <tr><td style="font-weight:600">#SOL-031</td><td>Cojines Decorativos Premium</td><td style="color:var(--text-muted)">10 Feb 2026</td><td>8,000 un</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-        </tbody></table>
-        <div class="table-pg"><span>Mostrando 4 de 15</span><div class="pg-btns"><button><i class="fas fa-chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button><i class="fas fa-chevron-right"></i></button></div></div>
+        <tbody></tbody></table>
+        <div class="table-pg"></div>
       </div>
     </div>
 
@@ -1192,12 +1186,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="dtable-wrap">
         <div class="dtable-header"><h3>Mis Pedidos</h3></div>
         <table class="dtable"><thead><tr><th>ID</th><th>Producto</th><th>Cantidad</th><th>Monto</th><th>Etapa</th><th>Estado</th><th></th></tr></thead>
-        <tbody id="c-orders-body">
-          <tr><td style="font-weight:600">#PED-001</td><td>Luminarias LED</td><td>1,200 un</td><td>$16,800</td><td>5/9 — Producción</td><td><span class="badge badge-success"><i class="fas fa-cog"></i> Producción</span></td><td><button class="btn btn-outline btn-sm" onclick="cView('c-track')">Timeline</button></td></tr>
-          <tr><td style="font-weight:600">#PED-002</td><td>Cojines Premium</td><td>8,000 un</td><td>$12,000</td><td>9/9 — Entregado</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-          <tr><td style="font-weight:600">#PED-003</td><td>Textiles Hogar</td><td>3,000 un</td><td>$8,400</td><td>7/9 — En tránsito</td><td><span class="badge badge-info"><i class="fas fa-truck"></i> Tránsito</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-          <tr><td style="font-weight:600">#PED-004</td><td>Herramientas</td><td>500 un</td><td>$4,500</td><td>9/9 — Entregado</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>
-        </tbody></table>
+        <tbody id="c-orders-body"></tbody></table>
       </div>
     </div>
 
@@ -1215,11 +1204,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="dtable-wrap">
         <div class="dtable-header"><h3>Mis Facturas</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">Pagadas</button><button class="chip">Pendientes</button></div></div>
         <table class="dtable"><thead><tr><th>N°</th><th>Pedido</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th>Estado</th><th>Archivo</th></tr></thead>
-        <tbody id="c-invoices-body">
-          <tr><td style="font-weight:600">FAC-001</td><td>#PED-001</td><td><span class="badge badge-success" style="font-size:10px">Ingreso</span></td><td class="exp-amt in">+$8,400</td><td style="color:var(--text-muted)">20 Mar</td><td><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></td><td><a href="#" style="color:var(--danger)"><i class="fas fa-file-pdf"></i> PDF</a></td></tr>
-          <tr><td style="font-weight:600">FAC-002</td><td>#PED-002</td><td><span class="badge badge-success" style="font-size:10px">Ingreso</span></td><td class="exp-amt in">+$12,000</td><td style="color:var(--text-muted)">08 Mar</td><td><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></td><td><a href="#" style="color:var(--danger)"><i class="fas fa-file-pdf"></i> PDF</a></td></tr>
-          <tr><td style="font-weight:600">FAC-003</td><td>#PED-003</td><td><span class="badge badge-success" style="font-size:10px">Ingreso</span></td><td class="exp-amt">$5,460</td><td style="color:var(--text-muted)">01 Abr</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></td><td style="color:var(--text-muted)">—</td></tr>
-        </tbody></table>
+        <tbody id="c-invoices-body"></tbody></table>
       </div>
     </div>
 
@@ -1258,15 +1243,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
       <div class="card" style="padding:28px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h3 style="font-size:16px;font-weight:600">Historial de actividad</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Cotizaciones</button><button class="chip">Pedidos</button><button class="chip">Facturas</button></div></div>
-        <div class="timeline" id="c-history-timeline">
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Factura FAC-002 pagada — $12,000</h4><p>08 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-002 entregado</h4><p>05 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Archivo subido: Comprobante_transferencia.jpg</h4><p>20 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización #SOL-047 enviada</h4><p>28 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-001 en producción (etapa 5/9)</h4><p>22 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pago anticipo 50% — $8,400</h4><p>20 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cuenta creada — Bienvenido a MIP Q&L</h4><p>01 Ene 2026</p></div></div>
-        </div>
+        <div class="timeline" id="c-history-timeline"></div>
       </div>
     </div>
 
@@ -1312,14 +1289,8 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="dtable-wrap">
         <div class="dtable-header"><h3>Todas las solicitudes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">Pendientes</button><button class="chip">Cotizadas</button><button class="chip">Producción</button></div></div>
         <table class="dtable"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Fecha</th><th>Cant.</th><th>Estado</th><th></th></tr></thead>
-        <tbody>
-          <tr><td style="font-weight:600">#SOL-047</td><td><div class="client-cell"><div class="c-av">JP</div><div><div style="font-weight:500">Juan Pérez</div><div style="font-size:11px;color:var(--text-muted)">RetailMax SpA</div></div></div></td><td>Zapatillas Running</td><td style="color:var(--text-muted)">28 Mar</td><td>5,000</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></td><td><button class="btn btn-dark btn-sm" onclick="openDetail()"><i class="fas fa-eye"></i> Ver</button></td></tr>
-          <tr><td style="font-weight:600">#SOL-046</td><td><div class="client-cell"><div class="c-av">MV</div><div><div style="font-weight:500">María V. Soto</div><div style="font-size:11px;color:var(--text-muted)">HealthPro</div></div></div></td><td>Guantes Nitrilo</td><td style="color:var(--text-muted)">25 Mar</td><td>50,000</td><td><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
-          <tr><td style="font-weight:600">#SOL-043</td><td><div class="client-cell"><div class="c-av">RC</div><div><div style="font-weight:500">Roberto Cifuentes</div><div style="font-size:11px;color:var(--text-muted)">EcoStore</div></div></div></td><td>Bolsas Ecológicas</td><td style="color:var(--text-muted)">15 Mar</td><td>20,000</td><td><span class="badge badge-info"><i class="fas fa-dollar-sign"></i> Cotizado</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
-          <tr><td style="font-weight:600">#SOL-038</td><td><div class="client-cell"><div class="c-av">AL</div><div><div style="font-weight:500">Andrea López</div><div style="font-size:11px;color:var(--text-muted)">LuxHome</div></div></div></td><td>Luminarias LED</td><td style="color:var(--text-muted)">02 Mar</td><td>1,200</td><td><span class="badge badge-success"><i class="fas fa-cog"></i> Producción</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
-          <tr><td style="font-weight:600">#SOL-035</td><td><div class="client-cell"><div class="c-av">CS</div><div><div style="font-weight:500">Carlos Sepúlveda</div><div style="font-size:11px;color:var(--text-muted)">SportMax</div></div></div></td><td>Pelotas Fútbol</td><td style="color:var(--text-muted)">20 Feb</td><td>10,000</td><td><span class="badge badge-neutral"><i class="fas fa-check"></i> Entregado</span></td><td><button class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></button></td></tr>
-        </tbody></table>
-        <div class="table-pg"><span>Mostrando 5 de 22</span><div class="pg-btns"><button><i class="fas fa-chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button>4</button><button>5</button><button><i class="fas fa-chevron-right"></i></button></div></div>
+        <tbody id="a-req-tbody"></tbody></table>
+        <div class="table-pg" id="a-req-pg"></div>
       </div>
     </div>
 
@@ -1758,8 +1729,19 @@ async function api(path, opts = {}) {
 // ─── Session ───
 let currentUser = JSON.parse(localStorage.getItem('mip_user') || 'null');
 
+// ─── Session verification ───
+if (currentUser) {
+  api(`/api/auth/me?email=${encodeURIComponent(currentUser.email)}`)
+    .then(u => { currentUser.role = u.role; localStorage.setItem('mip_user', JSON.stringify(currentUser)); })
+    .catch(() => {});
+}
+
 // ─── Navigation ───
 function go(id) {
+  if (id === 'page-admin' && (!currentUser || currentUser.role !== 'admin')) {
+    toast('error', 'Acceso denegado', 'No tienes permisos de administrador');
+    return;
+  }
   document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active', 'fade-enter'));
   const p = document.getElementById(id);
   if (p) { p.classList.add('active', 'fade-enter'); window.scrollTo(0, 0); }
@@ -1788,17 +1770,11 @@ async function doLogin(e) {
     localStorage.setItem('mip_user', JSON.stringify(user));
     updateUserUI();
     toast('success', 'Bienvenido', `Hola ${user.nombre}`);
-    setTimeout(() => go('page-client'), 800);
+    const dest = user.role === 'admin' ? 'page-admin' : 'page-client';
+    setTimeout(() => go(dest), 800);
   } catch (err) {
     toast('error', 'Error', err.message);
   }
-}
-
-function doAdmin() {
-  currentUser = { id: 0, nombre: 'Admin MIP', email: 'admin@mipquality.com', role: 'admin' };
-  localStorage.setItem('mip_user', JSON.stringify(currentUser));
-  toast('success', 'Acceso Admin', 'Ingresando al panel...');
-  setTimeout(() => go('page-admin'), 800);
 }
 
 async function doRegister(e) {
@@ -1847,7 +1823,8 @@ async function doCompleteProfile(e) {
     updateUserUI();
     document.getElementById('profileModal').classList.remove('open');
     toast('success', 'Perfil completado', `Bienvenido ${user.nombre}`);
-    setTimeout(() => go('page-client'), 600);
+    const dest = currentUser.role === 'admin' ? 'page-admin' : 'page-client';
+    setTimeout(() => go(dest), 600);
   } catch (err) {
     toast('error', 'Error', err.message);
   }
@@ -1892,6 +1869,102 @@ async function loadClientDashboard() {
   } catch (err) { console.error('Dashboard load error:', err); }
 }
 
+// ─── Client: Load Orders ───
+async function loadClientOrders() {
+  if (!currentUser) return;
+  try {
+    const pedidos = await api(`/api/pedidos?cliente_id=${currentUser.id}`);
+    const tbody = document.getElementById('c-orders-body');
+    if (!tbody) return;
+    const etapaNames = ['','Solicitud','Cotización','Muestra','Pago 50%','Producción','QC China','Embarque','Entrega','Pago final'];
+    const estadoBadge = { activo: 'badge-success', completado: 'badge-neutral', cancelado: 'badge-danger' };
+    const estadoIcon = { activo: 'fa-cog', completado: 'fa-check', cancelado: 'fa-times' };
+    tbody.innerHTML = pedidos.length ? pedidos.map(p => {
+      const etapa = etapaNames[p.etapa_actual] || 'Pendiente';
+      return `<tr><td style="font-weight:600">#PED-${String(p.id).padStart(3,'0')}</td><td>Pedido #${p.cotizacion_id}</td><td>${p.monto_total ? '$'+p.monto_total.toLocaleString() : '—'}</td><td>${p.etapa_actual}/9 — ${etapa}</td><td><span class="badge ${estadoBadge[p.estado]||'badge-neutral'}"><i class="fas ${estadoIcon[p.estado]||'fa-circle'}"></i> ${p.estado}</span></td><td><button class="btn btn-outline btn-sm" onclick="loadClientTimeline(${p.id},${p.etapa_actual})">Timeline</button></td></tr>`;
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No tienes pedidos activos</td></tr>';
+    // Update stats
+    const cards = document.querySelectorAll('#c-orders .stat-card .s-val');
+    if (cards[0]) cards[0].textContent = pedidos.length;
+    if (cards[1]) cards[1].textContent = pedidos.filter(p => p.estado === 'activo' && p.etapa_actual >= 7).length;
+    if (cards[2]) cards[2].textContent = pedidos.filter(p => p.estado === 'completado').length;
+    const total = pedidos.reduce((s, p) => s + (p.monto_total || 0), 0);
+    if (cards[3]) cards[3].textContent = '$' + (total / 1000).toFixed(0) + 'K';
+  } catch (err) { console.error('Load orders error:', err); }
+}
+
+// ─── Client: Load Timeline ───
+function loadClientTimeline(pedidoId, etapaActual) {
+  cView('c-track');
+  const timeline = document.querySelector('#c-track .timeline');
+  if (!timeline) return;
+  const etapas = ['Solicitud enviada','Cotización aprobada','Muestra aprobada','Pago 50% recibido','En producción','QC China','Embarque','Entrega','Pago final'];
+  timeline.innerHTML = etapas.map((e, i) => {
+    const step = i + 1;
+    let dotClass = '';
+    let icon = 'fa-circle';
+    if (step < etapaActual) { dotClass = 'done'; icon = 'fa-check'; }
+    else if (step === etapaActual) { dotClass = 'current'; icon = 'fa-circle'; }
+    const statusText = step < etapaActual ? 'Completado' : step === etapaActual ? 'En curso' : 'Pendiente';
+    return `<div class="tl-item"><div class="tl-dot ${dotClass}"><i class="fas ${icon}"></i></div><div class="tl-content"><h4>${e}</h4><p>${statusText}</p></div></div>`;
+  }).join('');
+  const title = document.querySelector('#c-track h3');
+  if (title) title.textContent = `Pedido #PED-${String(pedidoId).padStart(3,'0')} — Seguimiento`;
+}
+
+// ─── Client: Load Invoices ───
+async function loadClientInvoices() {
+  if (!currentUser) return;
+  try {
+    const facturas = await api('/api/facturas');
+    const tbody = document.getElementById('c-invoices-body');
+    if (!tbody) return;
+    tbody.innerHTML = facturas.length ? facturas.map(f => {
+      const date = new Date(f.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+      const tipoBadge = f.tipo === 'ingreso' ? 'badge-success' : 'badge-danger';
+      const estadoBadge = f.estado === 'pagado' ? 'badge-success' : 'badge-warning';
+      const estadoIcon = f.estado === 'pagado' ? 'fa-check' : 'fa-clock';
+      const amtClass = f.tipo === 'ingreso' ? 'exp-amt in' : 'exp-amt out';
+      const amtPrefix = f.tipo === 'ingreso' ? '+' : '-';
+      const archivo = f.archivo_url ? `<a href="${f.archivo_url}" target="_blank" style="color:var(--danger)"><i class="fas fa-file-pdf"></i> PDF</a>` : '<span style="color:var(--text-muted)">—</span>';
+      return `<tr><td style="font-weight:600">FAC-${String(f.id).padStart(3,'0')}</td><td>${f.pedido_id ? '#PED-'+String(f.pedido_id).padStart(3,'0') : '—'}</td><td><span class="badge ${tipoBadge}" style="font-size:10px">${f.tipo}</span></td><td class="${amtClass}">${amtPrefix}$${f.monto.toLocaleString()}</td><td style="color:var(--text-muted)">${date}</td><td><span class="badge ${estadoBadge}"><i class="fas ${estadoIcon}"></i> ${f.estado}</span></td><td>${archivo}</td></tr>`;
+    }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">No hay facturas registradas</td></tr>';
+  } catch (err) { console.error('Load invoices error:', err); }
+}
+
+// ─── Client: Load History ───
+async function loadClientHistory() {
+  if (!currentUser) return;
+  try {
+    const eventos = await api(`/api/historial?cliente_id=${currentUser.id}`);
+    const timeline = document.getElementById('c-history-timeline');
+    if (!timeline) return;
+    timeline.innerHTML = eventos.length ? eventos.map(ev => {
+      const date = new Date(ev.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+      return `<div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>${ev.descripcion}</h4><p>${date}</p></div></div>`;
+    }).join('') : '<div style="text-align:center;color:var(--text-muted);padding:24px">No hay actividad registrada</div>';
+  } catch (err) { console.error('Load history error:', err); }
+}
+
+// ─── Client: Real File Upload ───
+async function uploadFile(inputEl, pedidoId) {
+  const file = inputEl.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const url = pedidoId ? `/api/archivos/upload?pedido_id=${pedidoId}` : '/api/archivos/upload';
+    const r = await fetch(API + url, { method: 'POST', body: formData });
+    if (!r.ok) throw new Error('Upload failed');
+    const result = await r.json();
+    toast('success', 'Archivo subido', result.nombre);
+    return result;
+  } catch (err) {
+    toast('error', 'Error', 'No se pudo subir el archivo');
+    return null;
+  }
+}
+
 // ─── Client Views ───
 function cView(id) {
   ['c-dash', 'c-quote', 'c-track', 'c-orders', 'c-invoices', 'c-support', 'c-history'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
@@ -1902,6 +1975,9 @@ function cView(id) {
   const idx = { 'c-dash': 0, 'c-quote': 1, 'c-track': 2, 'c-orders': 3, 'c-invoices': 4, 'c-support': 5, 'c-history': 6 };
   if (links[idx[id]]) links[idx[id]].classList.add('active');
   if (id === 'c-dash') loadClientDashboard();
+  if (id === 'c-orders') loadClientOrders();
+  if (id === 'c-invoices') loadClientInvoices();
+  if (id === 'c-history') loadClientHistory();
 }
 
 // ─── Quotation: Category cascading ───
@@ -2150,7 +2226,8 @@ async function handleGoogleCredential(response) {
       toast('info', 'Completa tu perfil', 'Necesitamos algunos datos adicionales.');
     } else {
       toast('success', 'Bienvenido', `Hola ${user.nombre}`);
-      setTimeout(() => go('page-client'), 800);
+      const dest = user.role === 'admin' ? 'page-admin' : 'page-client';
+      setTimeout(() => go(dest), 800);
     }
   } catch (err) {
     toast('error', 'Error', err.message);

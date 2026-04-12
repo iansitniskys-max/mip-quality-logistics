@@ -17,6 +17,7 @@ class Cliente(Base):
     referido_por = Column(String(100))
     vendedor_asignado = Column(String(200))
     sitio_web = Column(String(300))
+    role = Column(String(20), default="client")  # 'client' or 'admin'
     created_at = Column(DateTime, server_default=func.now())
 
     cotizaciones = relationship("Cotizacion", back_populates="cliente")

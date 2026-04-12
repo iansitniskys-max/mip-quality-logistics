@@ -29,6 +29,7 @@ class ClienteOut(BaseModel):
     referido_por: Optional[str] = ""
     vendedor_asignado: Optional[str] = ""
     sitio_web: Optional[str] = ""
+    role: Optional[str] = "client"
     created_at: datetime
     class Config:
         from_attributes = True

@@ -38,7 +38,7 @@ def on_startup():
         # Migrate: add new columns if missing
         from sqlalchemy import text
         with engine.connect() as conn:
-            for col, col_type in [("num_empleados", "VARCHAR(30)"), ("referido_por", "VARCHAR(100)"), ("vendedor_asignado", "VARCHAR(200)"), ("sitio_web", "VARCHAR(300)")]:
+            for col, col_type in [("num_empleados", "VARCHAR(30)"), ("referido_por", "VARCHAR(100)"), ("vendedor_asignado", "VARCHAR(200)"), ("sitio_web", "VARCHAR(300)"), ("role", "VARCHAR(20) DEFAULT 'client'")]:
                 try:
                     conn.execute(text(f"ALTER TABLE clientes ADD COLUMN {col} {col_type}"))
                     conn.commit()
@@ -105,7 +105,7 @@ def google_login(request_body: dict, db: Session = Depends(get_db)):
         "num_empleados": cliente.num_empleados or "",
         "referido_por": cliente.referido_por or "",
         "picture": picture,
-        "role": "client",
+        "role": cliente.role or "client",
         "profile_complete": profile_complete,
     }
 
@@ -116,7 +116,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not cliente:
         raise HTTPException(404, "Cliente no encontrado")
     profile_complete = bool(cliente.empresa and cliente.telefono and cliente.num_empleados)
-    return {"id": cliente.id, "nombre": cliente.nombre, "email": cliente.email, "empresa": cliente.empresa, "telefono": cliente.telefono or "", "rubro": cliente.rubro or "", "num_empleados": cliente.num_empleados or "", "referido_por": cliente.referido_por or "", "role": "client", "profile_complete": profile_complete}
+    return {"id": cliente.id, "nombre": cliente.nombre, "email": cliente.email, "empresa": cliente.empresa, "telefono": cliente.telefono or "", "rubro": cliente.rubro or "", "num_empleados": cliente.num_empleados or "", "referido_por": cliente.referido_por or "", "role": cliente.role or "client", "profile_complete": profile_complete}
 
 
 @app.post("/api/auth/register")
@@ -173,7 +173,21 @@ def complete_profile(data: dict, db: Session = Depends(get_db)):
         "rubro": cliente.rubro, "num_empleados": cliente.num_empleados,
         "referido_por": cliente.referido_por, "vendedor_asignado": cliente.vendedor_asignado,
         "sitio_web": cliente.sitio_web,
-        "role": "client", "profile_complete": True,
+        "role": cliente.role or "client", "profile_complete": True,
+    }
+
+
+# ─── Auth: Verify current user ───
+@app.get("/api/auth/me")
+def get_me(email: str = Query(...), db: Session = Depends(get_db)):
+    """Verify user role from backend - prevents localStorage tampering"""
+    cliente = db.query(Cliente).filter(Cliente.email == email).first()
+    if not cliente:
+        raise HTTPException(404, "Usuario no encontrado")
+    return {
+        "id": cliente.id, "nombre": cliente.nombre, "email": cliente.email,
+        "empresa": cliente.empresa, "role": cliente.role or "client",
+        "profile_complete": bool(cliente.empresa and cliente.telefono and cliente.num_empleados),
     }
 
 
