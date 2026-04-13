@@ -308,6 +308,32 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 
 .integration-tag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);background:var(--bg-surface);border:1px solid var(--border);font-size:12px;color:var(--text-secondary)}
 
+/* ═══ KANBAN / PIPELINE CRM ═══ */
+.view-toggle{display:inline-flex;background:var(--bg-surface);border-radius:var(--radius);padding:3px;gap:0}
+.view-toggle button{padding:6px 14px;border-radius:5px;font-size:12px;font-weight:500;color:var(--text-muted);transition:all .2s;white-space:nowrap}
+.view-toggle button.active{background:var(--bg-white);color:var(--text);box-shadow:var(--shadow-sm)}
+.kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;min-height:400px;-webkit-overflow-scrolling:touch}
+.kanban-col{min-width:260px;max-width:300px;flex:1;background:var(--bg-surface);border-radius:var(--radius-lg);display:flex;flex-direction:column;border:1px solid var(--border)}
+.kanban-col-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.kanban-col-head h4{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-secondary)}
+.kanban-col-head .cnt{background:rgba(0,0,0,0.06);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;color:var(--text-muted)}
+.kanban-col-body{padding:8px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;min-height:80px}
+.kanban-card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .2s,border-color .2s}
+.kanban-card:hover{border-color:var(--border-hover);box-shadow:var(--shadow-md)}
+.kanban-card .kc-product{font-size:13px;font-weight:600;margin-bottom:4px;color:var(--text)}
+.kanban-card .kc-client{font-size:11px;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.kanban-card .kc-client .kc-av{width:20px;height:20px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--text-secondary)}
+.kanban-card .kc-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted)}
+.kanban-card .kc-amount{font-weight:600;color:var(--text)}
+.kanban-card .kc-date{font-size:10px}
+.kanban-card .kc-actions{display:flex;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.kanban-card .kc-actions button{flex:1;padding:4px 0;font-size:10px;border-radius:4px;background:var(--bg-surface);color:var(--text-muted);transition:all .15s;display:flex;align-items:center;justify-content:center;gap:4px}
+.kanban-card .kc-actions button:hover{background:var(--bg-dark);color:var(--text-inv)}
+.kanban-col[data-status="pendiente"] .kanban-col-head{border-top:3px solid var(--warning)}
+.kanban-col[data-status="cotizado"] .kanban-col-head{border-top:3px solid var(--info)}
+.kanban-col[data-status="produccion"] .kanban-col-head{border-top:3px solid var(--success)}
+.kanban-col[data-status="entregado"] .kanban-col-head{border-top:3px solid var(--text-muted)}
+
 /* ═══ ACCOUNTING ═══ */
 .acc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
 .mini-bars{display:flex;align-items:flex-end;gap:2px;height:32px;margin-top:10px}
@@ -510,6 +536,19 @@ html,body{overflow-x:hidden;max-width:100vw}
   .admin-btn-group{width:100%}
   .admin-btn-group .btn{flex:1;justify-content:center;font-size:11px;padding:6px 8px}
   .exp-row{grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+  /* Mobile: horizontal compact stats */
+  .stat-grid{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;margin-bottom:16px}
+  .stat-card{min-width:0;flex:1;padding:10px 12px}
+  .stat-card .s-label{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat-card .s-val{font-size:16px}
+  .stat-card .s-sub{display:none}
+  .acc-grid{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;margin-bottom:16px}
+  .acc-grid .stat-card{min-width:0;flex:1;padding:10px 12px}
+  /* Kanban responsive */
+  .kanban-board{gap:8px}
+  .kanban-col{min-width:220px;max-width:260px}
+  .kanban-card{padding:10px}
+  .kanban-card .kc-product{font-size:12px}
 }
 @media(max-width:480px){
   .hero{padding:70px 14px 32px;min-height:auto}
@@ -1288,7 +1327,10 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- ADMIN: Requests -->
     <div class="page-body" id="a-req">
       <div class="admin-header-flex" style="margin-bottom:16px">
-        <div></div>
+        <div class="view-toggle">
+          <button class="active" onclick="switchReqView('pipeline')"><i class="fas fa-columns"></i> Pipeline</button>
+          <button onclick="switchReqView('table')"><i class="fas fa-table"></i> Tabla</button>
+        </div>
         <button class="btn btn-dark btn-sm" onclick="openNewProjectModal()"><i class="fas fa-plus"></i> Nuevo Proyecto</button>
       </div>
       <div class="stat-grid">
@@ -1297,11 +1339,23 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="stat-card"><div class="s-label">En producción</div><div class="s-val">0</div></div>
         <div class="stat-card"><div class="s-label">En tránsito</div><div class="s-val">0</div></div>
       </div>
-      <div class="dtable-wrap">
-        <div class="dtable-header"><h3>Todas las solicitudes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">Pendientes</button><button class="chip">Cotizadas</button><button class="chip">Producción</button></div></div>
-        <table class="dtable"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Fecha</th><th>Cant.</th><th>Estado</th><th></th></tr></thead>
-        <tbody id="a-req-tbody"></tbody></table>
-        <div class="table-pg" id="a-req-pg"></div>
+      <!-- PIPELINE / KANBAN VIEW (default) -->
+      <div id="a-req-pipeline">
+        <div class="kanban-board" id="kanban-board">
+          <div class="kanban-col" data-status="pendiente"><div class="kanban-col-head"><h4>Pendiente</h4><span class="cnt">0</span></div><div class="kanban-col-body" id="kb-pendiente"></div></div>
+          <div class="kanban-col" data-status="cotizado"><div class="kanban-col-head"><h4>Cotizado</h4><span class="cnt">0</span></div><div class="kanban-col-body" id="kb-cotizado"></div></div>
+          <div class="kanban-col" data-status="produccion"><div class="kanban-col-head"><h4>Producción</h4><span class="cnt">0</span></div><div class="kanban-col-body" id="kb-produccion"></div></div>
+          <div class="kanban-col" data-status="entregado"><div class="kanban-col-head"><h4>Entregado</h4><span class="cnt">0</span></div><div class="kanban-col-body" id="kb-entregado"></div></div>
+        </div>
+      </div>
+      <!-- TABLE VIEW (hidden by default) -->
+      <div id="a-req-table" style="display:none">
+        <div class="dtable-wrap">
+          <div class="dtable-header"><h3>Todas las solicitudes</h3></div>
+          <table class="dtable"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Fecha</th><th>Cant.</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="a-req-tbody"></tbody></table>
+          <div class="table-pg" id="a-req-pg"></div>
+        </div>
       </div>
     </div>
 
@@ -2122,41 +2176,84 @@ function aView(id) {
   if (id === 'a-tickets') loadAdminTickets();
 }
 
+// ─── View Toggle: Pipeline / Table ───
+function switchReqView(view) {
+  const pipeline = document.getElementById('a-req-pipeline');
+  const table = document.getElementById('a-req-table');
+  const btns = document.querySelectorAll('.view-toggle button');
+  if (view === 'pipeline') {
+    if (pipeline) pipeline.style.display = 'block';
+    if (table) table.style.display = 'none';
+    btns[0]?.classList.add('active'); btns[1]?.classList.remove('active');
+  } else {
+    if (pipeline) pipeline.style.display = 'none';
+    if (table) table.style.display = 'block';
+    btns[0]?.classList.remove('active'); btns[1]?.classList.add('active');
+  }
+}
+
 async function loadAdminData() {
   try {
     const cots = await api('/api/cotizaciones');
     const pendientes = cots.filter(c => c.estado === 'pendiente').length;
     const cotizados = cots.filter(c => c.estado === 'cotizado').length;
-    const produccion = cots.filter(c => c.estado === 'produccion').length;
-    const transito = cots.filter(c => c.estado === 'transito' || c.estado === 'embarque').length;
+    const enProduccion = cots.filter(c => c.estado === 'produccion').length;
+    const entregados = cots.filter(c => c.estado === 'entregado').length;
 
     const cards = document.querySelectorAll('#a-req .stat-card');
     if (cards[0]) cards[0].querySelector('.s-val').textContent = pendientes;
     if (cards[1]) cards[1].querySelector('.s-val').textContent = cotizados;
-    if (cards[2]) cards[2].querySelector('.s-val').textContent = produccion;
-    if (cards[3]) cards[3].querySelector('.s-val').textContent = transito;
+    if (cards[2]) cards[2].querySelector('.s-val').textContent = enProduccion;
+    if (cards[3]) cards[3].querySelector('.s-val').textContent = entregados;
 
-    // Update sidebar badge
     const badge = document.getElementById('admin-pending-cnt');
     if (badge) badge.textContent = pendientes || cots.length;
-    const tbody = document.querySelector('#a-req .dtable tbody');
-    if (tbody && cots.length > 0) {
-      const clientes = {};
-      for (const c of cots) {
-        if (!clientes[c.cliente_id]) {
-          try { clientes[c.cliente_id] = await api(`/api/clientes/${c.cliente_id}`); } catch { clientes[c.cliente_id] = { nombre: 'Cliente', empresa: '' }; }
-        }
+
+    // Fetch all clients
+    const clientes = {};
+    for (const c of cots) {
+      if (!clientes[c.cliente_id]) {
+        try { clientes[c.cliente_id] = await api(`/api/clientes/${c.cliente_id}`); } catch { clientes[c.cliente_id] = { nombre: 'Cliente', empresa: '', email: '' }; }
       }
-      tbody.innerHTML = cots.slice(0, 10).map(c => {
-        const cl = clientes[c.cliente_id] || { nombre: 'N/A', empresa: '' };
-        const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-        const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
-        const labels = { pendiente: 'Pendiente', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
-        const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
-        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')" title="Invitar cliente"><i class="fas fa-envelope"></i></button><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)" title="Subir documento"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail(${c.id})"><i class="fas fa-eye"></i></button></td></tr>`;
-      }).join('');
-    } else {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px"><i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px"></i>No hay solicitudes. Click "Nuevo Proyecto" para crear una.</td></tr>';
+    }
+
+    // ─── Render KANBAN ───
+    const statuses = ['pendiente','cotizado','produccion','entregado'];
+    statuses.forEach(status => {
+      const col = document.getElementById(`kb-${status}`);
+      const cnt = col?.parentElement?.querySelector('.cnt');
+      const filtered = cots.filter(c => c.estado === status);
+      if (cnt) cnt.textContent = filtered.length;
+      if (col) {
+        col.innerHTML = filtered.length ? filtered.map(c => {
+          const cl = clientes[c.cliente_id] || { nombre: 'N/A', empresa: '', email: '' };
+          const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+          const date = new Date(c.created_at).toLocaleDateString('es-CL', { day:'2-digit', month:'short' });
+          return `<div class="kanban-card" onclick="openDetail(${c.id})">
+            <div class="kc-product">${c.producto}</div>
+            <div class="kc-client"><span class="kc-av">${initials}</span>${cl.nombre}</div>
+            <div class="kc-meta"><span class="kc-amount">${c.cantidad || '—'}</span><span class="kc-date">${date}</span></div>
+            <div class="kc-actions">
+              <button onclick="event.stopPropagation();inviteClientToPlatform('${cl.email}','${cl.nombre}')" title="Invitar"><i class="fas fa-envelope"></i></button>
+              <button onclick="event.stopPropagation();openAdminUploadModal(${c.id},null)" title="Subir doc"><i class="fas fa-upload"></i></button>
+              <button onclick="event.stopPropagation();openDetail(${c.id})" title="Ver detalle"><i class="fas fa-eye"></i></button>
+            </div>
+          </div>`;
+        }).join('') : '<div style="text-align:center;padding:20px;color:var(--text-faint);font-size:12px">Sin solicitudes</div>';
+      }
+    });
+
+    // ─── Render TABLE ───
+    const tbody = document.getElementById('a-req-tbody');
+    if (tbody) {
+      const badges = { pendiente:'badge-warning', cotizado:'badge-info', produccion:'badge-success', entregado:'badge-neutral' };
+      const labels = { pendiente:'Pendiente', cotizado:'Cotizado', produccion:'Producción', entregado:'Entregado' };
+      tbody.innerHTML = cots.length ? cots.slice(0,20).map(c => {
+        const cl = clientes[c.cliente_id] || { nombre: 'N/A', empresa: '', email: '' };
+        const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+        const date = new Date(c.created_at).toLocaleDateString('es-CL', { day:'2-digit', month:'short' });
+        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')"><i class="fas fa-envelope"></i></button><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail(${c.id})"><i class="fas fa-eye"></i></button></td></tr>`;
+      }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px"><i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px"></i>No hay solicitudes</td></tr>';
     }
   } catch (err) { console.error('Admin load error:', err); }
 }
