@@ -227,9 +227,9 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 .sb-user .av{width:32px;height:32px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-secondary)}
 .sb-user .name{font-size:12px;font-weight:600}
 .sb-user .email{font-size:10px;color:var(--text-muted)}
-.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;background:var(--bg)}
-.topbar{height:var(--topbar-h);padding:0 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid rgba(0,0,0,0.06);background:rgba(255,255,255,0.95);backdrop-filter:blur(20px);position:sticky;top:0;z-index:50}
-.topbar h1{font-size:16px;font-weight:600}
+.main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;background:var(--bg);overflow-x:hidden;max-width:calc(100vw - var(--sidebar-w))}
+.topbar{height:var(--topbar-h);padding:0 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid rgba(0,0,0,0.06);background:rgba(255,255,255,0.95);backdrop-filter:blur(20px);position:sticky;top:0;z-index:50;gap:12px}
+.topbar h1{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:250px}
 .topbar-right{display:flex;align-items:center;gap:10px}
 .topbar-search{display:flex;align-items:center;gap:6px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;width:200px}
 .topbar-search i{color:var(--text-faint);font-size:12px}
@@ -237,9 +237,9 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 .topbar-notif{position:relative;width:32px;height:32px;border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;transition:border-color .2s}
 .topbar-notif:hover{border-color:var(--border-active)}
 .topbar-notif .dot{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--danger)}
-.page-body{padding:28px}
+.page-body{padding:24px;overflow-x:hidden}
 
-.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
 .stat-card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px}
 .stat-card .s-label{font-size:12px;color:var(--text-muted);margin-bottom:6px}
 .stat-card .s-val{font-size:22px;font-weight:600}
@@ -309,7 +309,7 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 .integration-tag{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);background:var(--bg-surface);border:1px solid var(--border);font-size:12px;color:var(--text-secondary)}
 
 /* ═══ ACCOUNTING ═══ */
-.acc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.acc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
 .mini-bars{display:flex;align-items:flex-end;gap:2px;height:32px;margin-top:10px}
 .mini-bars div{flex:1;border-radius:2px 2px 0 0;min-height:3px;transition:opacity .2s}
 .mini-bars div:hover{opacity:1!important}
@@ -502,8 +502,8 @@ html,body{overflow-x:hidden;max-width:100vw}
 /* ─ Admin inline grids responsive ─ */
 .admin-grid-2{display:grid;grid-template-columns:2fr 1fr;gap:20px}
 .admin-grid-half{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.admin-header-flex{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px}
-.admin-btn-group{display:flex;gap:8px;flex-wrap:wrap}
+.admin-header-flex{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.admin-btn-group{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 @media(max-width:768px){
   .admin-grid-2,.admin-grid-half{grid-template-columns:1fr}
   .admin-header-flex{flex-direction:column;align-items:flex-start}
