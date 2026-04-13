@@ -499,6 +499,18 @@ html,body{overflow-x:hidden;max-width:100vw}
   /* ─ Trust bar ─ */
   .trust-bar{padding:32px 16px}
 }
+/* ─ Admin inline grids responsive ─ */
+.admin-grid-2{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+.admin-grid-half{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.admin-header-flex{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px}
+.admin-btn-group{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:768px){
+  .admin-grid-2,.admin-grid-half{grid-template-columns:1fr}
+  .admin-header-flex{flex-direction:column;align-items:flex-start}
+  .admin-btn-group{width:100%}
+  .admin-btn-group .btn{flex:1;justify-content:center;font-size:11px;padding:6px 8px}
+  .exp-row{grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+}
 @media(max-width:480px){
   .hero{padding:70px 14px 32px;min-height:auto}
   .hero h1{font-size:24px}
@@ -516,7 +528,10 @@ html,body{overflow-x:hidden;max-width:100vw}
   .footer-col{margin-bottom:16px}
   .btn-lg{padding:12px 20px;font-size:13px}
   .topbar h1{max-width:100px;font-size:13px}
-  .page-body{padding:10px}
+  .page-body{padding:12px}
+  .admin-grid-2{grid-template-columns:1fr;gap:12px}
+  .exp-row{grid-template-columns:1fr}
+  .modal-box{padding:20px 16px}
 }
 
 /* ═══ CTA POPUP BANNER ═══ */
@@ -1001,12 +1016,12 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="sb-header"><a class="logo" href="#" onclick="go('page-landing');return false"><svg viewBox="0 0 32 32" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="14" fill="none" stroke="#1a1a1a" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="14" ry="7" fill="none" stroke="#1a1a1a" stroke-width=".8" opacity=".5"/><circle cx="16" cy="16" r="2" fill="#1a1a1a" opacity=".3"/></svg><div><div class="logo-name" style="font-size:11px">MIP Q&L</div><div class="logo-sub" style="font-size:8px">Portal Cliente</div></div></a></div>
     <nav class="sb-nav">
       <div class="sb-section"><div class="sb-section-title">Principal</div>
-        <a class="sb-link active" onclick="cView('c-dash')"><i class="fas fa-th-large"></i> Dashboard<span class="cnt">3</span></a>
+        <a class="sb-link active" onclick="cView('c-dash')"><i class="fas fa-th-large"></i> Dashboard</a>
         <a class="sb-link" onclick="cView('c-quote')"><i class="fas fa-plus-circle"></i> Nueva Cotización</a>
         <a class="sb-link" onclick="cView('c-track')"><i class="fas fa-history"></i> Mis Solicitudes</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Operaciones</div>
-        <a class="sb-link" onclick="cView('c-orders')"><i class="fas fa-box"></i> Mis Pedidos<span class="cnt">2</span></a>
+        <a class="sb-link" onclick="cView('c-orders')"><i class="fas fa-box"></i> Mis Pedidos</a>
         <a class="sb-link" onclick="cView('c-invoices')"><i class="fas fa-file-invoice"></i> Facturas</a>
         <a class="sb-link" onclick="cView('c-support')"><i class="fas fa-headset"></i> Soporte</a>
       </div>
@@ -1018,7 +1033,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="sb-footer"><div class="sb-user"><div class="av">--</div><div><div class="name">Cliente</div><div class="email">email</div></div></div></div>
   </aside>
   <div class="main">
-    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
 
     <div class="page-body" id="c-dash">
       <div class="stat-grid">
@@ -1203,7 +1218,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- CLIENT: Soporte -->
     <div class="page-body" id="c-support" style="display:none">
       <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
-      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px">
+      <div class="admin-grid-2">
         <div class="card" style="padding:28px">
           <h3 style="font-size:16px;font-weight:600;margin-bottom:16px">Preguntas Frecuentes</h3>
           <div class="faq-item" onclick="this.classList.toggle('open')"><div class="faq-q"><i class="fas fa-chevron-right"></i> ¿Cuánto tarda una cotización?</div><div class="faq-a">Normalmente entre 24-48 horas hábiles recibimos propuestas de nuestros proveedores en China.</div></div>
@@ -1268,11 +1283,11 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="sb-footer"><div class="sb-user"><div class="av" style="background:var(--danger-bg);color:var(--danger)">A</div><div><div class="name">Admin MIP</div><div class="email">admin@mipquality.com</div></div></div></div>
   </aside>
   <div class="main">
-    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
 
     <!-- ADMIN: Requests -->
     <div class="page-body" id="a-req">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="admin-header-flex" style="margin-bottom:16px">
         <div></div>
         <button class="btn btn-dark btn-sm" onclick="openNewProjectModal()"><i class="fas fa-plus"></i> Nuevo Proyecto</button>
       </div>
@@ -1400,9 +1415,9 @@ html,body{overflow-x:hidden;max-width:100vw}
 
     <!-- ADMIN: Accounting -->
     <div class="page-body" id="a-acc" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px">
-        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Control de Gastos</h2><p style="font-size:13px;color:var(--text-secondary)">Marzo 2026</p></div>
-        <div style="display:flex;gap:8px"><select class="form-input" style="width:140px;padding:7px 12px;font-size:12px"><option>Marzo 2026</option><option>Febrero 2026</option><option>Enero 2026</option><option>Q1 2026</option></select><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo gasto</button><button class="btn btn-outline btn-sm"><i class="fas fa-file-export"></i> Exportar</button></div>
+      <div class="admin-header-flex">
+        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Control de Gastos</h2></div>
+        <div class="admin-btn-group"><select class="form-input" style="max-width:140px;padding:7px 12px;font-size:12px"><option>2026</option><option>2025</option></select><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-outline btn-sm"><i class="fas fa-file-export"></i> Exportar</button></div>
       </div>
       <div class="acc-grid">
         <div class="stat-card"><div class="s-label">Ingresos</div><div class="s-val" id="acc-ingresos" style="color:var(--success)">$0</div><div class="s-sub"></div></div>
@@ -1410,7 +1425,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val" id="acc-utilidad">$0</div><div class="s-sub" id="acc-margen"></div></div>
         <div class="stat-card"><div class="s-label">Facturas pendientes</div><div class="s-val" id="acc-pendientes">0</div><div class="s-sub"></div></div>
       </div>
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+      <div class="admin-grid-2">
         <div class="dtable-wrap">
           <div class="dtable-header"><h3>Libro de gastos & ingresos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Ingresos</button><button class="chip">Gastos</button></div></div>
           <div style="max-height:420px;overflow-y:auto" id="acc-libro-body">
@@ -1431,11 +1446,11 @@ html,body{overflow-x:hidden;max-width:100vw}
 
     <!-- ADMIN: Clientes -->
     <div class="page-body" id="a-clients" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div class="admin-header-flex">
         <h2 style="font-size:18px;font-weight:600">Maestra de Clientes</h2>
-        <div style="display:flex;gap:8px">
+        <div class="admin-btn-group">
           <button class="btn btn-outline btn-sm" onclick="window.open('/api/clientes/export?template_only=true')"><i class="fas fa-file-download"></i> Plantilla</button>
-          <button class="btn btn-outline btn-sm" onclick="importBulk('clientes')"><i class="fas fa-file-upload"></i> Importar CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="importBulk('clientes')"><i class="fas fa-file-upload"></i> Importar</button>
           <button class="btn btn-outline btn-sm" onclick="window.open('/api/clientes/export')"><i class="fas fa-file-export"></i> Exportar</button>
         </div>
       </div>
@@ -1475,7 +1490,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="stat-card"><div class="s-label">Pedidos activos</div><div class="s-val" id="rpt-pedidos">0</div></div>
         <div class="stat-card"><div class="s-label">Ingresos totales</div><div class="s-val" id="rpt-ingresos">$0</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="admin-grid-half">
         <div class="dtable-wrap"><div class="dtable-header"><h3>Top Clientes</h3></div><table class="dtable"><thead><tr><th>Cliente</th><th>Cotizaciones</th></tr></thead><tbody id="rpt-top-clients"><tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:24px">Sin datos aún</td></tr></tbody></table></div>
         <div class="dtable-wrap"><div class="dtable-header"><h3>Top Productos</h3></div><table class="dtable"><thead><tr><th>Producto</th><th>Estado</th></tr></thead><tbody id="rpt-top-products"><tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:24px">Sin datos aún</td></tr></tbody></table></div>
       </div>
@@ -1484,7 +1499,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- ADMIN: Configuración -->
     <div class="page-body" id="a-config" style="display:none">
       <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Configuración</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div class="admin-grid-half">
         <div class="card" style="padding:24px">
           <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-building" style="color:var(--text-muted);margin-right:6px"></i>Información de la empresa</h3>
           <div class="form-group"><label class="form-label">Nombre empresa</label><input class="form-input" value="MIP Quality & Logistics"></div>
