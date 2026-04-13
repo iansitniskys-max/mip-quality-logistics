@@ -1015,7 +1015,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" onclick="openFeedbackModal()"><i class="fas fa-bug"></i> Reportar error</a>
       </div>
     </nav>
-    <div class="sb-footer"><div class="sb-user"><div class="av">JP</div><div><div class="name">Juan Pérez</div><div class="email">juan@empresa.com</div></div></div></div>
+    <div class="sb-footer"><div class="sb-user"><div class="av">--</div><div><div class="name">Cliente</div><div class="email">email</div></div></div></div>
   </aside>
   <div class="main">
     <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i><span class="dot"></span></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
@@ -1158,18 +1158,10 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="page-body" id="c-track" style="display:none">
       <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
       <div class="card" style="padding:28px;max-width:640px">
-        <h3 style="font-size:16px;font-weight:600;margin-bottom:4px">Pedido #SOL-038 — Luminarias LED</h3>
-        <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">1,200 unidades</p>
-        <div class="timeline">
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Solicitud enviada</h4><p>02 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización aprobada</h4><p>05 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Muestra aprobada</h4><p>18 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pago 50% recibido</h4><p>20 Mar 2026</p></div></div>
-          <div class="tl-item"><div class="tl-dot current"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>En producción</h4><p>22 Mar 2026 — en curso</p></div></div>
-          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>QC China</h4><p>Pendiente</p></div></div>
-          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Embarque</h4><p>Pendiente</p></div></div>
-          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Entrega</h4><p>Pendiente</p></div></div>
-          <div class="tl-item"><div class="tl-dot"><i class="fas fa-circle"></i></div><div class="tl-content"><h4>Pago final</h4><p>Pendiente</p></div></div>
+        <h3 id="c-track-title" style="font-size:16px;font-weight:600;margin-bottom:4px">Seguimiento</h3>
+        <p id="c-track-sub" style="color:var(--text-muted);font-size:13px;margin-bottom:20px"></p>
+        <div class="timeline" id="c-track-timeline">
+          <div style="text-align:center;padding:24px;color:var(--text-muted)">Selecciona un pedido para ver el timeline</div>
         </div>
       </div>
     </div>
@@ -1311,7 +1303,11 @@ html,body{overflow-x:hidden;max-width:100vw}
           </div>
           <div class="form-row">
             <div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" id="np-empresa" placeholder="Empresa SpA"></div>
+            <div class="form-group"><label class="form-label">RUT</label><input type="text" class="form-input" id="np-rut" placeholder="76.123.456-7"></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label class="form-label">Teléfono</label><input type="text" class="form-input" id="np-telefono" placeholder="+56 9 1234 5678"></div>
+            <div class="form-group"><label class="form-label">Rubro</label><select class="form-input" id="np-rubro"><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Deportes</option><option>Otro</option></select></div>
           </div>
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-box" style="margin-right:4px"></i> PRODUCTO / PROYECTO</div>
           <div class="form-group"><label class="form-label">Producto / Nombre del proyecto *</label><input type="text" class="form-input" id="np-producto" placeholder="Máquina de hielo, Línea Ironman, etc." required></div>
@@ -1321,8 +1317,15 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group"><label class="form-label">Precio objetivo</label><input type="text" class="form-input" id="np-precio" placeholder="$3.50 USD"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Plazo</label><select class="form-input" id="np-plazo"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>100 días</option><option>Flexible</option></select></div>
+            <div class="form-group"><label class="form-label">Plazo producción</label><select class="form-input" id="np-plazo"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>100 días</option><option>120 días</option><option>Flexible</option></select></div>
             <div class="form-group"><label class="form-label">Estado</label><select class="form-input" id="np-estado"><option value="pendiente">Pendiente</option><option value="cotizado">Cotizado</option><option value="produccion">En producción</option><option value="entregado">Entregado</option></select></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-percentage" style="margin-right:4px"></i> COMERCIAL MIP</div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Margen MIP (%)</label><input type="text" class="form-input" id="np-margen" placeholder="15%"></div>
+            <div class="form-group"><label class="form-label">Condiciones de pago</label><select class="form-input" id="np-condiciones-pago"><option value="">Seleccionar...</option><option>50/50 (50% anticipo, 50% pre-embarque)</option><option>30/70 (30% anticipo, 70% pre-embarque)</option><option>100% anticipo</option><option>LC (Carta de crédito)</option><option>A convenir</option></select></div>
+          </div>
+          <div class="form-group"><label class="form-label">Financiamiento</label><select class="form-input" id="np-financiamiento"><option value="">Sin financiamiento</option><option>MIP financia anticipo</option><option>MIP financia 100%</option><option>Financiamiento parcial</option><option>Leasing / Arriendo</option><option>A convenir</option></select></div>
           </div>
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-truck" style="margin-right:4px"></i> PEDIDO (opcional)</div>
           <div class="switch-wrap" style="margin-bottom:12px"><div class="switch" id="sw-crear-pedido" onclick="toggleSw('sw-crear-pedido','np-pedido-fields')"></div><span style="font-size:13px;color:var(--text-secondary)">Crear pedido asociado</span></div>
@@ -1333,6 +1336,12 @@ html,body{overflow-x:hidden;max-width:100vw}
             </div>
             <div class="form-group"><label class="form-label">Condiciones</label><input type="text" class="form-input" id="np-condiciones" placeholder="50/50, FOB, etc."></div>
           </div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-file-alt" style="margin-right:4px"></i> DOCUMENTOS (opcional)</div>
+          <div class="form-group"><label class="form-label">Cotización enviada al cliente</label><input type="file" class="form-input" id="np-doc-cotizacion" accept=".pdf,.doc,.docx,.xlsx" style="padding:8px"></div>
+          <div class="form-group"><label class="form-label">Otros documentos del proyecto</label><input type="file" class="form-input" id="np-doc-otros" accept=".pdf,.doc,.docx,.xlsx,.jpg,.png" multiple style="padding:8px"></div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-envelope" style="margin-right:4px"></i> INVITAR CLIENTE</div>
+          <div class="switch-wrap" style="margin-bottom:8px"><div class="switch" id="sw-invitar-cliente" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:var(--text-secondary)">Enviar invitación por email al crear</span></div>
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">El cliente recibirá un email para registrarse. Solo necesitará crear su contraseña y verá toda la información del proyecto ya cargada.</p>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
             <button type="button" class="btn btn-outline btn-sm" onclick="closeNewProjectModal()">Cancelar</button>
             <button type="submit" class="btn btn-dark"><i class="fas fa-save"></i> Crear Proyecto</button>
@@ -1404,44 +1413,17 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
         <div class="dtable-wrap">
           <div class="dtable-header"><h3>Libro de gastos & ingresos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Ingresos</button><button class="chip">Gastos</button></div></div>
-          <div style="max-height:420px;overflow-y:auto">
+          <div style="max-height:420px;overflow-y:auto" id="acc-libro-body">
             <div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto</div><div>Estado</div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--success-bg);color:var(--success)"><i class="fas fa-arrow-down"></i></div><div><div style="font-weight:500">Pago anticipo 50% — SOL-038</div><div class="exp-cat">LuxHome · Luminarias</div></div><div><span class="badge badge-success" style="font-size:10px">Ingreso</span></div><div style="color:var(--text-muted)">20 Mar</div><div class="exp-amt in">+$8,400</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-bg);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Pago proveedor Shenzhen</div><div class="exp-cat">Producción · Luminarias</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">22 Mar</div><div class="exp-amt out">-$6,200</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--success-bg);color:var(--success)"><i class="fas fa-arrow-down"></i></div><div><div style="font-weight:500">Comisión broker SOL-035</div><div class="exp-cat">SportMax · Pelotas</div></div><div><span class="badge badge-success" style="font-size:10px">Ingreso</span></div><div style="color:var(--text-muted)">18 Mar</div><div class="exp-amt in">+$4,500</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-bg);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Flete marítimo 40'</div><div class="exp-cat">Shanghai → Valparaíso</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">15 Mar</div><div class="exp-amt out">-$3,800</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-bg);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Agente aduanero</div><div class="exp-cat">Aduanas · Despacho marzo</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">12 Mar</div><div class="exp-amt out">-$1,250</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-bg);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Inspección QC pre-embarque</div><div class="exp-cat">Calidad · Guangzhou</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">10 Mar</div><div class="exp-amt out">-$850</div><div><span class="badge badge-warning"><i class="fas fa-clock"></i> Pendiente</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--success-bg);color:var(--success)"><i class="fas fa-arrow-down"></i></div><div><div style="font-weight:500">Pago final SOL-031</div><div class="exp-cat">RetailMax · Cojines</div></div><div><span class="badge badge-success" style="font-size:10px">Ingreso</span></div><div style="color:var(--text-muted)">08 Mar</div><div class="exp-amt in">+$12,000</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
-            <div class="exp-row"><div class="exp-icon" style="background:var(--danger-bg);color:var(--danger)"><i class="fas fa-arrow-up"></i></div><div><div style="font-weight:500">Sueldos operaciones</div><div class="exp-cat">RRHH · Marzo</div></div><div><span class="badge badge-danger" style="font-size:10px">Gasto</span></div><div style="color:var(--text-muted)">05 Mar</div><div class="exp-amt out">-$8,200</div><div><span class="badge badge-success"><i class="fas fa-check"></i> Pagado</span></div></div>
           </div>
-          <div class="table-pg"><span>Mostrando 8 de 34</span><div class="pg-btns"><button><i class="fas fa-chevron-left"></i></button><button class="active">1</button><button>2</button><button>3</button><button><i class="fas fa-chevron-right"></i></button></div></div>
+          <div class="table-pg" id="acc-libro-pg"></div>
         </div>
         <div>
           <div class="card" style="padding:24px;margin-bottom:16px">
             <h3 style="font-size:14px;font-weight:600;margin-bottom:16px">Estado de resultados</h3>
-            <div class="pl-row"><span class="pl-label">Comisiones importación</span><span class="pl-val pos">$86,400</span></div>
-            <div class="pl-row"><span class="pl-label">Servicios sourcing</span><span class="pl-val pos">$32,200</span></div>
-            <div class="pl-row"><span class="pl-label">Gestión logística</span><span class="pl-val pos">$24,200</span></div>
-            <div class="pl-row total"><span class="pl-label">Total ingresos</span><span class="pl-val pos">$142,800</span></div>
-            <div style="height:12px"></div>
-            <div class="pl-row"><span class="pl-label">Proveedores</span><span class="pl-val neg">-$52,300</span></div>
-            <div class="pl-row"><span class="pl-label">Fletes & logística</span><span class="pl-val neg">-$18,600</span></div>
-            <div class="pl-row"><span class="pl-label">Aduanas</span><span class="pl-val neg">-$6,350</span></div>
-            <div class="pl-row"><span class="pl-label">Personal</span><span class="pl-val neg">-$14,800</span></div>
-            <div class="pl-row"><span class="pl-label">QC & muestras</span><span class="pl-val neg">-$4,200</span></div>
-            <div class="pl-row"><span class="pl-label">Marketing</span><span class="pl-val neg">-$2,200</span></div>
-            <div class="pl-row total"><span class="pl-label">Total gastos</span><span class="pl-val neg">-$98,450</span></div>
-            <div style="margin-top:12px;padding:14px;background:rgba(45,122,79,0.06);border:0.5px solid rgba(45,122,79,0.15);border-radius:var(--radius);text-align:center"><div style="font-size:11px;color:var(--success);letter-spacing:.5px">UTILIDAD NETA</div><div style="font-size:24px;font-weight:600;color:var(--success)">$44,350</div><div style="font-size:11px;color:var(--success)">Margen 31.1%</div></div>
-          </div>
-          <div class="card" style="padding:24px">
-            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px">Control de presupuesto</h3>
-            <div class="budget-item"><div class="budget-top"><span class="b-name">Proveedores</span><span class="b-nums">$52,300 / $60,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:87%;background:var(--warning)"></div></div></div>
-            <div class="budget-item"><div class="budget-top"><span class="b-name">Fletes</span><span class="b-nums">$18,600 / $25,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:74%;background:var(--success)"></div></div></div>
-            <div class="budget-item"><div class="budget-top"><span class="b-name">Aduanas</span><span class="b-nums">$6,350 / $8,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:79%;background:var(--success)"></div></div></div>
-            <div class="budget-item"><div class="budget-top"><span class="b-name">Personal</span><span class="b-nums">$14,800 / $15,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:99%;background:var(--danger)"></div></div></div>
-            <div class="budget-item"><div class="budget-top"><span class="b-name">QC & Muestras</span><span class="b-nums">$4,200 / $6,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:70%;background:var(--success)"></div></div></div>
-            <div class="budget-item"><div class="budget-top"><span class="b-name">Marketing</span><span class="b-nums">$2,200 / $5,000</span></div><div class="budget-bar"><div class="budget-fill" style="width:44%;background:var(--text-muted)"></div></div></div>
+            <div id="acc-pl-body">
+              <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sin movimientos registrados</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1458,21 +1440,15 @@ html,body{overflow-x:hidden;max-width:100vw}
         </div>
       </div>
       <div class="stat-grid">
-        <div class="stat-card"><div class="s-label">Total clientes</div><div class="s-val" id="ac-total">5</div></div>
-        <div class="stat-card"><div class="s-label">Activos este mes</div><div class="s-val">4</div></div>
-        <div class="stat-card"><div class="s-label">Nuevos Q1</div><div class="s-val">3</div></div>
-        <div class="stat-card"><div class="s-label">Con pedidos activos</div><div class="s-val">2</div></div>
+        <div class="stat-card"><div class="s-label">Total clientes</div><div class="s-val" id="ac-total">0</div></div>
+        <div class="stat-card"><div class="s-label">Activos este mes</div><div class="s-val" id="ac-activos">0</div></div>
+        <div class="stat-card"><div class="s-label">Nuevos Q1</div><div class="s-val" id="ac-nuevos">0</div></div>
+        <div class="stat-card"><div class="s-label">Con pedidos activos</div><div class="s-val" id="ac-pedidos">0</div></div>
       </div>
       <div class="dtable-wrap">
         <div class="dtable-header"><h3>Clientes registrados</h3><div class="topbar-search" style="width:200px"><i class="fas fa-search"></i><input placeholder="Buscar cliente..." oninput="filterClients(this.value)"></div></div>
         <table class="dtable"><thead><tr><th>ID</th><th>Nombre</th><th>Empresa</th><th>RUT</th><th>Rubro</th><th>Email</th><th>Teléfono</th><th></th></tr></thead>
-        <tbody id="a-clients-body">
-          <tr><td>1</td><td><div class="client-cell"><div class="c-av">JP</div><div style="font-weight:500">Juan Pérez</div></div></td><td>RetailMax SpA</td><td>76.123.456-7</td><td>Retail</td><td style="color:var(--text-muted)">juan@empresa.com</td><td style="color:var(--text-muted)">+56 9 1234 5678</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
-          <tr><td>2</td><td><div class="client-cell"><div class="c-av">MV</div><div style="font-weight:500">María V. Soto</div></div></td><td>HealthPro</td><td>77.654.321-0</td><td>Salud</td><td style="color:var(--text-muted)">maria@healthpro.cl</td><td style="color:var(--text-muted)">+56 9 8765 4321</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
-          <tr><td>3</td><td><div class="client-cell"><div class="c-av">RC</div><div style="font-weight:500">Roberto Cifuentes</div></div></td><td>EcoStore</td><td>76.987.654-3</td><td>Retail</td><td style="color:var(--text-muted)">roberto@ecostore.cl</td><td style="color:var(--text-muted)">+56 9 5555 1234</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
-          <tr><td>4</td><td><div class="client-cell"><div class="c-av">AL</div><div style="font-weight:500">Andrea López</div></div></td><td>LuxHome</td><td>78.111.222-3</td><td>Hogar</td><td style="color:var(--text-muted)">andrea@luxhome.cl</td><td style="color:var(--text-muted)">+56 9 3333 4444</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
-          <tr><td>5</td><td><div class="client-cell"><div class="c-av">CS</div><div style="font-weight:500">Carlos Sepúlveda</div></div></td><td>SportMax</td><td>79.222.333-4</td><td>Deportes</td><td style="color:var(--text-muted)">carlos@sportmax.cl</td><td style="color:var(--text-muted)">+56 9 6666 7777</td><td><button class="btn btn-outline btn-sm">Editar</button></td></tr>
-        </tbody></table>
+        <tbody id="a-clients-body"></tbody></table>
       </div>
     </div>
 
@@ -1494,31 +1470,14 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="page-body" id="a-reports" style="display:none">
       <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Reportes & Análisis</h2>
       <div class="stat-grid">
-        <div class="stat-card"><div class="s-label">Tasa conversión</div><div class="s-val">68%</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +5% vs Q4</div></div>
-        <div class="stat-card"><div class="s-label">Ticket promedio</div><div class="s-val">$14.2K</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +12%</div></div>
-        <div class="stat-card"><div class="s-label">Crecimiento YoY</div><div class="s-val">+22%</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> Sostenido</div></div>
-        <div class="stat-card"><div class="s-label">Retención clientes</div><div class="s-val">94%</div><div class="s-sub up"><i class="fas fa-arrow-up"></i> +3%</div></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;margin-bottom:20px">
-        <div class="dtable-wrap">
-          <div class="dtable-header"><h3>Resumen mensual 2026</h3></div>
-          <table class="dtable"><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Utilidad</th><th>Margen</th></tr></thead>
-          <tbody>
-            <tr><td style="font-weight:500">Enero</td><td class="exp-amt in">$98,200</td><td class="exp-amt out">$72,100</td><td style="font-weight:600;color:var(--success)">$26,100</td><td>26.6%</td></tr>
-            <tr><td style="font-weight:500">Febrero</td><td class="exp-amt in">$120,800</td><td class="exp-amt out">$85,400</td><td style="font-weight:600;color:var(--success)">$35,400</td><td>29.3%</td></tr>
-            <tr><td style="font-weight:500">Marzo</td><td class="exp-amt in">$142,800</td><td class="exp-amt out">$98,450</td><td style="font-weight:600;color:var(--success)">$44,350</td><td>31.1%</td></tr>
-          </tbody></table>
-        </div>
-        <div class="card" style="padding:24px;border-left:3px solid var(--info)">
-          <h3 style="font-size:14px;font-weight:600;margin-bottom:14px"><i class="fas fa-robot" style="color:var(--info);margin-right:6px"></i>IA Copilot — Insights</h3>
-          <div style="margin-bottom:16px;padding:12px;background:var(--success-bg);border-radius:var(--radius);font-size:12px"><span class="badge badge-success" style="font-size:9px;margin-bottom:6px">OPORTUNIDAD</span><p style="color:var(--text-secondary);margin-top:4px">RetailMax muestra un +40% en volumen. Recomendar aumento de MOQ para reducir costo unitario en próxima OC.</p></div>
-          <div style="margin-bottom:16px;padding:12px;background:var(--warning-bg);border-radius:var(--radius);font-size:12px"><span class="badge badge-warning" style="font-size:9px;margin-bottom:6px">ALERTA</span><p style="color:var(--text-secondary);margin-top:4px">Costos de flete marítimo subieron 15% en Q1. Considerar consolidar envíos o negociar contratos anuales.</p></div>
-          <div style="padding:12px;background:var(--info-bg);border-radius:var(--radius);font-size:12px"><span class="badge badge-info" style="font-size:9px;margin-bottom:6px">TENDENCIA</span><p style="color:var(--text-secondary);margin-top:4px">Sector Hogar & Deco crece 35% interanual. Potencial para ampliar catálogo de proveedores en esta categoría.</p></div>
-        </div>
+        <div class="stat-card"><div class="s-label">Total cotizaciones</div><div class="s-val" id="rpt-cots">0</div></div>
+        <div class="stat-card"><div class="s-label">Total clientes</div><div class="s-val" id="rpt-clients">0</div></div>
+        <div class="stat-card"><div class="s-label">Pedidos activos</div><div class="s-val" id="rpt-pedidos">0</div></div>
+        <div class="stat-card"><div class="s-label">Ingresos totales</div><div class="s-val" id="rpt-ingresos">$0</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-        <div class="dtable-wrap"><div class="dtable-header"><h3>Top Clientes</h3></div><table class="dtable"><thead><tr><th>Cliente</th><th>Pedidos</th><th>Monto</th></tr></thead><tbody><tr><td style="font-weight:500">RetailMax SpA</td><td>8</td><td style="font-weight:600">$42,000</td></tr><tr><td style="font-weight:500">LuxHome</td><td>5</td><td style="font-weight:600">$28,400</td></tr><tr><td style="font-weight:500">SportMax</td><td>4</td><td style="font-weight:600">$18,500</td></tr></tbody></table></div>
-        <div class="dtable-wrap"><div class="dtable-header"><h3>Top Productos</h3></div><table class="dtable"><thead><tr><th>Producto</th><th>Pedidos</th><th>Monto</th></tr></thead><tbody><tr><td style="font-weight:500">Zapatillas Running</td><td>12</td><td style="font-weight:600">$51,000</td></tr><tr><td style="font-weight:500">Luminarias LED</td><td>8</td><td style="font-weight:600">$33,600</td></tr><tr><td style="font-weight:500">Textiles Hogar</td><td>6</td><td style="font-weight:600">$16,800</td></tr></tbody></table></div>
+        <div class="dtable-wrap"><div class="dtable-header"><h3>Top Clientes</h3></div><table class="dtable"><thead><tr><th>Cliente</th><th>Cotizaciones</th></tr></thead><tbody id="rpt-top-clients"><tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:24px">Sin datos aún</td></tr></tbody></table></div>
+        <div class="dtable-wrap"><div class="dtable-header"><h3>Top Productos</h3></div><table class="dtable"><thead><tr><th>Producto</th><th>Estado</th></tr></thead><tbody id="rpt-top-products"><tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:24px">Sin datos aún</td></tr></tbody></table></div>
       </div>
     </div>
 
@@ -1736,16 +1695,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Historial del Sistema</h2>
       <div class="card" style="padding:28px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h3 style="font-size:14px;font-weight:600">Todos los eventos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Clientes</button><button class="chip">Cotizaciones</button><button class="chip">Pedidos</button><button class="chip">Facturas</button></div></div>
-        <div class="timeline" id="a-history-timeline">
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Nuevo cliente registrado: juan@empresa.com</h4><p>07 Abr 2026 — Sistema</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización #SOL-047 creada — Zapatillas Running</h4><p>28 Mar 2026 — Juan Pérez</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Factura FAC-002 pagada — $12,000</h4><p>08 Mar 2026 — Admin</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-001 actualizado: etapa 5/9 (Producción)</h4><p>22 Mar 2026 — Admin</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Archivo subido: Factura_SOL038_anticipo.pdf</h4><p>20 Mar 2026 — Admin</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Cotización #SOL-043 estado → Cotizado</h4><p>15 Mar 2026 — Admin</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Pedido #PED-002 completado — Cojines Premium</h4><p>05 Mar 2026 — Sistema</p></div></div>
-          <div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>Nuevo cliente registrado: maria@healthpro.cl</h4><p>01 Mar 2026 — Sistema</p></div></div>
-        </div>
+        <div class="timeline" id="a-history-timeline"></div>
       </div>
     </div>
 
@@ -1768,31 +1718,12 @@ html,body{overflow-x:hidden;max-width:100vw}
   </div>
 </div>
 
-<!-- DETAIL PANEL -->
+<!-- DETAIL PANEL (Dynamic) -->
 <div class="detail-overlay" id="dOverlay" onclick="closeDetail()"></div>
 <div class="detail-panel" id="dPanel">
-  <div class="detail-head"><div><h3 style="font-size:16px;font-weight:600">#SOL-047 — Detalle</h3><span class="badge badge-warning" style="margin-top:4px"><i class="fas fa-clock"></i> Pendiente</span></div><button onclick="closeDetail()" style="font-size:16px;color:var(--text-muted)"><i class="fas fa-times"></i></button></div>
-  <div class="detail-body">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><div style="width:40px;height:40px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--text-secondary)">JP</div><div><div style="font-weight:600">Juan Pérez</div><div style="font-size:12px;color:var(--text-muted)">RetailMax SpA — juan@empresa.com</div></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Producto</span><span style="font-weight:500;font-size:13px">Zapatillas Running Custom</span></div>
-      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Cantidad</span><span style="font-weight:500;font-size:13px">5,000 pares</span></div>
-      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Precio objetivo</span><span style="font-weight:500;font-size:13px">$8.50 USD/par</span></div>
-      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Plazo</span><span style="font-weight:500;font-size:13px">60 días</span></div>
-      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Personalización</span><span style="font-weight:500;font-size:13px;color:var(--success)">Sí — Logo + colores</span></div>
-      <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Uso final</span><span style="font-weight:500;font-size:13px">Venta retail</span></div>
-    </div>
-    <div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.5px">DESCRIPCIÓN TÉCNICA</div><p style="font-size:13px;color:var(--text-secondary);line-height:1.7;background:var(--bg-surface);padding:14px;border-radius:var(--radius)">Zapatilla running con upper mesh transpirable, suela EVA con placa de carbono, logo bordado lateral. Colores: negro/dorado y blanco/azul. Tallas 36-45. Caja individual con packaging personalizado.</p></div>
-    <div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.5px">IMÁGENES DE REFERENCIA</div><div style="display:flex;gap:8px"><div style="width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);display:flex;align-items:center;justify-content:center"><i class="fas fa-image" style="color:var(--text-faint)"></i></div><div style="width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);display:flex;align-items:center;justify-content:center"><i class="fas fa-image" style="color:var(--text-faint)"></i></div><div style="width:64px;height:64px;border-radius:var(--radius);background:var(--bg-surface);display:flex;align-items:center;justify-content:center"><i class="fas fa-image" style="color:var(--text-faint)"></i></div></div></div>
-    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
-    <h4 style="font-size:14px;font-weight:600;margin-bottom:14px">Subir cotización</h4>
-    <div class="card" style="padding:20px">
-      <div class="form-group"><label class="form-label">Precio unitario (USD)</label><input type="text" class="form-input" value="$9.20"></div>
-      <div class="form-group"><label class="form-label">Condiciones</label><textarea class="form-input">MOQ 3,000 pares. Producción 45 días. Pago 50/50. FOB Shenzhen.</textarea></div>
-      <div class="form-group"><label class="form-label">Adjuntar propuesta</label><div class="upload-zone" onclick="simUpload('qUp')" style="padding:14px"><i class="fas fa-file-pdf" style="font-size:16px"></i><h4 style="font-size:12px">Adjuntar PDF</h4></div><div class="upload-preview" id="qUp"></div></div>
-      <div class="ai-tag"><i class="fas fa-robot"></i><span>Al enviar, la IA Copilot generará un email profesional con la propuesta para el cliente.</span></div>
-      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline btn-sm" onclick="closeDetail()">Cancelar</button><button class="btn btn-dark" onclick="sendQuote()"><i class="fas fa-paper-plane"></i> Enviar cotización</button></div>
-    </div>
+  <div class="detail-head"><div><h3 id="detail-title" style="font-size:16px;font-weight:600">Detalle</h3><span id="detail-badge" class="badge" style="margin-top:4px"></span></div><button onclick="closeDetail()" style="font-size:16px;color:var(--text-muted)"><i class="fas fa-times"></i></button></div>
+  <div class="detail-body" id="detail-content">
+    <div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:24px"></i><p style="margin-top:8px">Cargando...</p></div>
   </div>
 </div>
 
@@ -2168,9 +2099,11 @@ function aView(id) {
   links.forEach(l => l.classList.remove('active'));
   const idx = { 'a-req': 0, 'a-ops': 1, 'a-acc': 2, 'a-clients': 3, 'a-reports': 4, 'a-config': 5, 'a-integrations': 6, 'a-editor': 7, 'a-history': 8 };
   if (links[idx[id]]) links[idx[id]].classList.add('active');
-  if (id === 'a-acc') loadContabilidad();
+  if (id === 'a-acc') { loadContabilidad(); loadContabilidadDynamic(); }
   if (id === 'a-clients') loadAdminClients();
   if (id === 'a-config') loadAdminUsers();
+  if (id === 'a-reports') loadAdminReports();
+  if (id === 'a-history') loadAdminHistory();
   if (id === 'a-tickets') loadAdminTickets();
 }
 
@@ -2205,7 +2138,7 @@ async function loadAdminData() {
         const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
         const labels = { pendiente: 'Pendiente', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
         const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
-        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)" title="Subir documento"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail()"><i class="fas fa-eye"></i></button></td></tr>`;
+        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')" title="Invitar cliente"><i class="fas fa-envelope"></i></button><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)" title="Subir documento"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail(${c.id})"><i class="fas fa-eye"></i></button></td></tr>`;
       }).join('');
     } else {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px"><i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px"></i>No hay solicitudes. Click "Nuevo Proyecto" para crear una.</td></tr>';
@@ -2282,7 +2215,58 @@ async function simUpload(pid) {
 }
 
 // ─── UI Helpers ───
-function openDetail() { document.getElementById('dPanel').classList.add('open'); document.getElementById('dOverlay').classList.add('open'); }
+async function openDetail(cotId) {
+  document.getElementById('dPanel').classList.add('open');
+  document.getElementById('dOverlay').classList.add('open');
+  const content = document.getElementById('detail-content');
+  const title = document.getElementById('detail-title');
+  const badge = document.getElementById('detail-badge');
+  content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:24px"></i></div>';
+  try {
+    const c = await api(`/api/cotizaciones/${cotId}`);
+    let cl = { nombre: 'N/A', empresa: '', email: '' };
+    try { cl = await api(`/api/clientes/${c.cliente_id}`); } catch {}
+    const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+    const badges = { pendiente:'badge-warning', cotizado:'badge-info', produccion:'badge-success', entregado:'badge-neutral' };
+    const labels = { pendiente:'Pendiente', cotizado:'Cotizado', produccion:'Producción', entregado:'Entregado' };
+    title.textContent = `#SOL-${String(c.id).padStart(3,'0')} — ${c.producto}`;
+    badge.className = `badge ${badges[c.estado]||'badge-neutral'}`;
+    badge.innerHTML = `${labels[c.estado]||c.estado}`;
+    // Load docs for this cotizacion
+    let docsHtml = '';
+    try {
+      const docs = await api(`/api/archivos?cotizacion_id=${c.id}`);
+      if (docs.length) {
+        docsHtml = docs.map(d => {
+          const icon = d.tipo === 'pdf' ? 'fa-file-pdf' : d.tipo === 'xlsx' ? 'fa-file-excel' : d.tipo === 'jpg' || d.tipo === 'png' || d.tipo === 'jpeg' ? 'fa-file-image' : 'fa-file';
+          const iconColor = d.tipo === 'pdf' ? 'var(--danger)' : d.tipo === 'xlsx' ? 'var(--success)' : 'var(--info)';
+          const catLabel = { cotizacion_proveedor:'Cot. Proveedor', cotizacion_formal:'Cot. MIP', factura:'Factura', comprobante_pago:'Comprobante', reporte_qc:'Reporte QC', doc_logistico:'Doc Logístico', mix_productos:'Mix Productos', foto_referencia:'Foto Ref.', especificacion:'Specs', video:'Video' };
+          return `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px"><i class="fas ${icon}" style="color:${iconColor}"></i><div style="flex:1"><div style="font-weight:500">${d.nombre}</div><div style="font-size:10px;color:var(--text-muted)">${catLabel[d.categoria]||d.categoria||'Otro'} · ${d.subido_por||'admin'}</div></div><a href="${d.url}" target="_blank" style="color:var(--text-muted);font-size:12px"><i class="fas fa-download"></i></a></div>`;
+        }).join('');
+      }
+    } catch {}
+    content.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><div style="width:40px;height:40px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--text-secondary)">${initials}</div><div><div style="font-weight:600">${cl.nombre}</div><div style="font-size:12px;color:var(--text-muted)">${cl.empresa||''} — ${cl.email}</div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Producto</span><span style="font-weight:500;font-size:13px">${c.producto}</span></div>
+        <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Cantidad</span><span style="font-weight:500;font-size:13px">${c.cantidad||'—'}</span></div>
+        <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Precio objetivo</span><span style="font-weight:500;font-size:13px">${c.precio_objetivo||'—'}</span></div>
+        <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Plazo</span><span style="font-weight:500;font-size:13px">${c.plazo||'—'}</span></div>
+        <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Personalización</span><span style="font-weight:500;font-size:13px">${c.personalizacion||'No'}</span></div>
+        <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Uso final</span><span style="font-weight:500;font-size:13px">${c.uso_final||'—'}</span></div>
+      </div>
+      ${c.descripcion ? `<div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.5px">DESCRIPCIÓN</div><p style="font-size:13px;color:var(--text-secondary);line-height:1.7;background:var(--bg-surface);padding:14px;border-radius:var(--radius)">${c.descripcion}</p></div>` : ''}
+      ${docsHtml ? `<div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.5px">DOCUMENTOS</div><div style="display:flex;flex-direction:column;gap:6px">${docsHtml}</div></div>` : ''}
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-dark btn-sm" onclick="openAdminUploadModal(${c.id},null)"><i class="fas fa-upload"></i> Subir documento</button>
+        <button class="btn btn-outline btn-sm" onclick="closeDetail()">Cerrar</button>
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger)"><i class="fas fa-exclamation-triangle" style="font-size:24px"></i><p style="margin-top:8px">Error cargando detalle</p></div>';
+  }
+}
 function closeDetail() { document.getElementById('dPanel').classList.remove('open'); document.getElementById('dOverlay').classList.remove('open'); }
 function sendQuote() { closeDetail(); toast('success', 'Cotización enviada', 'Email generado vía IA Copilot y enviado al cliente.'); }
 function toggleSw(sid, did) { const s = document.getElementById(sid); const d = document.getElementById(did); s.classList.toggle('on'); d.style.display = s.classList.contains('on') ? 'block' : 'none'; }
@@ -2353,6 +2337,101 @@ function initGoogleSignIn() {
   }
 }
 
+// ─── Admin: Reports (Dynamic) ───
+async function loadAdminReports() {
+  try {
+    const [cots, clientes, resumen] = await Promise.all([
+      api('/api/cotizaciones'), api('/api/clientes'), api('/api/contabilidad/resumen')
+    ]);
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('rpt-cots', cots.length);
+    el('rpt-clients', clientes.filter(c => c.role !== 'admin').length);
+    el('rpt-pedidos', cots.filter(c => c.estado === 'produccion').length);
+    el('rpt-ingresos', '$' + resumen.ingresos.toLocaleString());
+    // Top clients
+    const clientMap = {}; clientes.forEach(c => clientMap[c.id] = c);
+    const clientCots = {}; cots.forEach(c => { clientCots[c.cliente_id] = (clientCots[c.cliente_id]||0)+1; });
+    const topClients = Object.entries(clientCots).sort((a,b) => b[1]-a[1]).slice(0,5);
+    const tcBody = document.getElementById('rpt-top-clients');
+    if (tcBody) tcBody.innerHTML = topClients.length ? topClients.map(([id,cnt]) => {
+      const cl = clientMap[id] || {nombre:'N/A'}; return `<tr><td style="font-weight:500">${cl.nombre}</td><td>${cnt}</td></tr>`;
+    }).join('') : '<tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:24px">Sin datos</td></tr>';
+    // Top products
+    const tpBody = document.getElementById('rpt-top-products');
+    if (tpBody) tpBody.innerHTML = cots.length ? cots.slice(0,5).map(c => {
+      const badges = {pendiente:'badge-warning',cotizado:'badge-info',produccion:'badge-success',entregado:'badge-neutral'};
+      return `<tr><td style="font-weight:500">${c.producto}</td><td><span class="badge ${badges[c.estado]||'badge-neutral'}">${c.estado}</span></td></tr>`;
+    }).join('') : '<tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:24px">Sin datos</td></tr>';
+  } catch (err) { console.error('Reports error:', err); }
+}
+
+// ─── Admin: History (Dynamic) ───
+async function loadAdminHistory() {
+  try {
+    const eventos = await api('/api/historial?limit=30');
+    const tl = document.getElementById('a-history-timeline');
+    if (!tl) return;
+    tl.innerHTML = eventos.length ? eventos.map(ev => {
+      const date = new Date(ev.created_at).toLocaleDateString('es-CL', {day:'2-digit',month:'short',year:'numeric'});
+      return `<div class="tl-item"><div class="tl-dot done"><i class="fas fa-check"></i></div><div class="tl-content"><h4>${ev.descripcion}</h4><p>${date} — ${ev.usuario||'Sistema'}</p></div></div>`;
+    }).join('') : '<div style="text-align:center;padding:24px;color:var(--text-muted)">Sin eventos registrados</div>';
+  } catch (err) { console.error('History error:', err); }
+}
+
+// ─── Admin: Contabilidad (Dynamic) ───
+async function loadContabilidadDynamic() {
+  try {
+    const [resumen, movs] = await Promise.all([api('/api/contabilidad/resumen'), api('/api/contabilidad')]);
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('acc-ingresos', '$' + resumen.ingresos.toLocaleString());
+    el('acc-gastos', '$' + resumen.gastos.toLocaleString());
+    el('acc-utilidad', '$' + resumen.utilidad_neta.toLocaleString());
+    el('acc-margen', resumen.margen > 0 ? `Margen ${resumen.margen}%` : '');
+    el('acc-pendientes', resumen.facturas_pendientes);
+    const libro = document.getElementById('acc-libro-body');
+    if (libro && movs.length) {
+      const hdr = '<div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto</div><div>Estado</div></div>';
+      libro.innerHTML = hdr + movs.map(m => {
+        const isIn = m.tipo === 'ingreso';
+        const date = new Date(m.fecha).toLocaleDateString('es-CL',{day:'2-digit',month:'short'});
+        return `<div class="exp-row"><div class="exp-icon" style="background:${isIn?'var(--success-bg)':'var(--danger-bg)'};color:${isIn?'var(--success)':'var(--danger)'}"><i class="fas fa-arrow-${isIn?'down':'up'}"></i></div><div><div style="font-weight:500">${m.descripcion}</div><div class="exp-cat">${m.categoria}</div></div><div><span class="badge ${isIn?'badge-success':'badge-danger'}" style="font-size:10px">${m.tipo}</span></div><div style="color:var(--text-muted)">${date}</div><div class="exp-amt ${isIn?'in':'out'}">${isIn?'+':'-'}$${m.monto.toLocaleString()}</div><div><span class="badge ${m.estado==='pagado'?'badge-success':'badge-warning'}"><i class="fas ${m.estado==='pagado'?'fa-check':'fa-clock'}"></i> ${m.estado}</span></div></div>`;
+      }).join('');
+    }
+    const pl = document.getElementById('acc-pl-body');
+    if (pl) {
+      if (resumen.ingresos > 0 || resumen.gastos > 0) {
+        pl.innerHTML = `<div class="pl-row total"><span class="pl-label">Total ingresos</span><span class="pl-val pos">$${resumen.ingresos.toLocaleString()}</span></div><div class="pl-row total"><span class="pl-label">Total gastos</span><span class="pl-val neg">-$${resumen.gastos.toLocaleString()}</span></div><div style="margin-top:12px;padding:14px;background:rgba(45,122,79,0.06);border:0.5px solid rgba(45,122,79,0.15);border-radius:var(--radius);text-align:center"><div style="font-size:11px;color:var(--success);letter-spacing:.5px">UTILIDAD NETA</div><div style="font-size:24px;font-weight:600;color:${resumen.utilidad_neta>=0?'var(--success)':'var(--danger)'}">$${resumen.utilidad_neta.toLocaleString()}</div><div style="font-size:11px;color:var(--success)">${resumen.margen > 0 ? 'Margen '+resumen.margen+'%' : ''}</div></div>`;
+      } else {
+        pl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sin movimientos registrados</div>';
+      }
+    }
+  } catch (err) { console.error('Contabilidad error:', err); }
+}
+
+// ─── Admin: Invite Client to Platform ───
+async function inviteClientToPlatform(email, nombre) {
+  try {
+    const APP_URL = window.location.origin;
+    const body = (
+      `Hola ${nombre},\n\n` +
+      `Te invitamos a la plataforma MIP Quality & Logistics donde ya puedes ver el estado de tus proyectos de importación.\n\n` +
+      `Para ingresar, regístrate con tu email (${email}) en:\n` +
+      `${APP_URL}\n\n` +
+      `Solo necesitas crear una contraseña. Toda la información de tus proyectos ya está cargada.\n\n` +
+      `— MIP Quality & Logistics`
+    );
+    // Try sending via backend notify endpoint
+    await api('/api/admin/invite-client', { method: 'POST', body: JSON.stringify({ email, nombre, message: body }) });
+    toast('success', 'Invitación enviada', `Email enviado a ${email}`);
+  } catch {
+    // Fallback: open mailto
+    const subject = encodeURIComponent('Invitación — MIP Quality & Logistics');
+    const mailBody = encodeURIComponent(`Hola ${nombre},\n\nTe invitamos a ver el estado de tus proyectos en la plataforma MIP Quality & Logistics.\n\nIngresa con tu email (${email}) en:\n${window.location.origin}\n\nSolo necesitas crear una contraseña.\n\n— MIP Quality & Logistics`);
+    window.open(`mailto:${email}?subject=${subject}&body=${mailBody}`);
+    toast('info', 'Abrir correo', 'Se abrió tu cliente de email para enviar la invitación');
+  }
+}
+
 // ─── Admin: New Project ───
 function openNewProjectModal() { document.getElementById('newProjectModal').classList.add('open'); }
 function closeNewProjectModal() { document.getElementById('newProjectModal').classList.remove('open'); }
@@ -2360,11 +2439,16 @@ function closeNewProjectModal() { document.getElementById('newProjectModal').cla
 async function submitNewProject(e) {
   e.preventDefault();
   const crearPedido = document.getElementById('sw-crear-pedido')?.classList.contains('on');
+  const invitarCliente = document.getElementById('sw-invitar-cliente')?.classList.contains('on');
+  const email = document.getElementById('np-email').value;
+  const nombre = document.getElementById('np-nombre').value;
   const data = {
-    cliente_nombre: document.getElementById('np-nombre').value,
-    cliente_email: document.getElementById('np-email').value,
+    cliente_nombre: nombre,
+    cliente_email: email,
     cliente_empresa: document.getElementById('np-empresa').value,
     cliente_telefono: document.getElementById('np-telefono').value,
+    cliente_rut: document.getElementById('np-rut')?.value || '',
+    cliente_rubro: document.getElementById('np-rubro')?.value || '',
     producto: document.getElementById('np-producto').value,
     descripcion: document.getElementById('np-descripcion').value,
     cantidad: document.getElementById('np-cantidad').value,
@@ -2378,9 +2462,25 @@ async function submitNewProject(e) {
   };
   try {
     const result = await api('/api/admin/create-project', { method: 'POST', body: JSON.stringify(data) });
+    // Upload documents if provided
+    const cotDoc = document.getElementById('np-doc-cotizacion')?.files[0];
+    if (cotDoc) {
+      const fd = new FormData(); fd.append('file', cotDoc);
+      await fetch(`${API}/api/admin/upload?cotizacion_id=${result.cotizacion_id}&categoria=cotizacion_formal&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+    }
+    const otrosDocs = document.getElementById('np-doc-otros')?.files;
+    if (otrosDocs?.length) {
+      for (const f of otrosDocs) {
+        const fd = new FormData(); fd.append('file', f);
+        await fetch(`${API}/api/admin/upload?cotizacion_id=${result.cotizacion_id}&categoria=otro&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+      }
+    }
+    // Invite client if switch is on
+    if (invitarCliente && email) {
+      inviteClientToPlatform(email, nombre);
+    }
     closeNewProjectModal();
     toast('success', 'Proyecto creado', `${result.producto} asignado a ${result.cliente_nombre}`);
-    // Reset form
     e.target.reset();
     // Reload admin data
     loadAdminData();

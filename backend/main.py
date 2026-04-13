@@ -286,6 +286,42 @@ def admin_invite(data: dict, db: Session = Depends(get_db)):
     return {"action": action, "email": email, "role": "admin", "email_sent": email_sent, "invite_link": invite_link}
 
 
+# ─── Admin: Invite Client to Platform ───
+@app.post("/api/admin/invite-client")
+def admin_invite_client(data: dict, db: Session = Depends(get_db)):
+    """Send invitation email to a client to join the platform"""
+    email = data.get("email", "").strip()
+    nombre = data.get("nombre", "").strip()
+    message = data.get("message", "")
+    if not email:
+        raise HTTPException(400, "Email requerido")
+    subject = "Invitación — MIP Quality & Logistics"
+    body = message or f"Hola {nombre},\n\nTe invitamos a la plataforma MIP Quality & Logistics.\n\n— MIP Q&L"
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+        SMTP_USER = os.getenv("SMTP_USER", "")
+        SMTP_PASS = os.getenv("SMTP_PASS", "")
+        if SMTP_USER and SMTP_PASS:
+            msg = MIMEText(body, "plain", "utf-8")
+            msg["Subject"] = subject
+            msg["From"] = SMTP_USER
+            msg["To"] = email
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASS)
+                s.sendmail(SMTP_USER, [email], msg.as_string())
+            return {"sent": True, "email": email}
+        else:
+            print(f"CLIENT INVITE (SMTP not configured):\nTo: {email}\n{body}")
+            return {"sent": False, "reason": "SMTP no configurado"}
+    except Exception as e:
+        print(f"Client invite email error: {e}")
+        raise HTTPException(500, f"Error enviando email: {str(e)}")
+
+
 # ─── Admin: Create Project for Client ───
 @app.post("/api/admin/create-project")
 def admin_create_project(data: dict, db: Session = Depends(get_db)):
