@@ -1086,7 +1086,23 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
         messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
     messages.append({"role": "user", "content": message})
 
-    # Try Claude first
+    # Try Gemini first (free tier)
+    if GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=system)
+            # Convert messages to Gemini format
+            gemini_history = []
+            for m in messages[:-1]:
+                gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+            chat = model.start_chat(history=gemini_history)
+            response = chat.send_message(message)
+            return {"reply": response.text, "provider": "gemini"}
+        except Exception as e:
+            print(f"Gemini error: {e}")
+
+    # Fallback to Claude
     if ANTHROPIC_API_KEY:
         try:
             import anthropic
@@ -1100,23 +1116,7 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
             reply = response.content[0].text
             return {"reply": reply, "provider": "claude"}
         except Exception as e:
-            print(f"Claude error: {e}. Falling back to Gemini...")
-
-    # Fallback to Gemini
-    if GEMINI_API_KEY:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system)
-            # Convert messages to Gemini format
-            gemini_history = []
-            for m in messages[:-1]:
-                gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
-            chat = model.start_chat(history=gemini_history)
-            response = chat.send_message(message)
-            return {"reply": response.text, "provider": "gemini"}
-        except Exception as e:
-            print(f"Gemini error: {e}")
+            print(f"Claude error: {e}")
 
     # Both failed or no keys configured
     return {
