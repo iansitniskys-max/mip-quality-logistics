@@ -727,6 +727,41 @@ html,body{overflow-x:hidden;max-width:100vw}
   .office-content{padding:24px}
   .office-content h3{font-size:22px}
 }
+
+/* ═══ CHATBOT MATEO ═══ */
+.chat-fab{position:fixed;bottom:24px;right:24px;z-index:900;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a1a1a,#333);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s;font-size:22px}
+.chat-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(0,0,0,0.35)}
+.chat-fab .fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#e8af43;color:#0f1419;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+.chat-panel{position:fixed;bottom:24px;right:24px;z-index:901;width:380px;max-height:560px;background:var(--bg-white);border-radius:16px;border:1px solid var(--border);box-shadow:0 8px 40px rgba(0,0,0,0.15);display:none;flex-direction:column;overflow:hidden}
+.chat-panel.open{display:flex}
+.chat-head{padding:14px 16px;background:linear-gradient(135deg,#1a1a1a,#2c2c2a);color:#fff;display:flex;align-items:center;gap:10px;border-radius:16px 16px 0 0}
+.chat-head .ch-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#e8af43,#c9922a);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#0f1419}
+.chat-head .ch-info{flex:1}
+.chat-head .ch-name{font-size:14px;font-weight:600}
+.chat-head .ch-status{font-size:11px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:4px}
+.chat-head .ch-status .dot-online{width:6px;height:6px;border-radius:50%;background:#4ade80}
+.chat-head .ch-close{color:rgba(255,255,255,0.6);font-size:16px;cursor:pointer;transition:color .2s;padding:4px}
+.chat-head .ch-close:hover{color:#fff}
+.chat-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:300px;max-height:400px;background:var(--bg)}
+.chat-msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;word-wrap:break-word}
+.chat-msg.bot{align-self:flex-start;background:var(--bg-white);border:1px solid var(--border);border-bottom-left-radius:4px}
+.chat-msg.user{align-self:flex-end;background:var(--bg-dark);color:var(--text-inv);border-bottom-right-radius:4px}
+.chat-msg.typing{align-self:flex-start;background:var(--bg-white);border:1px solid var(--border);border-bottom-left-radius:4px;color:var(--text-muted);font-style:italic}
+.chat-msg.typing .dots{display:inline-flex;gap:3px}
+.chat-msg.typing .dots span{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:chatDot 1.2s infinite}
+.chat-msg.typing .dots span:nth-child(2){animation-delay:.2s}
+.chat-msg.typing .dots span:nth-child(3){animation-delay:.4s}
+@keyframes chatDot{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+.chat-footer{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--bg-white)}
+.chat-footer input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:var(--bg);outline:none;transition:border-color .2s}
+.chat-footer input:focus{border-color:var(--border-active)}
+.chat-footer button{width:38px;height:38px;border-radius:10px;background:var(--bg-dark);color:var(--text-inv);display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;flex-shrink:0}
+.chat-footer button:hover{background:#444}
+.chat-footer button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:480px){
+  .chat-panel{bottom:0;right:0;left:0;width:100%;max-height:100vh;border-radius:16px 16px 0 0}
+  .chat-fab{bottom:16px;right:16px;width:50px;height:50px;font-size:20px}
+}
 </style>
 </head>
 <body>
@@ -1793,6 +1828,28 @@ html,body{overflow-x:hidden;max-width:100vw}
   <div class="detail-head"><div><h3 id="detail-title" style="font-size:16px;font-weight:600">Detalle</h3><span id="detail-badge" class="badge" style="margin-top:4px"></span></div><button onclick="closeDetail()" style="font-size:16px;color:var(--text-muted)"><i class="fas fa-times"></i></button></div>
   <div class="detail-body" id="detail-content">
     <div style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:24px"></i><p style="margin-top:8px">Cargando...</p></div>
+  </div>
+</div>
+
+<!-- CHATBOT MATEO -->
+<div class="chat-fab" id="chatFab" onclick="toggleChat()">
+  <i class="fas fa-comment-dots"></i>
+</div>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <div class="ch-avatar">M</div>
+    <div class="ch-info">
+      <div class="ch-name">Mateo</div>
+      <div class="ch-status"><span class="dot-online"></span> Asistente MIP</div>
+    </div>
+    <button class="ch-close" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="chat-body" id="chatBody">
+    <div class="chat-msg bot">Hola, soy Mateo de MIP Quality & Logistics. ¿En qué te puedo ayudar hoy?</div>
+  </div>
+  <div class="chat-footer">
+    <input type="text" id="chatInput" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button onclick="sendChat()" id="chatSendBtn"><i class="fas fa-paper-plane"></i></button>
   </div>
 </div>
 
@@ -2963,6 +3020,75 @@ loadIntegrations();
 setupOtroSelects();
 // Also show CTA after 5 seconds if still on landing
 if (!currentUser) setTimeout(showCta, 5000);
+
+// ─── Chatbot Mateo ───
+let chatHistory = [];
+function toggleChat() {
+  const panel = document.getElementById('chatPanel');
+  const fab = document.getElementById('chatFab');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+    fab.style.display = 'flex';
+  } else {
+    panel.classList.add('open');
+    fab.style.display = 'none';
+    document.getElementById('chatInput').focus();
+    // Personalized greeting for logged-in users
+    if (currentUser && chatHistory.length === 0) {
+      const body = document.getElementById('chatBody');
+      body.innerHTML = `<div class="chat-msg bot">Hola ${currentUser.nombre.split(' ')[0]}, soy Mateo de MIP Quality & Logistics. ¿En qué te puedo ayudar hoy?</div>`;
+    }
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const body = document.getElementById('chatBody');
+  const btn = document.getElementById('chatSendBtn');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  // Add user message
+  body.innerHTML += `<div class="chat-msg user">${msg.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  chatHistory.push({ role: 'user', content: msg });
+  input.value = '';
+  btn.disabled = true;
+
+  // Show typing indicator
+  body.innerHTML += '<div class="chat-msg typing" id="chatTyping"><div class="dots"><span></span><span></span><span></span></div></div>';
+  body.scrollTop = body.scrollHeight;
+
+  try {
+    const payload = {
+      message: msg,
+      history: chatHistory.slice(-10),
+      cliente_id: currentUser?.id || null,
+    };
+    const r = await fetch(API + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+
+    // Remove typing indicator
+    const typing = document.getElementById('chatTyping');
+    if (typing) typing.remove();
+
+    // Add bot response
+    const reply = data.reply || 'Lo siento, hubo un error. Intenta de nuevo.';
+    body.innerHTML += `<div class="chat-msg bot">${reply.replace(/\n/g, '<br>')}</div>`;
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch (err) {
+    const typing = document.getElementById('chatTyping');
+    if (typing) typing.remove();
+    body.innerHTML += '<div class="chat-msg bot">Disculpa, hubo un problema de conexión. ¿Puedes intentar de nuevo?</div>';
+  }
+
+  btn.disabled = false;
+  body.scrollTop = body.scrollHeight;
+}
 </script>
 </body>
 </html>

@@ -978,6 +978,118 @@ def update_ticket(id: int, data: dict, db: Session = Depends(get_db)):
     return {"id": t.id, "estado": t.estado}
 
 
+# ─── Chatbot: Mateo (Claude + Gemini fallback) ───
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+MATEO_SYSTEM_PROMPT = """Eres Mateo, asistente comercial de MIP Quality & Logistics, un broker de importación desde China con oficinas en Shenzhen, Guangzhou y Santiago de Chile.
+
+PERSONALIDAD:
+- Cercano y profesional. Usas "tú" (no "usted"). Tono como un ejecutivo de cuentas joven y confiable.
+- Español chileno natural pero sin modismos excesivos. Puedes usar "dale", "bacán", "cachai" muy ocasionalmente.
+- Respuestas concisas (máximo 3-4 párrafos cortos). No hagas listas largas a menos que te lo pidan.
+- Siempre ofreces el siguiente paso concreto (cotización, muestra, llamada).
+
+CONOCIMIENTO DE MIP:
+- Broker de importación: sourcing, control de calidad, logística puerta a puerta desde China
+- +12 años en la industria, +500 productos importados, +70 personas en China
+- Sectores: retail, industrial, hospitality, salud, tecnología, hogar, deportes, infantil
+- Proceso: Solicitud → Cotización (72hrs) → Muestra → Producción → QC China → Embarque → Entrega
+- Pago típico: 50% anticipo + 50% pre-embarque. También ofrecen financiamiento.
+- Flete marítimo China-Chile: 30-45 días. Aéreo: 5-7 días.
+- MOQ típico: desde 500 unidades dependiendo del producto.
+- Inspecciones pre-embarque con reporte fotográfico incluido.
+
+REGLAS:
+- Si el usuario pregunta precios específicos, da rangos estimados y ofrece cotización formal sin compromiso.
+- Si el usuario es un cliente logueado, tienes acceso a sus datos (nombre, empresa, cotizaciones, pedidos). Úsalos para personalizar.
+- Nunca inventes datos que no tengas. Si no sabes algo, di "déjame consultarlo con el equipo y te respondo".
+- Si te piden algo fuera de importación (ej: asesoría legal, inversiones), redirige amablemente al servicio correcto.
+- Siempre cierra ofreciendo una acción: "¿Te armo una cotización?", "¿Agendamos una llamada?", etc.
+"""
+
+
+@app.post("/api/chat")
+def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
+    """Chat endpoint: sends message to Claude (primary) or Gemini (fallback)"""
+    message = data.get("message", "").strip()
+    history = data.get("history", [])  # [{role: "user"/"assistant", content: "..."}]
+    cliente_id = data.get("cliente_id")
+
+    if not message:
+        raise HTTPException(400, "Mensaje vacío")
+
+    # Build context with client data if logged in
+    context = ""
+    if cliente_id:
+        try:
+            cliente = db.query(Cliente).get(cliente_id)
+            if cliente:
+                context += f"\n[DATOS DEL CLIENTE LOGUEADO]\nNombre: {cliente.nombre}\nEmpresa: {cliente.empresa}\nRubro: {cliente.rubro}\nEmail: {cliente.email}\n"
+                # Add their cotizaciones
+                cots = db.query(Cotizacion).filter(Cotizacion.cliente_id == cliente_id).order_by(Cotizacion.created_at.desc()).limit(5).all()
+                if cots:
+                    context += "\nCotizaciones activas:\n"
+                    for c in cots:
+                        context += f"- #{c.id} {c.producto} ({c.estado}) - Cantidad: {c.cantidad}\n"
+                # Add their pedidos
+                pedidos = db.query(Pedido).join(Cotizacion).filter(Cotizacion.cliente_id == cliente_id).order_by(Pedido.created_at.desc()).limit(5).all()
+                if pedidos:
+                    context += "\nPedidos activos:\n"
+                    etapa_names = ['','Solicitud','Cotización','Muestra','Pago 50%','Producción','QC China','Embarque','Entrega','Pago final']
+                    for p in pedidos:
+                        etapa = etapa_names[p.etapa_actual] if p.etapa_actual < len(etapa_names) else 'N/A'
+                        context += f"- Pedido #{p.id} etapa {p.etapa_actual}/9 ({etapa}) - ${p.monto_total}\n"
+        except Exception as e:
+            print(f"Chat context error: {e}")
+
+    system = MATEO_SYSTEM_PROMPT + context
+
+    # Build messages
+    messages = []
+    for h in history[-10:]:  # Keep last 10 messages for context
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+    messages.append({"role": "user", "content": message})
+
+    # Try Claude first
+    if ANTHROPIC_API_KEY:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=500,
+                system=system,
+                messages=messages,
+            )
+            reply = response.content[0].text
+            return {"reply": reply, "provider": "claude"}
+        except Exception as e:
+            print(f"Claude error: {e}. Falling back to Gemini...")
+
+    # Fallback to Gemini
+    if GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=system)
+            # Convert messages to Gemini format
+            gemini_history = []
+            for m in messages[:-1]:
+                gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+            chat = model.start_chat(history=gemini_history)
+            response = chat.send_message(message)
+            return {"reply": response.text, "provider": "gemini"}
+        except Exception as e:
+            print(f"Gemini error: {e}")
+
+    # Both failed or no keys configured
+    return {
+        "reply": "¡Hola! Soy Mateo de MIP Quality & Logistics. En este momento estoy teniendo problemas técnicos, pero puedes escribirnos a contacto@mipquality.com o al +56 9 8765 4321 por WhatsApp y te atendemos de inmediato.",
+        "provider": "fallback"
+    }
+
+
 # ─── Serve Frontend ───
 @app.get("/health")
 def health_nginx():
