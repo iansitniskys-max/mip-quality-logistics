@@ -40,6 +40,24 @@ class Cotizacion(Base):
 
     cliente = relationship("Cliente", back_populates="cotizaciones")
     pedido = relationship("Pedido", back_populates="cotizacion", uselist=False)
+    productos = relationship("ProductoCotizacion", back_populates="cotizacion", cascade="all, delete-orphan")
+
+
+class ProductoCotizacion(Base):
+    __tablename__ = "productos_cotizacion"
+    id = Column(Integer, primary_key=True, index=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=False)
+    nombre = Column(String(300), nullable=False)
+    categoria = Column(String(100))
+    materialidad = Column(String(100))
+    dimensiones = Column(String(100))
+    colores = Column(String(100))
+    cantidad = Column(String(100))
+    precio_objetivo = Column(String(100))
+    personalizacion = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+    cotizacion = relationship("Cotizacion", back_populates="productos")
 
 
 class Pedido(Base):

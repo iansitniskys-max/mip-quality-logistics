@@ -11,7 +11,7 @@ from sqlalchemy import func, extract
 
 from database import engine, get_db, Base
 from fastapi.responses import StreamingResponse
-from models import Cliente, Cotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent, Ticket
+from models import Cliente, Cotizacion, ProductoCotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent, Ticket
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
     PedidoCreate, PedidoUpdate, PedidoOut, FacturaCreate, FacturaOut,
@@ -585,6 +585,84 @@ def update_cotizacion(id: int, data: CotizacionUpdate, db: Session = Depends(get
     return c
 
 
+# ─── Productos de Cotización ───
+@app.post("/api/cotizaciones/{cot_id}/productos")
+def add_productos(cot_id: int, data: dict, db: Session = Depends(get_db)):
+    """Add multiple products to a cotizacion"""
+    cot = db.query(Cotizacion).get(cot_id)
+    if not cot:
+        raise HTTPException(404, "Cotización no encontrada")
+    productos = data.get("productos", [])
+    created = []
+    for p in productos:
+        prod = ProductoCotizacion(
+            cotizacion_id=cot_id,
+            nombre=p.get("nombre", ""),
+            categoria=p.get("categoria", ""),
+            materialidad=p.get("materialidad", ""),
+            dimensiones=p.get("dimensiones", ""),
+            colores=p.get("colores", ""),
+            cantidad=p.get("cantidad", ""),
+            precio_objetivo=p.get("precio_objetivo", ""),
+            personalizacion=p.get("personalizacion", ""),
+        )
+        db.add(prod)
+        db.flush()
+        created.append({"id": prod.id, "nombre": prod.nombre})
+    # Update cotizacion producto field with summary
+    names = [p.get("nombre", "") for p in productos if p.get("nombre")]
+    if names:
+        cot.producto = " + ".join(names[:5]) + (f" (+{len(names)-5} más)" if len(names) > 5 else "")
+        cot.cantidad = f"{len(productos)} productos"
+    db.commit()
+    return {"cotizacion_id": cot_id, "productos_creados": len(created), "productos": created}
+
+
+@app.get("/api/cotizaciones/{cot_id}/productos")
+def get_productos(cot_id: int, db: Session = Depends(get_db)):
+    """Get all products for a cotizacion"""
+    prods = db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == cot_id).order_by(ProductoCotizacion.id).all()
+    return [{"id": p.id, "nombre": p.nombre, "categoria": p.categoria, "materialidad": p.materialidad,
+             "dimensiones": p.dimensiones, "colores": p.colores, "cantidad": p.cantidad,
+             "precio_objetivo": p.precio_objetivo, "personalizacion": p.personalizacion} for p in prods]
+
+
+# ─── Admin: Download CSV ───
+@app.get("/api/admin/download-csv")
+def download_csv(db: Session = Depends(get_db)):
+    """Download all cotizaciones with products as CSV"""
+    cots = db.query(Cotizacion).order_by(Cotizacion.created_at.desc()).all()
+    output = io.StringIO()
+    output.write('\ufeff')  # BOM for UTF-8 Excel compatibility
+    writer = csv.writer(output, delimiter=';')
+    writer.writerow(["ID", "Cliente", "Empresa", "Email", "Producto", "Categoria", "Materialidad",
+                     "Cantidad", "Precio_Objetivo", "Plazo", "Uso_Final", "Personalizacion", "Estado", "Fecha"])
+    clientes = {}
+    for c in cots:
+        if c.cliente_id not in clientes:
+            cl = db.query(Cliente).get(c.cliente_id)
+            clientes[c.cliente_id] = cl
+        cl = clientes.get(c.cliente_id)
+        cl_nombre = cl.nombre if cl else "N/A"
+        cl_empresa = cl.empresa if cl else ""
+        cl_email = cl.email if cl else ""
+        date = c.created_at.strftime("%Y-%m-%d") if c.created_at else ""
+        # Get products for this cotizacion
+        prods = db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == c.id).all()
+        if prods:
+            for p in prods:
+                writer.writerow([f"SOL-{str(c.id).zfill(3)}", cl_nombre, cl_empresa, cl_email,
+                                p.nombre, p.categoria, p.materialidad, p.cantidad, p.precio_objetivo,
+                                c.plazo, c.uso_final, p.personalizacion, c.estado, date])
+        else:
+            writer.writerow([f"SOL-{str(c.id).zfill(3)}", cl_nombre, cl_empresa, cl_email,
+                            c.producto, "", "", c.cantidad, c.precio_objetivo,
+                            c.plazo, c.uso_final, c.personalizacion, c.estado, date])
+    output.seek(0)
+    return StreamingResponse(output, media_type="text/csv",
+                            headers={"Content-Disposition": "attachment; filename=cotizaciones_export.csv"})
+
+
 # ─── Pedidos ───
 @app.get("/api/pedidos", response_model=list[PedidoOut])
 def listar_pedidos(cliente_id: Optional[int] = None, db: Session = Depends(get_db)):
@@ -1091,7 +1169,7 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
         try:
             import google.generativeai as genai
             genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=system)
+            model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
             # Convert messages to Gemini format
             gemini_history = []
             for m in messages[:-1]:

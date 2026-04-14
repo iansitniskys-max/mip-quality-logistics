@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -775,6 +776,31 @@ html,body{overflow-x:hidden;max-width:100vw}
   .cg-name{font-size:11px}
   .cg-text{font-size:12px}
 }
+
+/* ═══ MULTI-PRODUCT CARDS ═══ */
+.product-cards{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.product-card{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg-white);overflow:hidden;transition:border-color .2s}
+.product-card:hover{border-color:var(--border-hover)}
+.pc-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg);border-bottom:1px solid var(--border);cursor:pointer;gap:10px}
+.pc-header .pc-num{width:28px;height:28px;border-radius:50%;background:var(--bg-dark);color:var(--text-inv);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.pc-header .pc-title{flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-header .pc-actions{display:flex;gap:4px}
+.pc-header .pc-actions button{width:28px;height:28px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted);transition:all .15s;background:var(--bg-white);border:1px solid var(--border)}
+.pc-header .pc-actions button:hover{border-color:var(--border-active);color:var(--text)}
+.pc-header .pc-actions button.danger:hover{color:var(--danger);border-color:var(--danger)}
+.pc-body{padding:16px;display:block}
+.product-card.collapsed .pc-body{display:none}
+.pc-uploads{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.pc-upload-zone{border:1.5px dashed var(--border-hover);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;transition:all .2s}
+.pc-upload-zone:hover{border-color:var(--border-active);background:rgba(0,0,0,0.01)}
+.pc-upload-zone i{font-size:18px;color:var(--text-faint);margin-bottom:4px;display:block}
+.pc-upload-zone h5{font-size:11px;font-weight:500;margin-bottom:2px}
+.pc-upload-zone p{font-size:10px;color:var(--text-muted)}
+.add-product-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border:2px dashed var(--border-hover);border-radius:var(--radius-lg);color:var(--text-muted);font-size:13px;font-weight:500;transition:all .2s;cursor:pointer}
+.add-product-btn:hover{border-color:var(--border-active);color:var(--text);background:rgba(0,0,0,0.01)}
+@media(max-width:768px){
+  .pc-uploads{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -1140,18 +1166,15 @@ html,body{overflow-x:hidden;max-width:100vw}
 
     <div class="page-body" id="c-quote" style="display:none">
       <div style="margin-bottom:20px"><button class="btn btn-outline btn-sm" onclick="cView('c-dash')"><i class="fas fa-arrow-left"></i> Volver</button></div>
-      <div class="card" style="max-width:860px;padding:28px">
+      <div class="card" style="max-width:900px;padding:28px">
         <h2 style="font-size:18px;font-weight:600;margin-bottom:4px">Nueva solicitud de cotización</h2>
-        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:6px">Nuestro equipo te contactará con una propuesta en 24-48 horas.</p>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:6px">Puedes agregar múltiples productos en una sola solicitud.</p>
         <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--info-bg);border-radius:var(--radius);margin-bottom:24px"><i class="fas fa-lightbulb" style="color:var(--info);font-size:12px"></i><span style="font-size:11px;color:var(--info)">Mientras más detalle incluyas, más precisa será tu cotización.</span></div>
         <form onsubmit="doQuote(event)">
-          <div class="form-group"><label class="form-label">Nombre del producto *</label><input type="text" class="form-input" id="q-producto" placeholder="Ej: Zapatillas Running con suela Eva" required></div>
-
-          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><i class="fas fa-clipboard-list" style="margin-right:4px"></i> ESPECIFICACIONES TÉCNICAS</div>
-
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><i class="fas fa-info-circle" style="margin-right:4px"></i> DATOS GENERALES</div>
           <div class="form-row">
             <div class="form-group"><label class="form-label">Industria *</label>
-              <select class="form-input" id="q-industria" required onchange="updateCategoria()">
+              <select class="form-input" id="q-industria" required>
                 <option value="">Seleccionar...</option>
                 <option>Moda y Textil</option><option>Hogar y Decoración</option><option>Industrial y Herramientas</option>
                 <option>Tecnología y Electrónica</option><option>Salud y Bienestar</option><option>Alimentos y Bebidas</option>
@@ -1159,66 +1182,19 @@ html,body{overflow-x:hidden;max-width:100vw}
                 <option>Juguetes y Recreación</option><option>Deportes y Outdoors</option><option value="_otro">Otro...</option>
               </select>
             </div>
-            <div class="form-group"><label class="form-label">Categoría de producto *</label>
-              <select class="form-input" id="q-categoria" required>
-                <option value="">Primero selecciona industria</option>
-                <option value="_otro">Otro...</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Materialidad *</label>
-              <select class="form-input" id="q-material" required>
-                <option value="">Seleccionar...</option>
-                <option>Algodón</option><option>Poliéster</option><option>Nylon</option><option>Cuero sintético</option><option>Cuero natural</option>
-                <option>Plástico PP</option><option>Plástico ABS</option><option>PVC</option><option>Silicona</option>
-                <option>Acero inoxidable</option><option>Aluminio</option><option>Hierro</option><option>Madera</option><option>MDF / Melamina</option>
-                <option>Vidrio</option><option>Cerámica</option><option>Cartón corrugado</option><option>Papel kraft</option>
-                <option>Caucho / Goma</option><option>EVA / Espuma</option><option>Bambú</option><option>Mixto / Compuesto</option>
-                <option value="_otro">Otro...</option>
-              </select>
-            </div>
-            <div class="form-group"><label class="form-label">Dimensiones aproximadas</label>
-              <select class="form-input" id="q-dimensiones">
-                <option value="">Seleccionar...</option>
-                <option>Muy pequeño (< 5 cm)</option><option>Pequeño (5 - 15 cm)</option><option>Mediano (15 - 50 cm)</option>
-                <option>Grande (50 - 100 cm)</option><option>Muy grande (> 100 cm)</option><option>Variable / Múltiples tamaños</option>
-                <option value="_otro">Otro...</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group"><label class="form-label">Colores</label>
-            <select class="form-input" id="q-colores">
-              <option value="">Seleccionar...</option>
-              <option>Blanco</option><option>Negro</option><option>Gris</option><option>Azul</option><option>Rojo</option>
-              <option>Verde</option><option>Amarillo</option><option>Marrón / Café</option><option>Rosa</option><option>Naranja</option>
-              <option>Transparente / Clear</option><option>Metalizado (dorado/plateado)</option><option>Varios colores (surtido)</option>
-              <option>Color personalizado (Pantone)</option><option value="_otro">Otro...</option>
-            </select>
-          </div>
-
-          <div class="form-group"><label class="form-label">Descripción adicional</label><textarea class="form-input" id="q-descripcion" placeholder="Detalles adicionales: acabado, certificaciones, normativas, packaging..." style="min-height:70px"></textarea></div>
-
-          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><i class="fas fa-calculator" style="margin-right:4px"></i> CANTIDAD Y PRECIO</div>
-
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Cantidad de unidades *</label><input type="text" class="form-input" id="q-cantidad" placeholder="Ej: 5000" required oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
-            <div class="form-group"><label class="form-label">Precio objetivo por unidad (USD)</label><input type="text" class="form-input" id="q-precio" placeholder="Ej: 3.50"></div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Plazo deseado</label><select class="form-input" id="q-plazo"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>Flexible</option></select></div>
             <div class="form-group"><label class="form-label">Uso final</label><select class="form-input" id="q-uso"><option value="">Seleccionar...</option><option>Venta directa (retail)</option><option>Marca propia / OEM</option><option>Uso interno</option><option>Reventa mayorista</option><option>Licitaciones</option><option>E-commerce</option><option>Proyecto / Obra</option></select></div>
           </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Plazo deseado</label><select class="form-input" id="q-plazo"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>120 días</option><option>Flexible</option></select></div>
+            <div class="form-group"><label class="form-label">Descripción general</label><input type="text" class="form-input" id="q-descripcion" placeholder="Ej: Línea de merchandising para evento..."></div>
+          </div>
 
-          <div class="form-group"><label class="form-label">¿Requiere personalización?</label><div class="switch-wrap"><div class="switch" id="sw1" onclick="toggleSw('sw1','swDetail')"></div><span style="font-size:13px;color:var(--text-secondary)">Sí</span></div><div id="swDetail" style="display:none;margin-top:10px"><textarea class="form-input" id="q-personalizacion" placeholder="Logo, colores corporativos, packaging especial..."></textarea></div></div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:20px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><i class="fas fa-box-open" style="margin-right:4px"></i> PRODUCTOS</div>
 
-          <div class="form-group"><label class="form-label">Imágenes de referencia (máx. 5)</label><div class="upload-zone" onclick="simUpload('imgPrv')"><i class="fas fa-cloud-upload-alt"></i><h4>Arrastra imágenes o haz clic</h4><p>JPG, PNG hasta 5MB</p></div><div class="upload-preview" id="imgPrv"></div></div>
-          <div class="form-group"><label class="form-label">Archivos adjuntos</label><div class="upload-zone" onclick="simUpload('filePrv')"><i class="fas fa-paperclip"></i><h4>Adjuntar archivos técnicos</h4><p>PDF, XLSX hasta 10MB</p></div><div class="upload-preview" id="filePrv"></div></div>
+          <div class="product-cards" id="productCards"></div>
+          <button type="button" class="add-product-btn" onclick="addProduct()"><i class="fas fa-plus-circle"></i> Agregar otro producto</button>
 
-          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px"><button type="button" class="btn btn-outline" onclick="cView('c-dash')">Cancelar</button><button type="submit" class="btn btn-dark btn-lg"><i class="fas fa-paper-plane"></i> Enviar solicitud</button></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px"><button type="button" class="btn btn-outline" onclick="cView('c-dash')">Cancelar</button><button type="submit" class="btn btn-dark btn-lg"><i class="fas fa-paper-plane"></i> Enviar solicitud</button></div>
         </form>
       </div>
     </div>
@@ -1379,7 +1355,7 @@ html,body{overflow-x:hidden;max-width:100vw}
           <button class="active" onclick="switchReqView('pipeline')"><i class="fas fa-columns"></i> Pipeline</button>
           <button onclick="switchReqView('table')"><i class="fas fa-table"></i> Tabla</button>
         </div>
-        <button class="btn btn-dark btn-sm" onclick="openNewProjectModal()"><i class="fas fa-plus"></i> Nuevo Proyecto</button>
+        <div class="admin-btn-group"><button class="btn btn-outline btn-sm" onclick="downloadBulkCSV()"><i class="fas fa-download"></i> CSV</button><button class="btn btn-dark btn-sm" onclick="openNewProjectModal()"><i class="fas fa-plus"></i> Nuevo Proyecto</button></div>
       </div>
       <div class="stat-grid">
         <div class="stat-card"><div class="s-label">Pendientes</div><div class="s-val">0</div></div>
@@ -2199,42 +2175,163 @@ function confirmOtro() {
 }
 
 // ─── Create Cotización + Auto-email ───
+// ─── Multi-Product Cards ───
+let productCount = 0;
+const MATERIALES_OPTIONS = '<option value="">Seleccionar...</option><option>Algodón</option><option>Poliéster</option><option>Nylon</option><option>Cuero sintético</option><option>Cuero natural</option><option>Plástico PP</option><option>Plástico ABS</option><option>PVC</option><option>Silicona</option><option>Acero inoxidable</option><option>Aluminio</option><option>Hierro</option><option>Madera</option><option>MDF / Melamina</option><option>Vidrio</option><option>Cerámica</option><option>Cartón corrugado</option><option>EVA / Espuma</option><option>Bambú</option><option>Mixto / Compuesto</option><option>Otro</option>';
+const DIMENSIONES_OPTIONS = '<option value="">Seleccionar...</option><option>Muy pequeño (&lt; 5 cm)</option><option>Pequeño (5 - 15 cm)</option><option>Mediano (15 - 50 cm)</option><option>Grande (50 - 100 cm)</option><option>Muy grande (&gt; 100 cm)</option><option>Variable</option>';
+const COLORES_OPTIONS = '<option value="">Seleccionar...</option><option>Blanco</option><option>Negro</option><option>Gris</option><option>Azul</option><option>Rojo</option><option>Verde</option><option>Amarillo</option><option>Marrón / Café</option><option>Rosa</option><option>Naranja</option><option>Transparente</option><option>Metalizado</option><option>Varios colores (surtido)</option><option>Color personalizado (Pantone)</option>';
+const CATEGORIA_OPTIONS = '<option value="">Seleccionar...</option><option>Botella / Termo</option><option>Gorra / Sombrero</option><option>Polera / Camiseta</option><option>Mochila / Bolso</option><option>Banano / Riñonera</option><option>Sandalia / Calzado</option><option>Chaleco / Chaqueta</option><option>Accesorio deportivo</option><option>Kit / Set</option><option>Packaging / Envase</option><option>Electrónica</option><option>Herramienta</option><option>Textil hogar</option><option>Juguete</option><option>Otro</option>';
+
+function addProduct(copyFrom) {
+  productCount++;
+  const n = productCount;
+  const container = document.getElementById('productCards');
+  const card = document.createElement('div');
+  card.className = 'product-card';
+  card.id = `pc-${n}`;
+  card.innerHTML = `
+    <div class="pc-header" onclick="toggleProductCard(${n})">
+      <span class="pc-num">${n}</span>
+      <span class="pc-title" id="pc-title-${n}">Producto ${n}</span>
+      <div class="pc-actions">
+        <button type="button" onclick="event.stopPropagation();duplicateProduct(${n})" title="Duplicar"><i class="fas fa-copy"></i></button>
+        <button type="button" class="danger" onclick="event.stopPropagation();removeProduct(${n})" title="Eliminar"><i class="fas fa-trash"></i></button>
+        <button type="button" onclick="event.stopPropagation();toggleProductCard(${n})" title="Expandir/Colapsar"><i class="fas fa-chevron-down" id="pc-chevron-${n}"></i></button>
+      </div>
+    </div>
+    <div class="pc-body" id="pc-body-${n}">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre del producto *</label><input type="text" class="form-input pc-nombre" data-n="${n}" placeholder="Ej: Botella térmica 500ml" required oninput="document.getElementById('pc-title-${n}').textContent=this.value||'Producto ${n}'"></div>
+        <div class="form-group"><label class="form-label">Categoría</label><select class="form-input pc-categoria">${CATEGORIA_OPTIONS}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Materialidad</label><select class="form-input pc-material">${MATERIALES_OPTIONS}</select></div>
+        <div class="form-group"><label class="form-label">Colores</label><select class="form-input pc-colores">${COLORES_OPTIONS}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Dimensiones</label><select class="form-input pc-dimensiones">${DIMENSIONES_OPTIONS}</select></div>
+        <div class="form-group"><label class="form-label">Cantidad *</label><input type="text" class="form-input pc-cantidad" placeholder="5000" required oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Precio objetivo / unidad (USD)</label><input type="text" class="form-input pc-precio" placeholder="3.50"></div>
+        <div class="form-group"><label class="form-label">Personalización</label><input type="text" class="form-input pc-personalizacion" placeholder="Logo, colores, packaging..."></div>
+      </div>
+      <div class="pc-uploads">
+        <div class="pc-upload-zone" onclick="simUpload('pc-ref-${n}')"><i class="fas fa-camera"></i><h5>Imagen referencia</h5><p>Foto del producto</p></div>
+        <div class="pc-upload-zone" onclick="simUpload('pc-logo-${n}')"><i class="fas fa-paint-brush"></i><h5>Logo / Arte</h5><p>Diseño personalización</p></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px"><div class="upload-preview" id="pc-ref-${n}"></div><div class="upload-preview" id="pc-logo-${n}"></div></div>
+    </div>`;
+  container.appendChild(card);
+  // Copy values if duplicating
+  if (copyFrom) {
+    const src = document.getElementById(`pc-${copyFrom}`);
+    if (src) {
+      card.querySelector('.pc-nombre').value = src.querySelector('.pc-nombre').value;
+      card.querySelector('.pc-categoria').value = src.querySelector('.pc-categoria').value;
+      card.querySelector('.pc-material').value = src.querySelector('.pc-material').value;
+      card.querySelector('.pc-colores').value = src.querySelector('.pc-colores').value;
+      card.querySelector('.pc-dimensiones').value = src.querySelector('.pc-dimensiones').value;
+      card.querySelector('.pc-cantidad').value = src.querySelector('.pc-cantidad').value;
+      card.querySelector('.pc-precio').value = src.querySelector('.pc-precio').value;
+      card.querySelector('.pc-personalizacion').value = src.querySelector('.pc-personalizacion').value;
+      document.getElementById(`pc-title-${n}`).textContent = src.querySelector('.pc-nombre').value + ' (copia)';
+    }
+  }
+}
+
+function removeProduct(n) {
+  const cards = document.querySelectorAll('.product-card');
+  if (cards.length <= 1) { toast('error', 'Error', 'Debe haber al menos 1 producto'); return; }
+  document.getElementById(`pc-${n}`)?.remove();
+  // Re-number
+  document.querySelectorAll('.product-card').forEach((c, i) => { c.querySelector('.pc-num').textContent = i + 1; });
+}
+
+function duplicateProduct(n) { addProduct(n); }
+
+function toggleProductCard(n) {
+  const card = document.getElementById(`pc-${n}`);
+  const chevron = document.getElementById(`pc-chevron-${n}`);
+  if (card) { card.classList.toggle('collapsed'); if (chevron) chevron.classList.toggle('fa-chevron-up'); }
+}
+
+// Init first product card
+document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('productCards')?.children.length === 0) addProduct(); });
+setTimeout(() => { if (document.getElementById('productCards')?.children.length === 0) addProduct(); }, 100);
+
 async function doQuote(e) {
   e.preventDefault();
   if (!currentUser) { toast('error', 'Error', 'Debes iniciar sesión'); return; }
-  const qty = document.getElementById('q-cantidad').value;
-  if (!qty || !/^\d+$/.test(qty)) { toast('error', 'Error', 'La cantidad debe ser un número entero sin puntos ni comas'); return; }
-  const sw = document.getElementById('sw1');
-  const specs = [
-    document.getElementById('q-industria').value,
-    document.getElementById('q-categoria').value,
-    document.getElementById('q-material').value,
-    document.getElementById('q-dimensiones')?.value || '',
-    document.getElementById('q-colores')?.value || '',
-  ].filter(v => v && v !== '_otro').join(' | ');
-  const desc = (specs + (document.getElementById('q-descripcion').value ? '\n' + document.getElementById('q-descripcion').value : '')).trim();
-  const data = {
+  const cards = document.querySelectorAll('.product-card');
+  if (cards.length === 0) { toast('error', 'Error', 'Agrega al menos un producto'); return; }
+
+  // Validate all products have name + quantity
+  for (const card of cards) {
+    const nombre = card.querySelector('.pc-nombre')?.value?.trim();
+    const cantidad = card.querySelector('.pc-cantidad')?.value?.trim();
+    if (!nombre) { toast('error', 'Error', 'Todos los productos deben tener nombre'); return; }
+    if (!cantidad || !/^\d+$/.test(cantidad)) { toast('error', 'Error', `"${nombre}": la cantidad debe ser un número entero`); return; }
+  }
+
+  // Collect products
+  const productos = [];
+  cards.forEach(card => {
+    productos.push({
+      nombre: card.querySelector('.pc-nombre')?.value?.trim() || '',
+      categoria: card.querySelector('.pc-categoria')?.value || '',
+      materialidad: card.querySelector('.pc-material')?.value || '',
+      dimensiones: card.querySelector('.pc-dimensiones')?.value || '',
+      colores: card.querySelector('.pc-colores')?.value || '',
+      cantidad: card.querySelector('.pc-cantidad')?.value + ' unidades',
+      precio_objetivo: card.querySelector('.pc-precio')?.value ? 'USD $' + card.querySelector('.pc-precio').value + ' /un' : '',
+      personalizacion: card.querySelector('.pc-personalizacion')?.value || '',
+    });
+  });
+
+  const names = productos.map(p => p.nombre);
+  const cotData = {
     cliente_id: currentUser.id,
-    producto: document.getElementById('q-producto').value,
-    descripcion: desc,
-    cantidad: qty + ' unidades',
-    precio_objetivo: document.getElementById('q-precio').value ? 'USD $' + document.getElementById('q-precio').value + ' /unidad' : '',
-    plazo: document.getElementById('q-plazo').value,
-    uso_final: document.getElementById('q-uso').value,
-    personalizacion: sw && sw.classList.contains('on') ? (document.getElementById('q-personalizacion')?.value || '') : '',
+    producto: names.join(' + '),
+    descripcion: document.getElementById('q-descripcion')?.value || '',
+    cantidad: `${productos.length} productos`,
+    precio_objetivo: '',
+    plazo: document.getElementById('q-plazo')?.value || '',
+    uso_final: document.getElementById('q-uso')?.value || '',
+    personalizacion: '',
   };
+
   try {
-    const cot = await api('/api/cotizaciones', { method: 'POST', body: JSON.stringify(data) });
-    // Send notification email
+    // 1. Create cotizacion
+    const cot = await api('/api/cotizaciones', { method: 'POST', body: JSON.stringify(cotData) });
+    // 2. Add products to cotizacion
+    await api(`/api/cotizaciones/${cot.id}/productos`, { method: 'POST', body: JSON.stringify({ productos }) });
+    // 3. Notify
     try {
       await api('/api/cotizaciones/notify', { method: 'POST', body: JSON.stringify({ cotizacion_id: cot.id, cliente_nombre: currentUser.nombre, cliente_email: currentUser.email }) });
     } catch (_) {}
-    toast('success', 'Solicitud enviada', 'Recibirás confirmación en tu correo.');
+    toast('success', 'Solicitud enviada', `${productos.length} producto(s) cotizados. Recibirás respuesta en 72 horas.`);
     e.target.reset();
+    document.getElementById('productCards').innerHTML = '';
+    productCount = 0;
+    addProduct();
     setTimeout(() => cView('c-dash'), 1500);
   } catch (err) {
     toast('error', 'Error', err.message);
   }
+}
+
+// ─── Admin: Bulk CSV Download ───
+async function downloadBulkCSV() {
+  try {
+    const response = await fetch(API + '/api/admin/download-csv');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'cotizaciones_export.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast('success', 'Descargado', 'CSV de cotizaciones exportado');
+  } catch (err) { toast('error', 'Error', 'No se pudo descargar el CSV'); }
 }
 
 // ─── Admin ───
@@ -2423,6 +2520,15 @@ async function openDetail(cotId) {
     title.textContent = `#SOL-${String(c.id).padStart(3,'0')} — ${c.producto}`;
     badge.className = `badge ${badges[c.estado]||'badge-neutral'}`;
     badge.innerHTML = `${labels[c.estado]||c.estado}`;
+    // Load products for this cotizacion
+    let productsHtml = '';
+    try {
+      const prods = await api(`/api/cotizaciones/${cotId}/productos`);
+      if (prods.length) {
+        productsHtml = '<div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.5px">PRODUCTOS (' + prods.length + ')</div>' +
+          prods.map((p, i) => `<div style="padding:10px 14px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;font-size:12px"><div style="font-weight:600;margin-bottom:4px">${i+1}. ${p.nombre}</div><div style="display:flex;flex-wrap:wrap;gap:8px;color:var(--text-secondary)">${p.categoria?'<span>'+p.categoria+'</span>':''}${p.materialidad?'<span>· '+p.materialidad+'</span>':''}${p.colores?'<span>· '+p.colores+'</span>':''}<span>· ${p.cantidad||'—'}</span>${p.precio_objetivo?'<span>· '+p.precio_objetivo+'</span>':''}</div>${p.personalizacion?'<div style="margin-top:4px;color:var(--text-muted);font-style:italic">'+p.personalizacion+'</div>':''}</div>`).join('') + '</div>';
+      }
+    } catch {}
     // Load docs for this cotizacion
     let docsHtml = '';
     try {
@@ -2446,6 +2552,7 @@ async function openDetail(cotId) {
         <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Personalización</span><span style="font-weight:500;font-size:13px">${c.personalizacion||'No'}</span></div>
         <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Uso final</span><span style="font-weight:500;font-size:13px">${c.uso_final||'—'}</span></div>
       </div>
+      ${productsHtml}
       ${c.descripcion ? `<div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;letter-spacing:.5px">DESCRIPCIÓN</div><p style="font-size:13px;color:var(--text-secondary);line-height:1.7;background:var(--bg-surface);padding:14px;border-radius:var(--radius)">${c.descripcion}</p></div>` : ''}
       ${docsHtml ? `<div style="margin-bottom:20px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.5px">DOCUMENTOS</div><div style="display:flex;flex-direction:column;gap:6px">${docsHtml}</div></div>` : ''}
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
