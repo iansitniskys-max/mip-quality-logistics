@@ -2107,6 +2107,7 @@ async function uploadFile(inputEl, pedidoId) {
 // ─── Client Views ───
 function cView(id) {
   ['c-dash', 'c-quote', 'c-track', 'c-orders', 'c-invoices', 'c-support', 'c-history'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
   const t = { 'c-dash': 'Dashboard', 'c-quote': 'Nueva Cotización', 'c-track': 'Seguimiento', 'c-orders': 'Mis Pedidos', 'c-invoices': 'Facturas', 'c-support': 'Soporte', 'c-history': 'Historial' };
   document.getElementById('cTitle').textContent = t[id] || 'Dashboard';
   const links = document.querySelectorAll('#page-client .sb-link');
