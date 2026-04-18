@@ -1915,8 +1915,10 @@ def generar_cotizacion_formal(cot_id: int, data: dict, db: Session = Depends(get
     total_cif = total_fob + flete_cost
     total_with_margin = total_cif * (1 + margen / 100)
 
-    # Generate PDF
-    numero = f"COT-{cot_id:04d}-{datetime.now().strftime('%Y%m%d')}"
+    # Generate PDF (numero must be unique; include time to avoid collisions)
+    existing = db.query(CotizacionFormal).filter(CotizacionFormal.cotizacion_id == cot_id).count()
+    rev = existing + 1
+    numero = f"COT-{cot_id:04d}-{datetime.now().strftime('%Y%m%d%H%M%S')}-R{rev}"
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
