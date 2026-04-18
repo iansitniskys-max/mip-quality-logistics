@@ -20,15 +20,22 @@ class ClienteCreate(BaseModel):
 class ClienteOut(BaseModel):
     id: int
     nombre: str
-    empresa: str
-    rut: str
-    rubro: str
+    empresa: Optional[str] = ""
+    razon_social: Optional[str] = ""
+    rut: Optional[str] = ""
+    rubro: Optional[str] = ""
     email: str
-    telefono: str
+    telefono: Optional[str] = ""
     num_empleados: Optional[str] = ""
     referido_por: Optional[str] = ""
     vendedor_asignado: Optional[str] = ""
+    kam_responsable: Optional[str] = ""
     sitio_web: Optional[str] = ""
+    ciudad: Optional[str] = ""
+    direccion_despacho: Optional[str] = ""
+    condicion_pago: Optional[str] = ""
+    notas: Optional[str] = ""
+    activo: Optional[str] = "true"
     role: Optional[str] = "client"
     created_at: datetime
     class Config:
@@ -157,13 +164,44 @@ class LoginRequest(BaseModel):
 class ClienteUpdate(BaseModel):
     nombre: Optional[str] = None
     empresa: Optional[str] = None
+    razon_social: Optional[str] = None
     rut: Optional[str] = None
     rubro: Optional[str] = None
     telefono: Optional[str] = None
     num_empleados: Optional[str] = None
     referido_por: Optional[str] = None
     vendedor_asignado: Optional[str] = None
+    kam_responsable: Optional[str] = None
     sitio_web: Optional[str] = None
+    ciudad: Optional[str] = None
+    direccion_despacho: Optional[str] = None
+    condicion_pago: Optional[str] = None
+    notas: Optional[str] = None
+    activo: Optional[str] = None
+
+
+# --- Actividades ---
+class ActividadCreate(BaseModel):
+    cliente_id: Optional[int] = None
+    cotizacion_id: Optional[int] = None
+    tipo: str = "nota"
+    titulo: Optional[str] = ""
+    descripcion: str = ""
+    autor: Optional[str] = ""
+
+class ActividadOut(BaseModel):
+    id: int
+    cliente_id: Optional[int]
+    cotizacion_id: Optional[int]
+    tipo: str
+    titulo: Optional[str] = ""
+    descripcion: Optional[str] = ""
+    etapa_anterior: Optional[str] = ""
+    etapa_nueva: Optional[str] = ""
+    autor: Optional[str] = ""
+    created_at: datetime
+    class Config:
+        from_attributes = True
 
 
 # --- Historial ---

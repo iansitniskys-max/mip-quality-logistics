@@ -8,6 +8,7 @@ class Cliente(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False)
     empresa = Column(String(200))
+    razon_social = Column(String(200))
     rut = Column(String(20))
     rubro = Column(String(100))
     email = Column(String(200), unique=True, nullable=False)
@@ -16,11 +17,18 @@ class Cliente(Base):
     num_empleados = Column(String(30))
     referido_por = Column(String(100))
     vendedor_asignado = Column(String(200))
+    kam_responsable = Column(String(200))
     sitio_web = Column(String(300))
+    ciudad = Column(String(100))
+    direccion_despacho = Column(String(300))
+    condicion_pago = Column(String(100))
+    notas = Column(Text)
+    activo = Column(String(10), default="true")
     role = Column(String(20), default="client")  # 'client' or 'admin'
     created_at = Column(DateTime, server_default=func.now())
 
     cotizaciones = relationship("Cotizacion", back_populates="cliente")
+    actividades = relationship("Actividad", back_populates="cliente", cascade="all, delete-orphan")
 
 
 class Cotizacion(Base):
@@ -159,3 +167,19 @@ class SiteContent(Base):
     value = Column(Text)
     content_type = Column(String(20), default="text")  # text, image, json
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Actividad(Base):
+    __tablename__ = "actividades"
+    id = Column(Integer, primary_key=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=True)
+    tipo = Column(String(30), nullable=False, default="nota")  # nota, llamada, email, reunion, visita, cambio_etapa, otro
+    titulo = Column(String(300))
+    descripcion = Column(Text)
+    etapa_anterior = Column(String(50))
+    etapa_nueva = Column(String(50))
+    autor = Column(String(200))
+    created_at = Column(DateTime, server_default=func.now())
+
+    cliente = relationship("Cliente", back_populates="actividades")

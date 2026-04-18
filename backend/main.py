@@ -11,12 +11,12 @@ from sqlalchemy import func, extract
 
 from database import engine, get_db, Base
 from fastapi.responses import StreamingResponse
-from models import Cliente, Cotizacion, ProductoCotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent, Ticket
+from models import Cliente, Cotizacion, ProductoCotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent, Ticket, Actividad
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
     PedidoCreate, PedidoUpdate, PedidoOut, FacturaCreate, FacturaOut,
     MovimientoCreate, MovimientoOut, LoginRequest, HistorialOut,
-    SiteContentUpdate, SiteContentOut,
+    SiteContentUpdate, SiteContentOut, ActividadCreate, ActividadOut,
 )
 import csv
 import io
@@ -38,7 +38,20 @@ def on_startup():
         # Migrate: add new columns if missing
         from sqlalchemy import text
         with engine.connect() as conn:
-            for col, col_type in [("num_empleados", "VARCHAR(30)"), ("referido_por", "VARCHAR(100)"), ("vendedor_asignado", "VARCHAR(200)"), ("sitio_web", "VARCHAR(300)"), ("role", "VARCHAR(20) DEFAULT 'client'")]:
+            for col, col_type in [
+                ("num_empleados", "VARCHAR(30)"),
+                ("referido_por", "VARCHAR(100)"),
+                ("vendedor_asignado", "VARCHAR(200)"),
+                ("sitio_web", "VARCHAR(300)"),
+                ("role", "VARCHAR(20) DEFAULT 'client'"),
+                ("razon_social", "VARCHAR(200)"),
+                ("kam_responsable", "VARCHAR(200)"),
+                ("ciudad", "VARCHAR(100)"),
+                ("direccion_despacho", "VARCHAR(300)"),
+                ("condicion_pago", "VARCHAR(100)"),
+                ("notas", "TEXT"),
+                ("activo", "VARCHAR(10) DEFAULT 'true'"),
+            ]:
                 try:
                     conn.execute(text(f"ALTER TABLE clientes ADD COLUMN {col} {col_type}"))
                     conn.commit()
@@ -1201,6 +1214,243 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
         "reply": "¡Hola! Soy Mateo de MIP Quality & Logistics. En este momento estoy teniendo problemas técnicos, pero puedes escribirnos a contacto@mipquality.com o al +56 9 8765 4321 por WhatsApp y te atendemos de inmediato.",
         "provider": "fallback"
     }
+
+
+# ═══ FASE 1: EXPORT/IMPORT EXCEL DE CLIENTES ═══
+@app.get("/api/clientes/export-excel")
+def export_clientes_excel(db: Session = Depends(get_db)):
+    """Export clients to CSV format (Excel-compatible with BOM UTF-8)"""
+    clientes = db.query(Cliente).order_by(Cliente.created_at.desc()).all()
+    output = io.StringIO()
+    output.write('\ufeff')  # BOM for Excel
+    writer = csv.writer(output, delimiter=';')
+    writer.writerow([
+        "ID", "Nombre", "Razón Social", "Nombre Comercial (Empresa)", "RUT", "Email",
+        "Teléfono", "Rubro", "Ciudad", "Dirección Despacho", "Condición Pago",
+        "KAM Responsable", "Vendedor Asignado", "Sitio Web", "N° Empleados",
+        "Referido Por", "Notas", "Activo", "Rol", "Fecha Creación"
+    ])
+    for c in clientes:
+        writer.writerow([
+            c.id, c.nombre or "", c.razon_social or "", c.empresa or "", c.rut or "",
+            c.email or "", c.telefono or "", c.rubro or "", c.ciudad or "",
+            c.direccion_despacho or "", c.condicion_pago or "", c.kam_responsable or "",
+            c.vendedor_asignado or "", c.sitio_web or "", c.num_empleados or "",
+            c.referido_por or "", c.notas or "", c.activo or "true", c.role or "client",
+            c.created_at.strftime("%Y-%m-%d") if c.created_at else ""
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        output, media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=clientes_export.csv"}
+    )
+
+
+@app.get("/api/clientes/template-excel")
+def export_clientes_template(db: Session = Depends(get_db)):
+    """Download empty Excel-compatible template for importing clients"""
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output, delimiter=';')
+    writer.writerow([
+        "Nombre", "Razón Social", "Nombre Comercial (Empresa)", "RUT", "Email",
+        "Teléfono", "Rubro", "Ciudad", "Dirección Despacho", "Condición Pago",
+        "KAM Responsable", "Vendedor Asignado", "Sitio Web", "N° Empleados", "Notas"
+    ])
+    # Example row
+    writer.writerow([
+        "Juan Pérez", "Retail Ejemplo SpA", "Retail Ejemplo", "76.123.456-7",
+        "juan@ejemplo.cl", "+56 9 1234 5678", "Retail / Moda", "Santiago",
+        "Av. Providencia 1234", "30 días", "María González", "Pedro López",
+        "www.ejemplo.cl", "11-50", "Cliente desde 2024"
+    ])
+    output.seek(0)
+    return StreamingResponse(
+        output, media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=plantilla_clientes.csv"}
+    )
+
+
+@app.post("/api/clientes/import-excel")
+def import_clientes_excel(data: dict, db: Session = Depends(get_db)):
+    """Import clients from parsed Excel/CSV rows (sent as JSON array)"""
+    rows = data.get("rows", [])
+    imported = 0
+    errors = []
+    for i, row in enumerate(rows):
+        try:
+            # Normalize keys (accept various formats)
+            email = (row.get("Email") or row.get("email") or "").strip().lower()
+            nombre = (row.get("Nombre") or row.get("nombre") or "").strip()
+            if not email or not nombre:
+                errors.append(f"Fila {i+2}: Email y Nombre son obligatorios")
+                continue
+            existing = db.query(Cliente).filter(Cliente.email == email).first()
+            if existing:
+                errors.append(f"Fila {i+2}: Email {email} ya existe")
+                continue
+            c = Cliente(
+                nombre=nombre,
+                razon_social=(row.get("Razón Social") or row.get("razon_social") or "").strip(),
+                empresa=(row.get("Nombre Comercial (Empresa)") or row.get("Empresa") or row.get("empresa") or "").strip(),
+                rut=(row.get("RUT") or row.get("rut") or "").strip(),
+                email=email,
+                telefono=(row.get("Teléfono") or row.get("telefono") or "").strip(),
+                rubro=(row.get("Rubro") or row.get("rubro") or "").strip(),
+                ciudad=(row.get("Ciudad") or row.get("ciudad") or "").strip(),
+                direccion_despacho=(row.get("Dirección Despacho") or row.get("direccion_despacho") or "").strip(),
+                condicion_pago=(row.get("Condición Pago") or row.get("condicion_pago") or "").strip(),
+                kam_responsable=(row.get("KAM Responsable") or row.get("kam_responsable") or "").strip(),
+                vendedor_asignado=(row.get("Vendedor Asignado") or row.get("vendedor_asignado") or "").strip(),
+                sitio_web=(row.get("Sitio Web") or row.get("sitio_web") or "").strip(),
+                num_empleados=(row.get("N° Empleados") or row.get("num_empleados") or "").strip(),
+                notas=(row.get("Notas") or row.get("notas") or "").strip(),
+                activo="true",
+            )
+            db.add(c)
+            db.flush()
+            imported += 1
+        except Exception as e:
+            errors.append(f"Fila {i+2}: {str(e)}")
+    db.commit()
+    return {"imported": imported, "errors": errors, "total": len(rows)}
+
+
+# ═══ FASE 2: DASHBOARD KPIS ═══
+@app.get("/api/admin/dashboard-metrics")
+def dashboard_metrics(db: Session = Depends(get_db)):
+    """Comprehensive metrics for admin dashboard"""
+    cots = db.query(Cotizacion).all()
+    clientes_q = db.query(Cliente).filter(Cliente.role != "admin")
+
+    # Pipeline por etapa
+    etapas = ["pendiente", "cotizado", "produccion", "entregado"]
+    probabilidades = {"pendiente": 20, "cotizado": 40, "produccion": 75, "entregado": 100}
+    pipeline_por_etapa = {}
+    valor_pipeline = 0.0
+    valor_ponderado = 0.0
+    for e in etapas:
+        filtered = [c for c in cots if c.estado == e]
+        count = len(filtered)
+        # Calculate total value from products
+        total_val = 0.0
+        for c in filtered:
+            prods = db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == c.id).all()
+            for p in prods:
+                try:
+                    # Parse price_objetivo like "USD $3.50 /un" or "3.50"
+                    import re
+                    price_match = re.search(r'[\d,\.]+', (p.precio_objetivo or "").replace(",", "."))
+                    qty_match = re.search(r'\d+', p.cantidad or "")
+                    if price_match and qty_match:
+                        total_val += float(price_match.group()) * int(qty_match.group())
+                except Exception:
+                    pass
+        pipeline_por_etapa[e] = {"count": count, "valor": total_val}
+        if e != "entregado":
+            valor_pipeline += total_val
+            valor_ponderado += total_val * (probabilidades[e] / 100.0)
+
+    # Win rate (entregado vs entregado + perdidos - usamos "entregado" como ganado)
+    entregados = pipeline_por_etapa["entregado"]["count"]
+    total_cerrados = entregados  # No tenemos "perdido" aún
+    win_rate = (entregados / total_cerrados * 100) if total_cerrados > 0 else 0
+
+    # Mes actual
+    from datetime import datetime as dt
+    now = dt.utcnow()
+    mes_actual = [c for c in cots if c.created_at and c.created_at.month == now.month and c.created_at.year == now.year]
+    ganados_mes = [c for c in mes_actual if c.estado == "entregado"]
+
+    # Actividad reciente (últimos 30 días)
+    from datetime import timedelta
+    hace_30 = now - timedelta(days=30)
+    nuevas_cots = len([c for c in cots if c.created_at and c.created_at > hace_30])
+
+    return {
+        "opps_abiertas": sum(pipeline_por_etapa[e]["count"] for e in ["pendiente", "cotizado", "produccion"]),
+        "valor_pipeline": valor_pipeline,
+        "valor_ponderado": valor_ponderado,
+        "win_rate": round(win_rate, 1),
+        "ganados_mes": {"count": len(ganados_mes), "valor": sum(0 for _ in ganados_mes)},
+        "perdidos_mes": {"count": 0, "valor": 0},
+        "total_clientes": clientes_q.count(),
+        "total_cotizaciones": len(cots),
+        "pipeline_por_etapa": pipeline_por_etapa,
+        "nuevas_cotizaciones_30d": nuevas_cots,
+    }
+
+
+# ═══ FASE 3: ACTIVIDADES / TIMELINE ═══
+@app.get("/api/actividades")
+def listar_actividades(
+    cliente_id: Optional[int] = None,
+    cotizacion_id: Optional[int] = None,
+    tipo: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """List activities filtered by client or cotizacion"""
+    q = db.query(Actividad)
+    if cliente_id:
+        q = q.filter(Actividad.cliente_id == cliente_id)
+    if cotizacion_id:
+        q = q.filter(Actividad.cotizacion_id == cotizacion_id)
+    if tipo:
+        q = q.filter(Actividad.tipo == tipo)
+    return q.order_by(Actividad.created_at.desc()).limit(limit).all()
+
+
+@app.post("/api/actividades", response_model=ActividadOut)
+def crear_actividad(data: ActividadCreate, db: Session = Depends(get_db)):
+    """Create a new activity/note"""
+    act = Actividad(**data.model_dump())
+    db.add(act)
+    db.commit()
+    db.refresh(act)
+    return act
+
+
+@app.delete("/api/actividades/{id}")
+def eliminar_actividad(id: int, db: Session = Depends(get_db)):
+    """Delete an activity"""
+    act = db.query(Actividad).get(id)
+    if not act:
+        raise HTTPException(404, "Actividad no encontrada")
+    db.delete(act)
+    db.commit()
+    return {"deleted": True}
+
+
+# ═══ FASE 4: PIPELINE DRAG & DROP (cambio de estado rápido) ═══
+@app.put("/api/cotizaciones/{id}/estado")
+def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)):
+    """Quick state change for pipeline drag & drop"""
+    nuevo_estado = data.get("estado")
+    autor = data.get("autor", "admin")
+    valid_estados = ["pendiente", "cotizado", "produccion", "entregado"]
+    if nuevo_estado not in valid_estados:
+        raise HTTPException(400, f"Estado inválido. Usar: {valid_estados}")
+    cot = db.query(Cotizacion).get(id)
+    if not cot:
+        raise HTTPException(404, "Cotización no encontrada")
+    estado_anterior = cot.estado
+    cot.estado = nuevo_estado
+    db.commit()
+    # Auto-log as activity
+    act = Actividad(
+        cliente_id=cot.cliente_id,
+        cotizacion_id=cot.id,
+        tipo="cambio_etapa",
+        titulo=f"Cambio de estado: {estado_anterior} → {nuevo_estado}",
+        descripcion=f"Cotización #{cot.id} movida de '{estado_anterior}' a '{nuevo_estado}'",
+        etapa_anterior=estado_anterior,
+        etapa_nueva=nuevo_estado,
+        autor=autor,
+    )
+    db.add(act)
+    db.commit()
+    return {"id": cot.id, "estado": nuevo_estado, "estado_anterior": estado_anterior}
 
 
 # ─── Serve Frontend ───
