@@ -3811,7 +3811,10 @@ async function loadProspects() {
       if (col) {
         col.innerHTML = filtered.length ? filtered.map(p => {
           const scoreColor = p.score_ia >= 70 ? 'var(--success)' : p.score_ia >= 40 ? 'var(--warning)' : 'var(--danger)';
-          return `<div class="kanban-card"><div class="kc-product">${p.nombre}</div><div class="kc-client">${p.empresa || 'Sin empresa'}</div><div class="kc-meta"><span style="font-size:10px">${p.fuente || 'otro'}</span><span style="color:${scoreColor};font-weight:600">${p.score_ia || 50}</span></div><div class="kc-actions"><button onclick="editProspect(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>${st !== 'convertido' ? '<button onclick="moveProspect('+p.id+',\\''+nextProspState(st)+'\\')" title="Siguiente"><i class="fas fa-arrow-right"></i></button>' : ''}${st !== 'convertido' ? '<button onclick="convertirProspect('+p.id+')" title="Convertir a cliente"><i class="fas fa-user-check"></i></button>' : ''}</div></div>`;
+          const nextSt = nextProspState(st);
+          const btnMove = st !== 'convertido' ? `<button onclick="moveProspect(${p.id},'${nextSt}')" title="Siguiente"><i class="fas fa-arrow-right"></i></button>` : '';
+          const btnConvert = st !== 'convertido' ? `<button onclick="convertirProspect(${p.id})" title="Convertir a cliente"><i class="fas fa-user-check"></i></button>` : '';
+          return `<div class="kanban-card"><div class="kc-product">${p.nombre}</div><div class="kc-client">${p.empresa || 'Sin empresa'}</div><div class="kc-meta"><span style="font-size:10px">${p.fuente || 'otro'}</span><span style="color:${scoreColor};font-weight:600">${p.score_ia || 50}</span></div><div class="kc-actions"><button onclick="editProspect(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>${btnMove}${btnConvert}</div></div>`;
         }).join('') : '<div style="text-align:center;padding:20px;color:var(--text-faint);font-size:12px">Sin prospects</div>';
       }
     });
