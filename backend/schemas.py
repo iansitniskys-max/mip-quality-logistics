@@ -206,6 +206,188 @@ class ActividadOut(BaseModel):
         from_attributes = True
 
 
+# --- Feature Flags ---
+class FeatureFlagOut(BaseModel):
+    modulo: str
+    activo: str
+    config: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+
+# --- Proveedores ---
+class ProveedorCreate(BaseModel):
+    nombre: str
+    ciudad_china: Optional[str] = ""
+    contacto: Optional[str] = ""
+    email: Optional[str] = ""
+    whatsapp: Optional[str] = ""
+    website: Optional[str] = ""
+    certificaciones: Optional[str] = "[]"
+    fortalezas: Optional[str] = "[]"
+    categorias: Optional[str] = "[]"
+    notas: Optional[str] = ""
+    rating: int = 3
+
+class ProveedorOut(BaseModel):
+    id: int
+    nombre: str
+    ciudad_china: Optional[str] = ""
+    contacto: Optional[str] = ""
+    email: Optional[str] = ""
+    whatsapp: Optional[str] = ""
+    website: Optional[str] = ""
+    certificaciones: Optional[str] = "[]"
+    fortalezas: Optional[str] = "[]"
+    categorias: Optional[str] = "[]"
+    notas: Optional[str] = ""
+    activo: Optional[str] = "true"
+    rating: Optional[int] = 3
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class ProductoProveedorCreate(BaseModel):
+    proveedor_id: int
+    sku: Optional[str] = ""
+    nombre: str
+    categoria: Optional[str] = ""
+    precio_fob: float = 0
+    moq: int = 0
+    lead_time_dias: int = 45
+
+class ProductoProveedorOut(BaseModel):
+    id: int
+    proveedor_id: int
+    sku: Optional[str] = ""
+    nombre: str
+    categoria: Optional[str] = ""
+    precio_fob: float
+    moq: int
+    lead_time_dias: int
+    activo: Optional[str] = "true"
+    class Config:
+        from_attributes = True
+
+
+# --- Prospects ---
+class ProspectCreate(BaseModel):
+    nombre: str
+    empresa: Optional[str] = ""
+    email: Optional[str] = ""
+    telefono: Optional[str] = ""
+    sector: Optional[str] = ""
+    fuente: str = "otro"
+    notas: Optional[str] = ""
+
+class ProspectOut(BaseModel):
+    id: int
+    nombre: str
+    empresa: Optional[str] = ""
+    email: Optional[str] = ""
+    telefono: Optional[str] = ""
+    sector: Optional[str] = ""
+    fuente: Optional[str] = "otro"
+    score_ia: Optional[int] = 50
+    notas: Optional[str] = ""
+    estado: str = "nuevo"
+    convertido_a_cliente_id: Optional[int] = None
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# --- Email Automation ---
+class EmailSequenceCreate(BaseModel):
+    nombre: str
+    etapa_trigger: Optional[str] = ""
+    delay_horas: int = 0
+    asunto_template: str
+    cuerpo_template: str
+    activo: str = "true"
+
+class EmailSequenceOut(BaseModel):
+    id: int
+    nombre: str
+    etapa_trigger: Optional[str] = ""
+    delay_horas: int
+    asunto_template: str
+    cuerpo_template: str
+    activo: str
+    class Config:
+        from_attributes = True
+
+
+class EmailLogOut(BaseModel):
+    id: int
+    cotizacion_id: Optional[int]
+    sequence_id: Optional[int]
+    destinatario: str
+    asunto: Optional[str] = ""
+    estado: str
+    programado_para: Optional[datetime]
+    enviado_at: Optional[datetime]
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# --- Proyectos ---
+class ProyectoCreate(BaseModel):
+    cotizacion_id: Optional[int] = None
+    nombre: str
+    descripcion: Optional[str] = ""
+    fecha_inicio: Optional[datetime] = None
+    fecha_fin: Optional[datetime] = None
+    color: Optional[str] = "#1d6fa5"
+
+class ProyectoOut(BaseModel):
+    id: int
+    cotizacion_id: Optional[int]
+    nombre: str
+    descripcion: Optional[str] = ""
+    estado: str
+    fecha_inicio: Optional[datetime]
+    fecha_fin: Optional[datetime]
+    color: Optional[str] = "#1d6fa5"
+    created_by: Optional[str] = ""
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class TareaCreate(BaseModel):
+    proyecto_id: int
+    seccion_id: Optional[int] = None
+    parent_id: Optional[int] = None
+    nombre: str
+    descripcion: Optional[str] = ""
+    prioridad: str = "media"
+    fecha_inicio: Optional[datetime] = None
+    fecha_fin: Optional[datetime] = None
+    asignado_a: Optional[str] = ""
+    es_milestone: str = "false"
+
+class TareaOut(BaseModel):
+    id: int
+    proyecto_id: int
+    seccion_id: Optional[int]
+    parent_id: Optional[int]
+    nombre: str
+    descripcion: Optional[str] = ""
+    estado: str
+    prioridad: str
+    fecha_inicio: Optional[datetime]
+    fecha_fin: Optional[datetime]
+    progreso: int
+    orden: int
+    es_milestone: str
+    asignado_a: Optional[str] = ""
+    class Config:
+        from_attributes = True
+
+
 # --- Historial ---
 class HistorialOut(BaseModel):
     id: int

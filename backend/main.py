@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query
@@ -11,12 +11,20 @@ from sqlalchemy import func, extract
 
 from database import engine, get_db, Base
 from fastapi.responses import StreamingResponse
-from models import Cliente, Cotizacion, ProductoCotizacion, Pedido, Factura, Archivo, MovimientoContable, HistorialEvento, SiteContent, Ticket, Actividad
+from models import (
+    Cliente, Cotizacion, ProductoCotizacion, Pedido, Factura, Archivo,
+    MovimientoContable, HistorialEvento, SiteContent, Ticket, Actividad,
+    FeatureFlag, Proveedor, ProductoProveedor, Prospect, EmailSequence, EmailLog,
+    Proyecto, ProyectoSeccion, Tarea, ComentarioTarea, CotizacionFormal,
+)
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
     PedidoCreate, PedidoUpdate, PedidoOut, FacturaCreate, FacturaOut,
     MovimientoCreate, MovimientoOut, LoginRequest, HistorialOut,
     SiteContentUpdate, SiteContentOut, ActividadCreate, ActividadOut,
+    FeatureFlagOut, ProveedorCreate, ProveedorOut, ProductoProveedorCreate, ProductoProveedorOut,
+    ProspectCreate, ProspectOut, EmailSequenceCreate, EmailSequenceOut, EmailLogOut,
+    ProyectoCreate, ProyectoOut, TareaCreate, TareaOut,
 )
 import csv
 import io
@@ -1467,6 +1475,533 @@ def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)
     db.add(act)
     db.commit()
     return {"id": cot.id, "estado": nuevo_estado, "estado_anterior": estado_anterior}
+
+
+# ═══════════════════════════════════════════════════
+# FEATURE FLAGS - Modulo 0
+# ═══════════════════════════════════════════════════
+DEFAULT_FEATURES = ["proyectos", "pdf", "emails", "proveedores", "prospects"]
+
+@app.get("/api/admin/features")
+def get_features(db: Session = Depends(get_db)):
+    """List all feature flags (auto-create defaults)"""
+    existing = {f.modulo: f for f in db.query(FeatureFlag).all()}
+    for m in DEFAULT_FEATURES:
+        if m not in existing:
+            f = FeatureFlag(modulo=m, activo="true")
+            db.add(f)
+            existing[m] = f
+    db.commit()
+    return [{"modulo": f.modulo, "activo": f.activo or "true"} for f in existing.values()]
+
+
+@app.put("/api/admin/features/{modulo}")
+def set_feature(modulo: str, data: dict, db: Session = Depends(get_db)):
+    """Toggle a feature flag"""
+    f = db.query(FeatureFlag).filter(FeatureFlag.modulo == modulo).first()
+    if not f:
+        f = FeatureFlag(modulo=modulo, activo="true")
+        db.add(f)
+    f.activo = data.get("activo", "true")
+    db.commit()
+    return {"modulo": f.modulo, "activo": f.activo}
+
+
+# ═══════════════════════════════════════════════════
+# PROVEEDORES - Modulo 4
+# ═══════════════════════════════════════════════════
+@app.get("/api/proveedores")
+def listar_proveedores(db: Session = Depends(get_db)):
+    return db.query(Proveedor).order_by(Proveedor.nombre).all()
+
+
+@app.post("/api/proveedores", response_model=ProveedorOut)
+def crear_proveedor(data: ProveedorCreate, db: Session = Depends(get_db)):
+    p = Proveedor(**data.model_dump())
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@app.get("/api/proveedores/{id}", response_model=ProveedorOut)
+def get_proveedor(id: int, db: Session = Depends(get_db)):
+    p = db.query(Proveedor).get(id)
+    if not p:
+        raise HTTPException(404, "Proveedor no encontrado")
+    return p
+
+
+@app.put("/api/proveedores/{id}")
+def update_proveedor(id: int, data: dict, db: Session = Depends(get_db)):
+    p = db.query(Proveedor).get(id)
+    if not p:
+        raise HTTPException(404, "Proveedor no encontrado")
+    for k, v in data.items():
+        if hasattr(p, k):
+            setattr(p, k, v)
+    db.commit()
+    return {"id": p.id, "updated": True}
+
+
+@app.delete("/api/proveedores/{id}")
+def delete_proveedor(id: int, db: Session = Depends(get_db)):
+    p = db.query(Proveedor).get(id)
+    if not p:
+        raise HTTPException(404, "Proveedor no encontrado")
+    db.delete(p)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/proveedores/{id}/productos")
+def get_productos_proveedor(id: int, db: Session = Depends(get_db)):
+    return db.query(ProductoProveedor).filter(ProductoProveedor.proveedor_id == id).all()
+
+
+@app.post("/api/proveedores/{id}/productos", response_model=ProductoProveedorOut)
+def add_producto_proveedor(id: int, data: dict, db: Session = Depends(get_db)):
+    data["proveedor_id"] = id
+    p = ProductoProveedor(**{k: v for k, v in data.items() if k in ["proveedor_id", "sku", "nombre", "categoria", "precio_fob", "moq", "lead_time_dias"]})
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+# ═══════════════════════════════════════════════════
+# PROSPECTS - Modulo 5
+# ═══════════════════════════════════════════════════
+@app.get("/api/prospects")
+def listar_prospects(estado: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(Prospect)
+    if estado:
+        q = q.filter(Prospect.estado == estado)
+    return q.order_by(Prospect.created_at.desc()).all()
+
+
+@app.post("/api/prospects", response_model=ProspectOut)
+def crear_prospect(data: ProspectCreate, db: Session = Depends(get_db)):
+    p = Prospect(**data.model_dump())
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@app.put("/api/prospects/{id}")
+def update_prospect(id: int, data: dict, db: Session = Depends(get_db)):
+    p = db.query(Prospect).get(id)
+    if not p:
+        raise HTTPException(404, "Prospect no encontrado")
+    for k, v in data.items():
+        if hasattr(p, k):
+            setattr(p, k, v)
+    db.commit()
+    return {"id": p.id, "estado": p.estado}
+
+
+@app.delete("/api/prospects/{id}")
+def delete_prospect(id: int, db: Session = Depends(get_db)):
+    p = db.query(Prospect).get(id)
+    if not p:
+        raise HTTPException(404, "Prospect no encontrado")
+    db.delete(p)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.post("/api/prospects/{id}/convertir")
+def convertir_prospect(id: int, db: Session = Depends(get_db)):
+    """Convert a prospect into a client"""
+    p = db.query(Prospect).get(id)
+    if not p:
+        raise HTTPException(404, "Prospect no encontrado")
+    if p.convertido_a_cliente_id:
+        raise HTTPException(400, "Prospect ya convertido")
+    # Check email not duplicated
+    email = (p.email or f"prospect-{p.id}@sin-email.local").strip().lower()
+    existing = db.query(Cliente).filter(Cliente.email == email).first()
+    if existing:
+        cliente = existing
+    else:
+        cliente = Cliente(
+            nombre=p.nombre, empresa=p.empresa or "", email=email,
+            telefono=p.telefono or "", rubro=p.sector or "",
+            referido_por=p.fuente or "", notas=p.notas or "",
+            role="client", activo="true",
+        )
+        db.add(cliente)
+        db.commit()
+        db.refresh(cliente)
+    p.estado = "convertido"
+    p.convertido_a_cliente_id = cliente.id
+    db.commit()
+    return {"prospect_id": p.id, "cliente_id": cliente.id, "email": cliente.email}
+
+
+# ═══════════════════════════════════════════════════
+# EMAIL AUTOMATION - Modulo 3
+# ═══════════════════════════════════════════════════
+@app.get("/api/email-sequences")
+def listar_sequences(db: Session = Depends(get_db)):
+    return db.query(EmailSequence).order_by(EmailSequence.id).all()
+
+
+@app.post("/api/email-sequences", response_model=EmailSequenceOut)
+def crear_sequence(data: EmailSequenceCreate, db: Session = Depends(get_db)):
+    s = EmailSequence(**data.model_dump())
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@app.put("/api/email-sequences/{id}")
+def update_sequence(id: int, data: dict, db: Session = Depends(get_db)):
+    s = db.query(EmailSequence).get(id)
+    if not s:
+        raise HTTPException(404, "Secuencia no encontrada")
+    for k, v in data.items():
+        if hasattr(s, k):
+            setattr(s, k, v)
+    db.commit()
+    return {"id": s.id, "activo": s.activo}
+
+
+@app.delete("/api/email-sequences/{id}")
+def delete_sequence(id: int, db: Session = Depends(get_db)):
+    s = db.query(EmailSequence).get(id)
+    if not s:
+        raise HTTPException(404, "Secuencia no encontrada")
+    db.delete(s)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/email-logs")
+def listar_email_logs(estado: Optional[str] = None, limit: int = 100, db: Session = Depends(get_db)):
+    q = db.query(EmailLog)
+    if estado:
+        q = q.filter(EmailLog.estado == estado)
+    return q.order_by(EmailLog.created_at.desc()).limit(limit).all()
+
+
+@app.post("/api/email-logs/{id}/enviar")
+def enviar_email_log(id: int, db: Session = Depends(get_db)):
+    """Manually send a pending email"""
+    log = db.query(EmailLog).get(id)
+    if not log:
+        raise HTTPException(404, "Email log no encontrado")
+    if log.estado == "enviado":
+        return {"status": "already_sent"}
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+        SMTP_USER = os.getenv("SMTP_USER", "")
+        SMTP_PASS = os.getenv("SMTP_PASS", "")
+        if SMTP_USER and SMTP_PASS:
+            msg = MIMEText(log.cuerpo or "", "plain", "utf-8")
+            msg["Subject"] = log.asunto or "MIP Quality & Logistics"
+            msg["From"] = SMTP_USER
+            msg["To"] = log.destinatario
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASS)
+                s.sendmail(SMTP_USER, [log.destinatario], msg.as_string())
+            log.estado = "enviado"
+            log.enviado_at = datetime.now()
+        else:
+            log.estado = "error"
+            log.error_msg = "SMTP no configurado"
+    except Exception as e:
+        log.estado = "error"
+        log.error_msg = str(e)
+    db.commit()
+    return {"id": log.id, "estado": log.estado}
+
+
+@app.post("/api/email-logs/crear-manual")
+def crear_email_log_manual(data: dict, db: Session = Depends(get_db)):
+    """Create a manual email in queue (pending)"""
+    log = EmailLog(
+        cotizacion_id=data.get("cotizacion_id"),
+        destinatario=data.get("destinatario", ""),
+        asunto=data.get("asunto", ""),
+        cuerpo=data.get("cuerpo", ""),
+        estado="pendiente",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return {"id": log.id}
+
+
+# ═══════════════════════════════════════════════════
+# PROYECTOS - Modulo 1
+# ═══════════════════════════════════════════════════
+@app.get("/api/proyectos")
+def listar_proyectos(db: Session = Depends(get_db)):
+    return db.query(Proyecto).order_by(Proyecto.created_at.desc()).all()
+
+
+@app.post("/api/proyectos", response_model=ProyectoOut)
+def crear_proyecto(data: ProyectoCreate, db: Session = Depends(get_db)):
+    p = Proyecto(**data.model_dump(), estado="planificacion")
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@app.get("/api/proyectos/{id}")
+def get_proyecto_detalle(id: int, db: Session = Depends(get_db)):
+    p = db.query(Proyecto).get(id)
+    if not p:
+        raise HTTPException(404, "Proyecto no encontrado")
+    secciones = db.query(ProyectoSeccion).filter(ProyectoSeccion.proyecto_id == id).order_by(ProyectoSeccion.orden).all()
+    tareas = db.query(Tarea).filter(Tarea.proyecto_id == id).order_by(Tarea.orden).all()
+    return {
+        "id": p.id, "nombre": p.nombre, "descripcion": p.descripcion,
+        "estado": p.estado, "color": p.color, "created_at": str(p.created_at),
+        "fecha_inicio": str(p.fecha_inicio) if p.fecha_inicio else None,
+        "fecha_fin": str(p.fecha_fin) if p.fecha_fin else None,
+        "cotizacion_id": p.cotizacion_id,
+        "secciones": [{"id": s.id, "nombre": s.nombre, "orden": s.orden} for s in secciones],
+        "tareas": [{
+            "id": t.id, "seccion_id": t.seccion_id, "parent_id": t.parent_id,
+            "nombre": t.nombre, "descripcion": t.descripcion,
+            "estado": t.estado, "prioridad": t.prioridad,
+            "fecha_inicio": str(t.fecha_inicio) if t.fecha_inicio else None,
+            "fecha_fin": str(t.fecha_fin) if t.fecha_fin else None,
+            "progreso": t.progreso, "orden": t.orden,
+            "es_milestone": t.es_milestone, "asignado_a": t.asignado_a,
+        } for t in tareas]
+    }
+
+
+@app.put("/api/proyectos/{id}")
+def update_proyecto(id: int, data: dict, db: Session = Depends(get_db)):
+    p = db.query(Proyecto).get(id)
+    if not p:
+        raise HTTPException(404, "Proyecto no encontrado")
+    for k, v in data.items():
+        if hasattr(p, k):
+            setattr(p, k, v)
+    db.commit()
+    return {"id": p.id}
+
+
+@app.delete("/api/proyectos/{id}")
+def delete_proyecto(id: int, db: Session = Depends(get_db)):
+    p = db.query(Proyecto).get(id)
+    if not p:
+        raise HTTPException(404, "Proyecto no encontrado")
+    db.delete(p)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.post("/api/cotizaciones/{cot_id}/convertir-proyecto")
+def convertir_cotizacion_proyecto(cot_id: int, db: Session = Depends(get_db)):
+    """Convert a cotizacion into a project with default import workflow sections and tasks"""
+    cot = db.query(Cotizacion).get(cot_id)
+    if not cot:
+        raise HTTPException(404, "Cotización no encontrada")
+    cliente = db.query(Cliente).get(cot.cliente_id)
+    cliente_name = cliente.nombre if cliente else ""
+    p = Proyecto(
+        cotizacion_id=cot_id,
+        nombre=f"Importación - {cot.producto} ({cliente_name})"[:300],
+        descripcion=f"Proyecto generado desde cotización #SOL-{str(cot_id).zfill(3)}",
+        estado="activo", color="#1d6fa5",
+    )
+    db.add(p)
+    db.flush()
+    # Default sections + tasks for import workflow
+    template = [
+        ("Preparación", ["Revisar especificaciones", "Contactar proveedores", "Recibir cotizaciones de proveedores"]),
+        ("Muestra", ["Solicitar muestra física", "Aprobar muestra con cliente"]),
+        ("Pago anticipo", ["Emitir factura anticipo 50%", "Confirmar pago recibido"]),
+        ("Producción", ["Iniciar producción en fábrica", "Seguimiento semanal de producción"]),
+        ("Control de Calidad", ["Inspección QC en fábrica", "Reporte fotográfico de QC"]),
+        ("Pago saldo", ["Emitir factura saldo 50%", "Confirmar pago pre-embarque"]),
+        ("Logística", ["Booking de flete", "Embarque", "Tracking de envío"]),
+        ("Aduana", ["Documentación de aduana", "Despacho aduanero"]),
+        ("Entrega", ["Entrega en bodega cliente", "Confirmación de recepción"]),
+    ]
+    orden = 0
+    for sec_name, tasks in template:
+        sec = ProyectoSeccion(proyecto_id=p.id, nombre=sec_name, orden=orden)
+        db.add(sec)
+        db.flush()
+        for ti, task_name in enumerate(tasks):
+            t = Tarea(proyecto_id=p.id, seccion_id=sec.id, nombre=task_name, orden=ti, estado="pendiente", prioridad="media")
+            db.add(t)
+        orden += 1
+    db.commit()
+    db.refresh(p)
+    return {"id": p.id, "nombre": p.nombre}
+
+
+@app.post("/api/tareas", response_model=TareaOut)
+def crear_tarea(data: TareaCreate, db: Session = Depends(get_db)):
+    t = Tarea(**data.model_dump())
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+@app.put("/api/tareas/{id}")
+def update_tarea(id: int, data: dict, db: Session = Depends(get_db)):
+    t = db.query(Tarea).get(id)
+    if not t:
+        raise HTTPException(404, "Tarea no encontrada")
+    for k, v in data.items():
+        if hasattr(t, k):
+            setattr(t, k, v)
+    db.commit()
+    return {"id": t.id, "estado": t.estado}
+
+
+@app.delete("/api/tareas/{id}")
+def delete_tarea(id: int, db: Session = Depends(get_db)):
+    t = db.query(Tarea).get(id)
+    if not t:
+        raise HTTPException(404, "Tarea no encontrada")
+    db.delete(t)
+    db.commit()
+    return {"deleted": True}
+
+
+# ═══════════════════════════════════════════════════
+# COTIZACIONES FORMALES (PDF) - Modulo 2
+# ═══════════════════════════════════════════════════
+@app.post("/api/cotizaciones/{cot_id}/generar-formal")
+def generar_cotizacion_formal(cot_id: int, data: dict, db: Session = Depends(get_db)):
+    """Generate a formal PDF quote from a cotizacion"""
+    cot = db.query(Cotizacion).get(cot_id)
+    if not cot:
+        raise HTTPException(404, "Cotización no encontrada")
+    cliente = db.query(Cliente).get(cot.cliente_id)
+    productos = db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == cot_id).all()
+
+    margen = float(data.get("margen_mip", 15))
+    flete = data.get("flete_tipo", "maritimo")
+    plazo = int(data.get("plazo_produccion_dias", 45))
+    condiciones = data.get("condiciones_pago", "50% anticipo + 50% pre-embarque")
+    notas = data.get("notas", "")
+
+    # Calculate prices
+    import re as _re
+    total_fob = 0.0
+    rows = []
+    for p in productos:
+        try:
+            pm = _re.search(r'[\d\.,]+', (p.precio_objetivo or "").replace(",", "."))
+            qm = _re.search(r'\d+', p.cantidad or "")
+            fob = float(pm.group()) if pm else 0
+            qty = int(qm.group()) if qm else 0
+            sub = fob * qty
+            total_fob += sub
+            rows.append((p.nombre, p.categoria, qty, fob, sub))
+        except Exception:
+            rows.append((p.nombre, p.categoria or "", 0, 0, 0))
+
+    flete_cost = total_fob * (0.08 if flete == "maritimo" else 0.20)
+    total_cif = total_fob + flete_cost
+    total_with_margin = total_cif * (1 + margen / 100)
+
+    # Generate PDF
+    numero = f"COT-{cot_id:04d}-{datetime.now().strftime('%Y%m%d')}"
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.units import cm
+        os.makedirs("/app/uploads/cotizaciones", exist_ok=True)
+        pdf_path = f"/app/uploads/cotizaciones/{numero}.pdf"
+        doc = SimpleDocTemplate(pdf_path, pagesize=A4, topMargin=2*cm)
+        styles = getSampleStyleSheet()
+        story = []
+        # Header
+        story.append(Paragraph("<b>MIP QUALITY &amp; LOGISTICS</b>", styles['Title']))
+        story.append(Paragraph("Importación desde China — Chile", styles['Normal']))
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(f"<b>COTIZACIÓN {numero}</b>", styles['Heading2']))
+        story.append(Paragraph(f"Fecha: {datetime.now().strftime('%d-%m-%Y')}", styles['Normal']))
+        if cliente:
+            story.append(Paragraph(f"Cliente: <b>{cliente.nombre}</b>", styles['Normal']))
+            story.append(Paragraph(f"Empresa: {cliente.empresa or ''}", styles['Normal']))
+            story.append(Paragraph(f"Email: {cliente.email}", styles['Normal']))
+        story.append(Spacer(1, 0.5*cm))
+        # Products table
+        table_data = [["Producto", "Categoría", "Cant.", "FOB USD", "Subtotal USD"]]
+        for r in rows:
+            table_data.append([str(x) if x else "-" for x in [r[0], r[1], r[2], f"${r[3]:.2f}", f"${r[4]:.2f}"]])
+        table_data.append(["", "", "", "Subtotal FOB:", f"${total_fob:.2f}"])
+        table_data.append(["", "", "", f"Flete ({flete}):", f"${flete_cost:.2f}"])
+        table_data.append(["", "", "", "Total CIF:", f"${total_cif:.2f}"])
+        table_data.append(["", "", "", f"Margen MIP ({margen}%):", f"${total_with_margin-total_cif:.2f}"])
+        table_data.append(["", "", "", "TOTAL:", f"${total_with_margin:.2f}"])
+        t = Table(table_data, colWidths=[5*cm, 3*cm, 2*cm, 3*cm, 3*cm])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1a1a1a')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#e8af43')),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('ALIGN', (2,0), (-1,-1), 'RIGHT'),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(f"<b>Condiciones:</b> {condiciones}", styles['Normal']))
+        story.append(Paragraph(f"<b>Plazo producción:</b> {plazo} días", styles['Normal']))
+        story.append(Paragraph(f"<b>Flete:</b> {flete.title()} desde China", styles['Normal']))
+        if notas:
+            story.append(Spacer(1, 0.3*cm))
+            story.append(Paragraph(f"<b>Notas:</b> {notas}", styles['Normal']))
+        story.append(Spacer(1, 0.8*cm))
+        story.append(Paragraph("<i>MIP Quality &amp; Logistics — contacto@mipquality.com</i>", styles['Normal']))
+        doc.build(story)
+        pdf_url = f"/uploads/cotizaciones/{numero}.pdf"
+    except Exception as e:
+        raise HTTPException(500, f"Error generando PDF: {str(e)}")
+
+    # Save to DB
+    formal = CotizacionFormal(
+        cotizacion_id=cot_id, numero=numero,
+        valido_hasta=datetime.now() + timedelta(days=30) if (lambda: True)() else None,
+        precio_unitario_fob=total_fob / max(sum(r[2] for r in rows), 1),
+        costo_cif=total_cif, margen_mip=margen,
+        total_clp=total_with_margin * 950,  # rough USD-CLP
+        condiciones_pago=condiciones, flete_tipo=flete,
+        plazo_produccion_dias=plazo, notas=notas,
+        pdf_url=pdf_url, estado="borrador",
+    )
+    # Set valido_hasta properly
+    from datetime import timedelta as _td
+    formal.valido_hasta = datetime.now() + _td(days=30)
+    db.add(formal)
+    db.commit()
+    db.refresh(formal)
+    return {
+        "id": formal.id, "numero": numero, "pdf_url": pdf_url,
+        "total_usd": total_with_margin, "total_clp": formal.total_clp,
+    }
+
+
+@app.get("/api/cotizaciones-formales")
+def listar_cotizaciones_formales(cotizacion_id: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(CotizacionFormal)
+    if cotizacion_id:
+        q = q.filter(CotizacionFormal.cotizacion_id == cotizacion_id)
+    return q.order_by(CotizacionFormal.created_at.desc()).all()
 
 
 # ─── Serve Frontend ───

@@ -185,3 +185,180 @@ class Actividad(Base):
 
     cliente = relationship("Cliente", back_populates="actividades")
     cotizacion = relationship("Cotizacion", back_populates="actividades")
+
+
+# ═══ FEATURE FLAGS ═══
+class FeatureFlag(Base):
+    __tablename__ = "feature_flags"
+    id = Column(Integer, primary_key=True, index=True)
+    modulo = Column(String(50), unique=True, nullable=False)  # proyectos, pdf, emails, proveedores, prospects
+    activo = Column(String(10), default="true")
+    config = Column(Text)  # JSON opcional
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+# ═══ PROVEEDORES ═══
+class Proveedor(Base):
+    __tablename__ = "proveedores"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False)
+    ciudad_china = Column(String(100))
+    contacto = Column(String(200))
+    email = Column(String(200))
+    whatsapp = Column(String(50))
+    website = Column(String(300))
+    certificaciones = Column(Text)  # JSON array
+    fortalezas = Column(Text)  # JSON array
+    categorias = Column(Text)  # JSON array
+    notas = Column(Text)
+    activo = Column(String(10), default="true")
+    rating = Column(Integer, default=3)  # 1-5
+    created_at = Column(DateTime, server_default=func.now())
+
+    productos = relationship("ProductoProveedor", back_populates="proveedor", cascade="all, delete-orphan")
+
+
+class ProductoProveedor(Base):
+    __tablename__ = "productos_proveedor"
+    id = Column(Integer, primary_key=True, index=True)
+    proveedor_id = Column(Integer, ForeignKey("proveedores.id"), nullable=False)
+    sku = Column(String(100))
+    nombre = Column(String(300), nullable=False)
+    categoria = Column(String(100))
+    precio_fob = Column(Float, default=0)
+    moq = Column(Integer, default=0)
+    lead_time_dias = Column(Integer, default=45)
+    activo = Column(String(10), default="true")
+    created_at = Column(DateTime, server_default=func.now())
+
+    proveedor = relationship("Proveedor", back_populates="productos")
+
+
+# ═══ PROSPECTS ═══
+class Prospect(Base):
+    __tablename__ = "prospects"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False)
+    empresa = Column(String(200))
+    email = Column(String(200))
+    telefono = Column(String(50))
+    sector = Column(String(100))
+    fuente = Column(String(50), default="otro")  # web, referido, linkedin, evento, otro
+    score_ia = Column(Integer, default=50)
+    notas = Column(Text)
+    estado = Column(String(30), default="nuevo")  # nuevo, contactado, calificado, convertido, descartado
+    convertido_a_cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+# ═══ EMAIL AUTOMATION ═══
+class EmailSequence(Base):
+    __tablename__ = "email_sequences"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False)
+    etapa_trigger = Column(String(50))  # pendiente, cotizado, produccion, entregado
+    delay_horas = Column(Integer, default=0)
+    asunto_template = Column(String(300))
+    cuerpo_template = Column(Text)
+    activo = Column(String(10), default="true")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class EmailLog(Base):
+    __tablename__ = "email_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=True)
+    sequence_id = Column(Integer, ForeignKey("email_sequences.id"), nullable=True)
+    destinatario = Column(String(200), nullable=False)
+    asunto = Column(String(300))
+    cuerpo = Column(Text)
+    estado = Column(String(20), default="pendiente")  # pendiente, enviado, cancelado, error
+    programado_para = Column(DateTime)
+    enviado_at = Column(DateTime)
+    error_msg = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+# ═══ PROYECTOS ═══
+class Proyecto(Base):
+    __tablename__ = "proyectos"
+    id = Column(Integer, primary_key=True, index=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=True)
+    nombre = Column(String(300), nullable=False)
+    descripcion = Column(Text)
+    estado = Column(String(30), default="planificacion")  # planificacion, activo, pausado, completado, cancelado
+    fecha_inicio = Column(DateTime)
+    fecha_fin = Column(DateTime)
+    color = Column(String(20), default="#1d6fa5")
+    created_by = Column(String(200))
+    created_at = Column(DateTime, server_default=func.now())
+
+    secciones = relationship("ProyectoSeccion", back_populates="proyecto", cascade="all, delete-orphan")
+    tareas = relationship("Tarea", back_populates="proyecto", cascade="all, delete-orphan")
+
+
+class ProyectoSeccion(Base):
+    __tablename__ = "proyecto_secciones"
+    id = Column(Integer, primary_key=True, index=True)
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id"), nullable=False)
+    nombre = Column(String(200), nullable=False)
+    orden = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+    proyecto = relationship("Proyecto", back_populates="secciones")
+    tareas = relationship("Tarea", back_populates="seccion")
+
+
+class Tarea(Base):
+    __tablename__ = "tareas"
+    id = Column(Integer, primary_key=True, index=True)
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id"), nullable=False)
+    seccion_id = Column(Integer, ForeignKey("proyecto_secciones.id"), nullable=True)
+    parent_id = Column(Integer, ForeignKey("tareas.id"), nullable=True)
+    nombre = Column(String(300), nullable=False)
+    descripcion = Column(Text)
+    estado = Column(String(30), default="pendiente")  # pendiente, en_progreso, completada, bloqueada
+    prioridad = Column(String(20), default="media")  # baja, media, alta, critica
+    fecha_inicio = Column(DateTime)
+    fecha_fin = Column(DateTime)
+    progreso = Column(Integer, default=0)
+    orden = Column(Integer, default=0)
+    es_milestone = Column(String(10), default="false")
+    asignado_a = Column(String(200))
+    created_at = Column(DateTime, server_default=func.now())
+
+    proyecto = relationship("Proyecto", back_populates="tareas")
+    seccion = relationship("ProyectoSeccion", back_populates="tareas")
+    comentarios = relationship("ComentarioTarea", back_populates="tarea", cascade="all, delete-orphan")
+
+
+class ComentarioTarea(Base):
+    __tablename__ = "comentario_tarea"
+    id = Column(Integer, primary_key=True, index=True)
+    tarea_id = Column(Integer, ForeignKey("tareas.id"), nullable=False)
+    texto = Column(Text, nullable=False)
+    autor = Column(String(200))
+    created_at = Column(DateTime, server_default=func.now())
+
+    tarea = relationship("Tarea", back_populates="comentarios")
+
+
+# ═══ COTIZACIONES FORMALES (PDF) ═══
+class CotizacionFormal(Base):
+    __tablename__ = "cotizaciones_formales"
+    id = Column(Integer, primary_key=True, index=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=False)
+    numero = Column(String(50), unique=True)
+    fecha_emision = Column(DateTime, server_default=func.now())
+    valido_hasta = Column(DateTime)
+    precio_unitario_fob = Column(Float, default=0)
+    costo_cif = Column(Float, default=0)
+    margen_mip = Column(Float, default=15)
+    total_clp = Column(Float, default=0)
+    condiciones_pago = Column(String(200), default="50% anticipo + 50% pre-embarque")
+    flete_tipo = Column(String(30), default="maritimo")  # maritimo, aereo
+    plazo_produccion_dias = Column(Integer, default=45)
+    notas = Column(Text)
+    pdf_url = Column(String(500))
+    estado = Column(String(30), default="borrador")  # borrador, enviada, aceptada, rechazada
+    created_at = Column(DateTime, server_default=func.now())

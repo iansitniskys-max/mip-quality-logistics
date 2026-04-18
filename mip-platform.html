@@ -1400,6 +1400,10 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" onclick="aView('a-acc')"><i class="fas fa-calculator"></i> Contabilidad</a>
         <a class="sb-link" onclick="aView('a-clients')"><i class="fas fa-users"></i> Clientes</a>
         <a class="sb-link" onclick="aView('a-reports')"><i class="fas fa-chart-bar"></i> Reportes</a>
+        <a class="sb-link" data-feature="proyectos" onclick="aView('a-proyectos')"><i class="fas fa-tasks"></i> Proyectos</a>
+        <a class="sb-link" data-feature="proveedores" onclick="aView('a-proveedores')"><i class="fas fa-industry"></i> Proveedores</a>
+        <a class="sb-link" data-feature="prospects" onclick="aView('a-prospects')"><i class="fas fa-user-plus"></i> Prospects</a>
+        <a class="sb-link" data-feature="emails" onclick="aView('a-emails')"><i class="fas fa-envelope-open-text"></i> Automatizaciones</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Sistema</div>
         <a class="sb-link" onclick="aView('a-config')"><i class="fas fa-cog"></i> Configuración</a>
@@ -1699,6 +1703,48 @@ html,body{overflow-x:hidden;max-width:100vw}
           </div>
         </div>
       </div>
+      <!-- Módulos Activos -->
+      <div style="margin-top:24px">
+        <div class="card" style="padding:24px">
+          <div style="margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:600"><i class="fas fa-puzzle-piece" style="color:var(--text-muted);margin-right:8px"></i>Módulos activos</h3>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px">Activa o desactiva módulos para mostrarlos/ocultarlos en el sidebar</p>
+          </div>
+          <div id="features-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="feature-toggle" data-modulo="proyectos">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius)">
+                <div><div style="font-size:13px;font-weight:600"><i class="fas fa-tasks" style="margin-right:6px;color:var(--text-muted)"></i>Proyectos</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Kanban, Gantt, gestión de tareas</div></div>
+                <div class="switch" id="ft-proyectos" onclick="toggleFeature('proyectos')"></div>
+              </div>
+            </div>
+            <div class="feature-toggle" data-modulo="proveedores">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius)">
+                <div><div style="font-size:13px;font-weight:600"><i class="fas fa-industry" style="margin-right:6px;color:var(--text-muted)"></i>Proveedores</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Maestra de fábricas China</div></div>
+                <div class="switch" id="ft-proveedores" onclick="toggleFeature('proveedores')"></div>
+              </div>
+            </div>
+            <div class="feature-toggle" data-modulo="prospects">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius)">
+                <div><div style="font-size:13px;font-weight:600"><i class="fas fa-user-plus" style="margin-right:6px;color:var(--text-muted)"></i>Prospects</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Pipeline pre-venta de leads</div></div>
+                <div class="switch" id="ft-prospects" onclick="toggleFeature('prospects')"></div>
+              </div>
+            </div>
+            <div class="feature-toggle" data-modulo="emails">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius)">
+                <div><div style="font-size:13px;font-weight:600"><i class="fas fa-envelope-open-text" style="margin-right:6px;color:var(--text-muted)"></i>Email Automation</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Secuencias por pipeline</div></div>
+                <div class="switch" id="ft-emails" onclick="toggleFeature('emails')"></div>
+              </div>
+            </div>
+            <div class="feature-toggle" data-modulo="pdf" style="grid-column:1/-1">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius)">
+                <div><div style="font-size:13px;font-weight:600"><i class="fas fa-file-pdf" style="margin-right:6px;color:var(--text-muted)"></i>Cotizaciones Formales PDF</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Generación de PDF profesional para cotizaciones</div></div>
+                <div class="switch" id="ft-pdf" onclick="toggleFeature('pdf')"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Admin Role Management -->
       <div style="margin-top:24px">
         <div class="card" style="padding:24px">
@@ -1865,6 +1911,152 @@ html,body{overflow-x:hidden;max-width:100vw}
     </div>
 
     <!-- ADMIN: Tickets -->
+    <!-- ═══ ADMIN: PROVEEDORES ═══ -->
+    <div class="page-body" id="a-proveedores" style="display:none">
+      <div class="admin-header-flex">
+        <h2 style="font-size:18px;font-weight:600">Proveedores China</h2>
+        <div class="admin-btn-group">
+          <button class="btn btn-dark btn-sm" onclick="openProveedorModal()"><i class="fas fa-plus"></i> Nuevo proveedor</button>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Total proveedores</div><div class="s-val" id="prov-total">0</div></div>
+        <div class="stat-card"><div class="s-label">Activos</div><div class="s-val" id="prov-activos">0</div></div>
+        <div class="stat-card"><div class="s-label">Con productos</div><div class="s-val" id="prov-productos">0</div></div>
+        <div class="stat-card"><div class="s-label">Rating promedio</div><div class="s-val" id="prov-rating">-</div></div>
+      </div>
+      <div class="dtable-wrap">
+        <div class="dtable-header"><h3>Proveedores registrados</h3></div>
+        <table class="dtable"><thead><tr><th>Nombre</th><th>Ciudad</th><th>Contacto</th><th>Email</th><th>Categorías</th><th>Rating</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="prov-body"><tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Sin proveedores. Click "Nuevo proveedor" para empezar.</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- Modal Nuevo Proveedor -->
+    <div class="modal-bg" id="proveedorModal">
+      <div class="modal-box" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-industry" style="margin-right:6px"></i> <span id="prov-modal-title">Nuevo Proveedor</span></h3>
+        <input type="hidden" id="prov-id">
+        <div class="form-row"><div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="prov-nombre" placeholder="Shenzhen XYZ Co." required></div><div class="form-group"><label class="form-label">Ciudad China</label><select class="form-input" id="prov-ciudad"><option value="">Seleccionar...</option><option>Shenzhen</option><option>Guangzhou</option><option>Shanghai</option><option>Yiwu</option><option>Ningbo</option><option>Qingdao</option><option>Beijing</option><option>Dongguan</option><option>Foshan</option><option>Xiamen</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Contacto</label><input type="text" class="form-input" id="prov-contacto" placeholder="Nombre del contacto"></div><div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="prov-email"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">WhatsApp</label><input type="text" class="form-input" id="prov-whatsapp" placeholder="+86..."></div><div class="form-group"><label class="form-label">Website</label><input type="text" class="form-input" id="prov-website"></div></div>
+        <div class="form-group"><label class="form-label">Categorías (separadas por coma)</label><input type="text" class="form-input" id="prov-categorias" placeholder="Gorras, Poleras, Mochilas"></div>
+        <div class="form-group"><label class="form-label">Certificaciones (separadas por coma)</label><input type="text" class="form-input" id="prov-certificaciones" placeholder="ISO 9001, BSCI, Sedex"></div>
+        <div class="form-group"><label class="form-label">Fortalezas (separadas por coma)</label><input type="text" class="form-input" id="prov-fortalezas" placeholder="Bordado, Packaging personalizado, Muestras rápidas"></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Rating (1-5)</label><select class="form-input" id="prov-rating-in"><option value="1">⭐ 1</option><option value="2">⭐⭐ 2</option><option value="3" selected>⭐⭐⭐ 3</option><option value="4">⭐⭐⭐⭐ 4</option><option value="5">⭐⭐⭐⭐⭐ 5</option></select></div><div class="form-group"><label class="form-label">Estado</label><select class="form-input" id="prov-activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div></div>
+        <div class="form-group"><label class="form-label">Notas</label><textarea class="form-input" id="prov-notas" style="min-height:60px"></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('proveedorModal').classList.remove('open')">Cancelar</button><button class="btn btn-dark btn-sm" onclick="saveProveedor()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+    </div>
+
+    <!-- ═══ ADMIN: PROSPECTS ═══ -->
+    <div class="page-body" id="a-prospects" style="display:none">
+      <div class="admin-header-flex">
+        <h2 style="font-size:18px;font-weight:600">Prospects / Leads</h2>
+        <div class="admin-btn-group">
+          <button class="btn btn-dark btn-sm" onclick="openProspectModal()"><i class="fas fa-plus"></i> Nuevo prospect</button>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Total prospects</div><div class="s-val" id="prosp-total">0</div></div>
+        <div class="stat-card"><div class="s-label">Nuevos</div><div class="s-val" id="prosp-nuevos">0</div></div>
+        <div class="stat-card"><div class="s-label">Contactados</div><div class="s-val" id="prosp-contactados">0</div></div>
+        <div class="stat-card"><div class="s-label">Convertidos</div><div class="s-val" id="prosp-convertidos">0</div></div>
+      </div>
+      <div class="kanban-board" id="prosp-kanban" style="min-height:360px">
+        <div class="kanban-col" data-status="nuevo"><div class="kanban-col-head"><h4>Nuevo</h4><span class="cnt" data-estado="nuevo">0</span></div><div class="kanban-col-body" id="pk-nuevo"></div></div>
+        <div class="kanban-col" data-status="contactado"><div class="kanban-col-head"><h4>Contactado</h4><span class="cnt" data-estado="contactado">0</span></div><div class="kanban-col-body" id="pk-contactado"></div></div>
+        <div class="kanban-col" data-status="calificado"><div class="kanban-col-head"><h4>Calificado</h4><span class="cnt" data-estado="calificado">0</span></div><div class="kanban-col-body" id="pk-calificado"></div></div>
+        <div class="kanban-col" data-status="convertido"><div class="kanban-col-head"><h4>Convertido</h4><span class="cnt" data-estado="convertido">0</span></div><div class="kanban-col-body" id="pk-convertido"></div></div>
+      </div>
+    </div>
+
+    <!-- Modal Nuevo Prospect -->
+    <div class="modal-bg" id="prospectModal">
+      <div class="modal-box" style="max-width:480px">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-user-plus" style="margin-right:6px"></i> <span id="prosp-modal-title">Nuevo Prospect</span></h3>
+        <input type="hidden" id="prosp-id">
+        <div class="form-row"><div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="prosp-nombre" required></div><div class="form-group"><label class="form-label">Empresa</label><input type="text" class="form-input" id="prosp-empresa"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="prosp-email"></div><div class="form-group"><label class="form-label">Teléfono</label><input type="text" class="form-input" id="prosp-telefono"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Sector</label><input type="text" class="form-input" id="prosp-sector" placeholder="Retail, Industrial..."></div><div class="form-group"><label class="form-label">Fuente</label><select class="form-input" id="prosp-fuente"><option value="web">Web</option><option value="referido">Referido</option><option value="linkedin">LinkedIn</option><option value="evento">Evento</option><option value="otro">Otro</option></select></div></div>
+        <div class="form-group"><label class="form-label">Notas</label><textarea class="form-input" id="prosp-notas" style="min-height:70px"></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('prospectModal').classList.remove('open')">Cancelar</button><button class="btn btn-dark btn-sm" onclick="saveProspect()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+    </div>
+
+    <!-- ═══ ADMIN: PROYECTOS ═══ -->
+    <div class="page-body" id="a-proyectos" style="display:none">
+      <div class="admin-header-flex">
+        <h2 style="font-size:18px;font-weight:600">Proyectos</h2>
+        <div class="admin-btn-group">
+          <button class="btn btn-dark btn-sm" onclick="openProyectoModal()"><i class="fas fa-plus"></i> Nuevo proyecto</button>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="s-label">Total proyectos</div><div class="s-val" id="proy-total">0</div></div>
+        <div class="stat-card"><div class="s-label">Activos</div><div class="s-val" id="proy-activos">0</div></div>
+        <div class="stat-card"><div class="s-label">Completados</div><div class="s-val" id="proy-completados">0</div></div>
+        <div class="stat-card"><div class="s-label">Tareas abiertas</div><div class="s-val" id="proy-tareas">0</div></div>
+      </div>
+      <div class="dtable-wrap" id="proy-list-wrap">
+        <div class="dtable-header"><h3>Todos los proyectos</h3></div>
+        <table class="dtable"><thead><tr><th>Nombre</th><th>Cotización</th><th>Estado</th><th>Fecha inicio</th><th>Tareas</th><th></th></tr></thead>
+        <tbody id="proy-body"><tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Sin proyectos aún</td></tr></tbody></table>
+      </div>
+      <!-- Proyecto detalle (oculto por defecto) -->
+      <div id="proy-detalle" style="display:none"></div>
+    </div>
+
+    <!-- Modal Nuevo Proyecto -->
+    <div class="modal-bg" id="proyectoModal">
+      <div class="modal-box" style="max-width:500px">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-tasks" style="margin-right:6px"></i> Nuevo Proyecto</h3>
+        <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="proy-nombre" placeholder="Importación gorras personalizadas" required></div>
+        <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="proy-desc" style="min-height:70px"></textarea></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Fecha inicio</label><input type="date" class="form-input" id="proy-inicio"></div><div class="form-group"><label class="form-label">Fecha fin</label><input type="date" class="form-input" id="proy-fin"></div></div>
+        <div class="form-group"><label class="form-label">Cotización asociada (opcional)</label><select class="form-input" id="proy-cotizacion"><option value="">Ninguna</option></select></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('proyectoModal').classList.remove('open')">Cancelar</button><button class="btn btn-dark btn-sm" onclick="saveProyecto()"><i class="fas fa-save"></i> Crear proyecto</button></div>
+      </div>
+    </div>
+
+    <!-- ═══ ADMIN: EMAIL AUTOMATION ═══ -->
+    <div class="page-body" id="a-emails" style="display:none">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:4px">Automatizaciones de Email</h2>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">Secuencias automáticas por etapa del pipeline</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="chip active" onclick="switchEmailTab('secuencias')" id="tab-secuencias">Secuencias</button>
+        <button class="chip" onclick="switchEmailTab('queue')" id="tab-queue">Queue & Logs</button>
+      </div>
+      <div id="email-tab-secuencias">
+        <div style="margin-bottom:12px;text-align:right">
+          <button class="btn btn-dark btn-sm" onclick="openSequenceModal()"><i class="fas fa-plus"></i> Nueva secuencia</button>
+        </div>
+        <div class="dtable-wrap">
+          <table class="dtable"><thead><tr><th>Nombre</th><th>Trigger (etapa)</th><th>Delay (h)</th><th>Asunto</th><th>Activo</th><th></th></tr></thead>
+          <tbody id="email-seq-body"><tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Sin secuencias</td></tr></tbody></table>
+        </div>
+      </div>
+      <div id="email-tab-queue" style="display:none">
+        <div class="dtable-wrap">
+          <table class="dtable"><thead><tr><th>Destinatario</th><th>Asunto</th><th>Estado</th><th>Programado</th><th>Enviado</th><th></th></tr></thead>
+          <tbody id="email-log-body"><tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Sin emails en cola</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Nueva Secuencia -->
+    <div class="modal-bg" id="sequenceModal">
+      <div class="modal-box" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-envelope-open-text" style="margin-right:6px"></i> Nueva Secuencia</h3>
+        <input type="hidden" id="seq-id">
+        <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="seq-nombre" placeholder="Follow-up 48h post-cotización"></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Etapa trigger</label><select class="form-input" id="seq-trigger"><option value="pendiente">Pendiente</option><option value="cotizado">Cotizado</option><option value="produccion">Producción</option><option value="entregado">Entregado</option></select></div><div class="form-group"><label class="form-label">Delay (horas)</label><input type="number" class="form-input" id="seq-delay" value="24" min="0"></div></div>
+        <div class="form-group"><label class="form-label">Asunto *</label><input type="text" class="form-input" id="seq-asunto" placeholder="Hola {{cliente}}, ¿viste tu cotización?"></div>
+        <div class="form-group"><label class="form-label">Cuerpo del email *</label><textarea class="form-input" id="seq-cuerpo" style="min-height:150px" placeholder="Hola {{cliente}},&#10;&#10;Te escribo para confirmar que recibiste nuestra cotización de {{producto}}.&#10;&#10;Variables: {{cliente}} {{producto}} {{cantidad}} {{precio}}"></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('sequenceModal').classList.remove('open')">Cancelar</button><button class="btn btn-dark btn-sm" onclick="saveSequence()"><i class="fas fa-save"></i> Guardar</button></div>
+      </div>
+    </div>
+
     <div class="page-body" id="a-tickets" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
         <h2 style="font-size:18px;font-weight:600"><i class="fas fa-bug" style="margin-right:6px"></i> Tickets de Soporte</h2>
@@ -1980,7 +2172,7 @@ function go(id) {
   if (p) { p.classList.add('active', 'fade-enter'); window.scrollTo(0, 0); }
   document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('open'));
   if (id === 'page-client' && currentUser) loadClientDashboard();
-  if (id === 'page-admin') loadAdminData();
+  if (id === 'page-admin') { loadAdminData(); if (typeof loadFeatures === 'function') loadFeatures(); }
 }
 function scrollTo2(id) { const e = document.getElementById(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
@@ -3473,6 +3665,455 @@ loadIntegrations();
 setupOtroSelects();
 // Also show CTA after 5 seconds if still on landing
 if (!currentUser) setTimeout(showCta, 5000);
+
+// ═══════════════════════════════════════════════════
+// FEATURE FLAGS - Modulo 0
+// ═══════════════════════════════════════════════════
+let _features = {};
+
+async function loadFeatures() {
+  try {
+    const features = await api('/api/admin/features');
+    _features = {};
+    features.forEach(f => { _features[f.modulo] = f.activo === 'true'; });
+    // Update toggles in config
+    Object.keys(_features).forEach(m => {
+      const sw = document.getElementById('ft-' + m);
+      if (sw) sw.classList.toggle('on', _features[m]);
+    });
+    // Update sidebar
+    applyFeatureFlags();
+  } catch (err) { console.error('Features load error:', err); }
+}
+
+function applyFeatureFlags() {
+  document.querySelectorAll('[data-feature]').forEach(el => {
+    const m = el.getAttribute('data-feature');
+    el.style.display = _features[m] === false ? 'none' : '';
+  });
+}
+
+async function toggleFeature(modulo) {
+  const newState = !_features[modulo];
+  _features[modulo] = newState;
+  const sw = document.getElementById('ft-' + modulo);
+  if (sw) sw.classList.toggle('on', newState);
+  try {
+    await api('/api/admin/features/' + modulo, { method: 'PUT', body: JSON.stringify({ activo: newState ? 'true' : 'false' }) });
+    applyFeatureFlags();
+    toast('success', 'Módulo ' + (newState ? 'activado' : 'desactivado'), modulo);
+  } catch (err) {
+    toast('error', 'Error', 'No se pudo guardar el cambio');
+    _features[modulo] = !newState;
+    if (sw) sw.classList.toggle('on', !newState);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// PROVEEDORES - Modulo 4
+// ═══════════════════════════════════════════════════
+async function loadProveedores() {
+  try {
+    const provs = await api('/api/proveedores');
+    const tbody = document.getElementById('prov-body');
+    if (!tbody) return;
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('prov-total', provs.length);
+    el('prov-activos', provs.filter(p => p.activo !== 'false').length);
+    el('prov-productos', provs.filter(p => p.productos?.length > 0).length);
+    if (provs.length > 0) {
+      const avg = provs.reduce((s,p) => s + (p.rating || 3), 0) / provs.length;
+      el('prov-rating', avg.toFixed(1) + ' ⭐');
+    }
+    tbody.innerHTML = provs.length ? provs.map(p => {
+      const cats = (() => { try { return JSON.parse(p.categorias || '[]').slice(0,3).join(', '); } catch { return p.categorias || ''; } })();
+      const stars = '⭐'.repeat(p.rating || 3);
+      const activo = p.activo === 'false' ? '<span style="color:var(--danger)">●</span> Inactivo' : '<span style="color:var(--success)">●</span> Activo';
+      return `<tr><td style="font-weight:500">${p.nombre}</td><td style="color:var(--text-muted)">${p.ciudad_china || '—'}</td><td>${p.contacto || '—'}</td><td style="color:var(--text-muted);font-size:12px">${p.email || '—'}</td><td style="font-size:11px;color:var(--text-muted)">${cats || '—'}</td><td>${stars}</td><td style="font-size:11px">${activo}</td><td><button class="btn btn-outline btn-sm" onclick='editProveedor(${JSON.stringify(p).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button></td></tr>`;
+    }).join('') : '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Sin proveedores. Click "Nuevo proveedor" para empezar.</td></tr>';
+  } catch (err) { console.error('Proveedores error:', err); }
+}
+
+function openProveedorModal() {
+  document.getElementById('prov-modal-title').textContent = 'Nuevo Proveedor';
+  ['prov-id','prov-nombre','prov-ciudad','prov-contacto','prov-email','prov-whatsapp','prov-website','prov-categorias','prov-certificaciones','prov-fortalezas','prov-notas'].forEach(id => {
+    const e = document.getElementById(id); if (e) e.value = '';
+  });
+  document.getElementById('prov-rating-in').value = '3';
+  document.getElementById('prov-activo').value = 'true';
+  document.getElementById('proveedorModal').classList.add('open');
+}
+
+function editProveedor(p) {
+  document.getElementById('prov-modal-title').textContent = 'Editar Proveedor';
+  const parseJsonArr = s => { try { return JSON.parse(s || '[]').join(', '); } catch { return s || ''; } };
+  const $ = id => document.getElementById(id);
+  $('prov-id').value = p.id;
+  $('prov-nombre').value = p.nombre;
+  $('prov-ciudad').value = p.ciudad_china || '';
+  $('prov-contacto').value = p.contacto || '';
+  $('prov-email').value = p.email || '';
+  $('prov-whatsapp').value = p.whatsapp || '';
+  $('prov-website').value = p.website || '';
+  $('prov-categorias').value = parseJsonArr(p.categorias);
+  $('prov-certificaciones').value = parseJsonArr(p.certificaciones);
+  $('prov-fortalezas').value = parseJsonArr(p.fortalezas);
+  $('prov-notas').value = p.notas || '';
+  $('prov-rating-in').value = p.rating || 3;
+  $('prov-activo').value = p.activo || 'true';
+  document.getElementById('proveedorModal').classList.add('open');
+}
+
+async function saveProveedor() {
+  const $ = id => document.getElementById(id).value;
+  const toJson = s => JSON.stringify(s.split(',').map(x => x.trim()).filter(Boolean));
+  const data = {
+    nombre: $('prov-nombre'),
+    ciudad_china: $('prov-ciudad'),
+    contacto: $('prov-contacto'),
+    email: $('prov-email'),
+    whatsapp: $('prov-whatsapp'),
+    website: $('prov-website'),
+    categorias: toJson($('prov-categorias')),
+    certificaciones: toJson($('prov-certificaciones')),
+    fortalezas: toJson($('prov-fortalezas')),
+    notas: $('prov-notas'),
+    rating: parseInt($('prov-rating-in')),
+    activo: $('prov-activo'),
+  };
+  if (!data.nombre) { toast('error', 'Error', 'Nombre es requerido'); return; }
+  try {
+    const id = $('prov-id');
+    if (id) await api('/api/proveedores/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/proveedores', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('proveedorModal').classList.remove('open');
+    toast('success', 'Proveedor guardado', '');
+    loadProveedores();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// PROSPECTS - Modulo 5
+// ═══════════════════════════════════════════════════
+async function loadProspects() {
+  try {
+    const prospects = await api('/api/prospects');
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('prosp-total', prospects.length);
+    el('prosp-nuevos', prospects.filter(p => p.estado === 'nuevo').length);
+    el('prosp-contactados', prospects.filter(p => p.estado === 'contactado').length);
+    el('prosp-convertidos', prospects.filter(p => p.estado === 'convertido').length);
+    ['nuevo','contactado','calificado','convertido'].forEach(st => {
+      const col = document.getElementById('pk-' + st);
+      const cnt = document.querySelector(`#prosp-kanban [data-estado="${st}"]`);
+      const filtered = prospects.filter(p => p.estado === st);
+      if (cnt) cnt.textContent = filtered.length;
+      if (col) {
+        col.innerHTML = filtered.length ? filtered.map(p => {
+          const scoreColor = p.score_ia >= 70 ? 'var(--success)' : p.score_ia >= 40 ? 'var(--warning)' : 'var(--danger)';
+          return `<div class="kanban-card"><div class="kc-product">${p.nombre}</div><div class="kc-client">${p.empresa || 'Sin empresa'}</div><div class="kc-meta"><span style="font-size:10px">${p.fuente || 'otro'}</span><span style="color:${scoreColor};font-weight:600">${p.score_ia || 50}</span></div><div class="kc-actions"><button onclick="editProspect(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>${st !== 'convertido' ? '<button onclick="moveProspect('+p.id+',\\''+nextProspState(st)+'\\')" title="Siguiente"><i class="fas fa-arrow-right"></i></button>' : ''}${st !== 'convertido' ? '<button onclick="convertirProspect('+p.id+')" title="Convertir a cliente"><i class="fas fa-user-check"></i></button>' : ''}</div></div>`;
+        }).join('') : '<div style="text-align:center;padding:20px;color:var(--text-faint);font-size:12px">Sin prospects</div>';
+      }
+    });
+  } catch (err) { console.error('Prospects error:', err); }
+}
+
+function nextProspState(current) {
+  const states = ['nuevo','contactado','calificado','convertido'];
+  const idx = states.indexOf(current);
+  return idx < 0 || idx >= states.length - 1 ? current : states[idx + 1];
+}
+
+function openProspectModal() {
+  document.getElementById('prosp-modal-title').textContent = 'Nuevo Prospect';
+  ['prosp-id','prosp-nombre','prosp-empresa','prosp-email','prosp-telefono','prosp-sector','prosp-notas'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('prosp-fuente').value = 'web';
+  document.getElementById('prospectModal').classList.add('open');
+}
+
+async function editProspect(id) {
+  try {
+    const all = await api('/api/prospects');
+    const p = all.find(x => x.id === id);
+    if (!p) return;
+    const $ = i => document.getElementById(i);
+    document.getElementById('prosp-modal-title').textContent = 'Editar Prospect';
+    $('prosp-id').value = p.id;
+    $('prosp-nombre').value = p.nombre;
+    $('prosp-empresa').value = p.empresa || '';
+    $('prosp-email').value = p.email || '';
+    $('prosp-telefono').value = p.telefono || '';
+    $('prosp-sector').value = p.sector || '';
+    $('prosp-fuente').value = p.fuente || 'otro';
+    $('prosp-notas').value = p.notas || '';
+    document.getElementById('prospectModal').classList.add('open');
+  } catch {}
+}
+
+async function saveProspect() {
+  const $ = id => document.getElementById(id).value;
+  const data = {
+    nombre: $('prosp-nombre'), empresa: $('prosp-empresa'), email: $('prosp-email'),
+    telefono: $('prosp-telefono'), sector: $('prosp-sector'),
+    fuente: $('prosp-fuente'), notas: $('prosp-notas'),
+  };
+  if (!data.nombre) { toast('error', 'Error', 'Nombre es requerido'); return; }
+  try {
+    const id = $('prosp-id');
+    if (id) await api('/api/prospects/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/prospects', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('prospectModal').classList.remove('open');
+    toast('success', 'Prospect guardado', '');
+    loadProspects();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function moveProspect(id, estado) {
+  try {
+    await api('/api/prospects/' + id, { method: 'PUT', body: JSON.stringify({ estado }) });
+    loadProspects();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function convertirProspect(id) {
+  if (!confirm('¿Convertir este prospect en cliente? Se creará en la base de clientes.')) return;
+  try {
+    const r = await api('/api/prospects/' + id + '/convertir', { method: 'POST' });
+    toast('success', 'Convertido', 'Cliente creado (ID ' + r.cliente_id + ')');
+    loadProspects();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// PROYECTOS - Modulo 1
+// ═══════════════════════════════════════════════════
+async function loadProyectos() {
+  try {
+    const proyectos = await api('/api/proyectos');
+    const cots = await api('/api/cotizaciones').catch(() => []);
+    const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    el('proy-total', proyectos.length);
+    el('proy-activos', proyectos.filter(p => p.estado === 'activo').length);
+    el('proy-completados', proyectos.filter(p => p.estado === 'completado').length);
+    const tbody = document.getElementById('proy-body');
+    if (tbody) {
+      tbody.innerHTML = proyectos.length ? proyectos.map(p => {
+        const cotRef = p.cotizacion_id ? '#SOL-' + String(p.cotizacion_id).padStart(3,'0') : '—';
+        const badge = { planificacion:'badge-warning', activo:'badge-info', completado:'badge-success', pausado:'badge-neutral', cancelado:'badge-danger' }[p.estado] || 'badge-neutral';
+        const date = p.fecha_inicio ? new Date(p.fecha_inicio).toLocaleDateString('es-CL') : '—';
+        return `<tr><td style="font-weight:500">${p.nombre}</td><td style="font-size:12px;color:var(--text-muted)">${cotRef}</td><td><span class="badge ${badge}">${p.estado}</span></td><td style="color:var(--text-muted)">${date}</td><td>—</td><td><button class="btn btn-outline btn-sm" onclick="openProyectoDetalle(${p.id})"><i class="fas fa-eye"></i></button></td></tr>`;
+      }).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Sin proyectos aún. Click "Nuevo proyecto" o convierte desde una cotización.</td></tr>';
+    }
+    // Populate cotizaciones select
+    const sel = document.getElementById('proy-cotizacion');
+    if (sel && cots.length) {
+      sel.innerHTML = '<option value="">Ninguna</option>' + cots.map(c => `<option value="${c.id}">#SOL-${String(c.id).padStart(3,'0')} - ${c.producto}</option>`).join('');
+    }
+  } catch (err) { console.error('Proyectos error:', err); }
+}
+
+function openProyectoModal() {
+  ['proy-nombre','proy-desc','proy-inicio','proy-fin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('proy-cotizacion').value = '';
+  document.getElementById('proyectoModal').classList.add('open');
+}
+
+async function saveProyecto() {
+  const $ = id => document.getElementById(id).value;
+  const data = {
+    nombre: $('proy-nombre'),
+    descripcion: $('proy-desc'),
+    fecha_inicio: $('proy-inicio') || null,
+    fecha_fin: $('proy-fin') || null,
+    cotizacion_id: $('proy-cotizacion') ? parseInt($('proy-cotizacion')) : null,
+  };
+  if (!data.nombre) { toast('error', 'Error', 'Nombre requerido'); return; }
+  try {
+    await api('/api/proyectos', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('proyectoModal').classList.remove('open');
+    toast('success', 'Proyecto creado', '');
+    loadProyectos();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function openProyectoDetalle(id) {
+  try {
+    const p = await api('/api/proyectos/' + id);
+    const detalle = document.getElementById('proy-detalle');
+    const listWrap = document.getElementById('proy-list-wrap');
+    if (listWrap) listWrap.style.display = 'none';
+    if (!detalle) return;
+    detalle.style.display = 'block';
+    const secciones = p.secciones || [];
+    const tareas = p.tareas || [];
+    const estadoBadge = { pendiente:'badge-warning', en_progreso:'badge-info', completada:'badge-success', bloqueada:'badge-danger' };
+    const seccionesHtml = secciones.map(s => {
+      const st = tareas.filter(t => t.seccion_id === s.id);
+      const done = st.filter(t => t.estado === 'completada').length;
+      return `<div class="card" style="padding:14px;margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><h4 style="font-size:13px;font-weight:600">${s.nombre}</h4><span style="font-size:11px;color:var(--text-muted)">${done}/${st.length} completadas</span></div>${st.map(t => `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:12px"><span class="badge ${estadoBadge[t.estado]||'badge-neutral'}" style="font-size:9px">${t.estado}</span><span style="flex:1">${t.nombre}</span><button class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:10px" onclick="avanzarTarea(${t.id},'${t.estado}')"><i class="fas fa-arrow-right"></i></button></div>`).join('')}</div>`;
+    }).join('');
+    detalle.innerHTML = `<div style="margin-bottom:16px"><button class="btn btn-outline btn-sm" onclick="cerrarProyectoDetalle()"><i class="fas fa-arrow-left"></i> Volver a lista</button></div><div style="margin-bottom:20px"><h3 style="font-size:18px;font-weight:600">${p.nombre}</h3><p style="font-size:13px;color:var(--text-muted)">${p.descripcion || ''}</p></div>${seccionesHtml || '<div style="text-align:center;padding:32px;color:var(--text-muted)">Sin tareas</div>'}`;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function cerrarProyectoDetalle() {
+  const d = document.getElementById('proy-detalle');
+  const l = document.getElementById('proy-list-wrap');
+  if (d) d.style.display = 'none';
+  if (l) l.style.display = 'block';
+}
+
+async function avanzarTarea(id, estadoActual) {
+  const next = { 'pendiente':'en_progreso', 'en_progreso':'completada', 'completada':'pendiente', 'bloqueada':'pendiente' }[estadoActual] || 'en_progreso';
+  try {
+    await api('/api/tareas/' + id, { method: 'PUT', body: JSON.stringify({ estado: next }) });
+    // Reload detail
+    const currentDetalle = document.getElementById('proy-detalle');
+    if (currentDetalle && currentDetalle.style.display === 'block') {
+      const match = currentDetalle.innerHTML.match(/cerrarProyectoDetalle/);
+      // Reload from state - re-open detail
+      // Since we don't track proyId, just reload the list
+      loadProyectos();
+      cerrarProyectoDetalle();
+    }
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// EMAIL AUTOMATION - Modulo 3
+// ═══════════════════════════════════════════════════
+function switchEmailTab(tab) {
+  document.getElementById('tab-secuencias').classList.toggle('active', tab === 'secuencias');
+  document.getElementById('tab-queue').classList.toggle('active', tab === 'queue');
+  document.getElementById('email-tab-secuencias').style.display = tab === 'secuencias' ? '' : 'none';
+  document.getElementById('email-tab-queue').style.display = tab === 'queue' ? '' : 'none';
+  if (tab === 'queue') loadEmailLogs();
+}
+
+async function loadEmailSequences() {
+  try {
+    const seqs = await api('/api/email-sequences');
+    const tbody = document.getElementById('email-seq-body');
+    if (!tbody) return;
+    tbody.innerHTML = seqs.length ? seqs.map(s => `<tr><td style="font-weight:500">${s.nombre}</td><td><span class="badge badge-info">${s.etapa_trigger || '—'}</span></td><td>${s.delay_horas}h</td><td style="font-size:12px;color:var(--text-muted)">${s.asunto_template.substring(0,60)}</td><td><span class="badge ${s.activo === 'true' ? 'badge-success' : 'badge-neutral'}">${s.activo === 'true' ? 'Activa' : 'Inactiva'}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="toggleSequence(${s.id},'${s.activo}')" title="Toggle"><i class="fas fa-power-off"></i></button><button class="btn btn-outline btn-sm" onclick="editSequence(${s.id})"><i class="fas fa-edit"></i></button><button class="btn btn-outline btn-sm" onclick="deleteSequence(${s.id})"><i class="fas fa-trash"></i></button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Sin secuencias. Crea una para automatizar follow-ups.</td></tr>';
+  } catch (err) { console.error('Sequences error:', err); }
+}
+
+async function loadEmailLogs() {
+  try {
+    const logs = await api('/api/email-logs?limit=50');
+    const tbody = document.getElementById('email-log-body');
+    if (!tbody) return;
+    const estadoBadge = { pendiente:'badge-warning', enviado:'badge-success', cancelado:'badge-neutral', error:'badge-danger' };
+    tbody.innerHTML = logs.length ? logs.map(l => `<tr><td style="font-size:12px">${l.destinatario}</td><td style="font-size:12px;color:var(--text-muted)">${(l.asunto || '').substring(0,50)}</td><td><span class="badge ${estadoBadge[l.estado]||'badge-neutral'}">${l.estado}</span></td><td style="font-size:11px;color:var(--text-muted)">${l.programado_para ? new Date(l.programado_para).toLocaleString('es-CL') : '—'}</td><td style="font-size:11px;color:var(--text-muted)">${l.enviado_at ? new Date(l.enviado_at).toLocaleString('es-CL') : '—'}</td><td>${l.estado === 'pendiente' ? '<button class="btn btn-dark btn-sm" onclick="sendEmailNow('+l.id+')" style="padding:2px 8px;font-size:10px"><i class="fas fa-paper-plane"></i> Enviar</button>' : ''}</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)">Sin emails en cola</td></tr>';
+  } catch (err) { console.error('Logs error:', err); }
+}
+
+function openSequenceModal() {
+  ['seq-id','seq-nombre','seq-asunto','seq-cuerpo'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('seq-trigger').value = 'pendiente';
+  document.getElementById('seq-delay').value = '24';
+  document.getElementById('sequenceModal').classList.add('open');
+}
+
+async function saveSequence() {
+  const $ = id => document.getElementById(id).value;
+  const data = {
+    nombre: $('seq-nombre'), etapa_trigger: $('seq-trigger'),
+    delay_horas: parseInt($('seq-delay')) || 0,
+    asunto_template: $('seq-asunto'), cuerpo_template: $('seq-cuerpo'),
+    activo: 'true',
+  };
+  if (!data.nombre || !data.asunto_template || !data.cuerpo_template) { toast('error', 'Error', 'Todos los campos son obligatorios'); return; }
+  try {
+    const id = $('seq-id');
+    if (id) await api('/api/email-sequences/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/email-sequences', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('sequenceModal').classList.remove('open');
+    toast('success', 'Secuencia guardada', '');
+    loadEmailSequences();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function toggleSequence(id, currentActive) {
+  const newState = currentActive === 'true' ? 'false' : 'true';
+  try {
+    await api('/api/email-sequences/' + id, { method: 'PUT', body: JSON.stringify({ activo: newState }) });
+    loadEmailSequences();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function editSequence(id) {
+  try {
+    const all = await api('/api/email-sequences');
+    const s = all.find(x => x.id === id);
+    if (!s) return;
+    const $ = i => document.getElementById(i);
+    $('seq-id').value = s.id;
+    $('seq-nombre').value = s.nombre;
+    $('seq-trigger').value = s.etapa_trigger || 'pendiente';
+    $('seq-delay').value = s.delay_horas;
+    $('seq-asunto').value = s.asunto_template;
+    $('seq-cuerpo').value = s.cuerpo_template;
+    document.getElementById('sequenceModal').classList.add('open');
+  } catch {}
+}
+
+async function deleteSequence(id) {
+  if (!confirm('¿Eliminar esta secuencia?')) return;
+  try {
+    await api('/api/email-sequences/' + id, { method: 'DELETE' });
+    loadEmailSequences();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function sendEmailNow(id) {
+  try {
+    const r = await api('/api/email-logs/' + id + '/enviar', { method: 'POST' });
+    toast(r.estado === 'enviado' ? 'success' : 'error', 'Email ' + r.estado, '');
+    loadEmailLogs();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// PDF COTIZACIONES FORMALES - Modulo 2
+// ═══════════════════════════════════════════════════
+function openPDFModal(cotId) {
+  const html = `<div class="modal-bg open" id="pdfModalTemp"><div class="modal-box" style="max-width:480px"><h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-file-pdf" style="margin-right:6px;color:var(--danger)"></i> Generar Cotización Formal</h3><div class="form-row"><div class="form-group"><label class="form-label">Margen MIP (%)</label><input type="number" class="form-input" id="pdf-margen" value="15" min="0" max="100" step="0.5"></div><div class="form-group"><label class="form-label">Flete</label><select class="form-input" id="pdf-flete"><option value="maritimo">Marítimo</option><option value="aereo">Aéreo</option></select></div></div><div class="form-row"><div class="form-group"><label class="form-label">Plazo producción (días)</label><input type="number" class="form-input" id="pdf-plazo" value="45" min="1"></div><div class="form-group"><label class="form-label">Condiciones pago</label><select class="form-input" id="pdf-pago"><option>50% anticipo + 50% pre-embarque</option><option>30% anticipo + 70% pre-embarque</option><option>100% anticipo</option><option>LC (Carta de crédito)</option></select></div></div><div class="form-group"><label class="form-label">Notas adicionales</label><textarea class="form-input" id="pdf-notas" style="min-height:60px"></textarea></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('pdfModalTemp').remove()">Cancelar</button><button class="btn btn-dark btn-sm" onclick="generarPDF(${cotId})"><i class="fas fa-file-pdf"></i> Generar PDF</button></div></div></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function generarPDF(cotId) {
+  const $ = id => document.getElementById(id).value;
+  const data = {
+    margen_mip: parseFloat($('pdf-margen')) || 15,
+    flete_tipo: $('pdf-flete'),
+    plazo_produccion_dias: parseInt($('pdf-plazo')) || 45,
+    condiciones_pago: $('pdf-pago'),
+    notas: $('pdf-notas') || '',
+  };
+  try {
+    const r = await api('/api/cotizaciones/' + cotId + '/generar-formal', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('pdfModalTemp')?.remove();
+    toast('success', 'PDF generado', r.numero);
+    window.open(r.pdf_url, '_blank');
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// Enchufar aView con nuevos modulos
+// ═══════════════════════════════════════════════════
+const _origAView = typeof aView === 'function' ? aView : null;
+if (_origAView) {
+  window.aView = function(id) {
+    _origAView(id);
+    if (id === 'a-proveedores') loadProveedores();
+    if (id === 'a-prospects') loadProspects();
+    if (id === 'a-proyectos') loadProyectos();
+    if (id === 'a-emails') loadEmailSequences();
+    if (id === 'a-config') loadFeatures();
+  };
+}
 
 // ─── Chatbot Mateo ───
 let chatHistory = [];
