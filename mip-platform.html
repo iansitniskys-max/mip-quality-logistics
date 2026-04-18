@@ -3061,7 +3061,7 @@ async function saveEditClient() {
 async function exportClientesExcel() {
   try {
     const clientes = await api('/api/clientes');
-    if (typeof XLSX === 'undefined') { window.open(API + '/api/clientes/export-excel'); return; }
+    if (typeof XLSX === 'undefined') { window.open(API + '/api/admin/clientes-export-excel'); return; }
     const rows = clientes.map(c => ({
       ID: c.id, Nombre: c.nombre, 'Razón Social': c.razon_social || '',
       'Nombre Comercial (Empresa)': c.empresa || '', RUT: c.rut || '',
@@ -3082,7 +3082,7 @@ async function exportClientesExcel() {
 }
 
 function downloadTemplateExcel() {
-  if (typeof XLSX === 'undefined') { window.open(API + '/api/clientes/template-excel'); return; }
+  if (typeof XLSX === 'undefined') { window.open(API + '/api/admin/clientes-template-excel'); return; }
   const example = [{
     Nombre: 'Juan Pérez', 'Razón Social': 'Retail Ejemplo SpA',
     'Nombre Comercial (Empresa)': 'Retail Ejemplo', RUT: '76.123.456-7',
@@ -3109,7 +3109,7 @@ async function importClientesExcel(event) {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet);
     if (!rows.length) { toast('error', 'Error', 'El archivo está vacío'); return; }
-    const result = await api('/api/clientes/import-excel', { method: 'POST', body: JSON.stringify({ rows }) });
+    const result = await api('/api/admin/clientes-import-excel', { method: 'POST', body: JSON.stringify({ rows }) });
     const msg = `${result.imported} clientes importados` + (result.errors.length ? ` (${result.errors.length} errores)` : '');
     toast(result.imported > 0 ? 'success' : 'error', 'Importación', msg);
     if (result.errors.length) console.warn('Errores:', result.errors);

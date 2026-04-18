@@ -1217,7 +1217,7 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
 
 
 # ═══ FASE 1: EXPORT/IMPORT EXCEL DE CLIENTES ═══
-@app.get("/api/clientes/export-excel")
+@app.get("/api/admin/clientes-export-excel")
 def export_clientes_excel(db: Session = Depends(get_db)):
     """Export clients to CSV format (Excel-compatible with BOM UTF-8)"""
     clientes = db.query(Cliente).order_by(Cliente.created_at.desc()).all()
@@ -1246,7 +1246,7 @@ def export_clientes_excel(db: Session = Depends(get_db)):
     )
 
 
-@app.get("/api/clientes/template-excel")
+@app.get("/api/admin/clientes-template-excel")
 def export_clientes_template(db: Session = Depends(get_db)):
     """Download empty Excel-compatible template for importing clients"""
     output = io.StringIO()
@@ -1271,7 +1271,7 @@ def export_clientes_template(db: Session = Depends(get_db)):
     )
 
 
-@app.post("/api/clientes/import-excel")
+@app.post("/api/admin/clientes-import-excel")
 def import_clientes_excel(data: dict, db: Session = Depends(get_db)):
     """Import clients from parsed Excel/CSV rows (sent as JSON array)"""
     rows = data.get("rows", [])
