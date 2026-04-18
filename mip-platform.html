@@ -2652,12 +2652,14 @@ async function openDetail(cotId) {
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <!-- Actividades / Timeline -->
       <div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;letter-spacing:.5px"><i class="fas fa-history" style="margin-right:4px"></i> ACTIVIDADES</div>
-        <div class="act-form">
-          <select id="act-tipo"><option value="nota">Nota</option><option value="llamada">Llamada</option><option value="email">Email</option><option value="reunion">Reunión</option><option value="visita">Visita</option><option value="otro">Otro</option></select>
-          <input id="act-titulo" placeholder="Título (opcional)">
-          <button onclick="addActividad(${c.id})"><i class="fas fa-plus"></i> Agregar</button>
+        <div style="display:flex;flex-direction:column;gap:6px;padding:12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:12px">
+          <div style="display:flex;gap:6px">
+            <select id="act-tipo" style="width:130px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-white)"><option value="nota">📝 Nota</option><option value="llamada">📞 Llamada</option><option value="email">✉️ Email</option><option value="reunion">👥 Reunión</option><option value="visita">📍 Visita</option><option value="otro">📌 Otro</option></select>
+            <input id="act-titulo" placeholder="Título (opcional)" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-white)">
+          </div>
+          <input id="act-desc" placeholder="Descripción detallada..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-white)">
+          <button onclick="addActividad(${c.id})" style="padding:6px 14px;background:var(--bg-dark);color:var(--text-inv);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;align-self:flex-end"><i class="fas fa-plus"></i> Agregar actividad</button>
         </div>
-        <input id="act-desc" class="form-input" placeholder="Descripción detallada..." style="margin-bottom:12px;font-size:12px;padding:8px 12px">
         <div class="activity-timeline" id="act-timeline"></div>
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
@@ -3042,6 +3044,7 @@ async function saveEditClient() {
     sitio_web: $('ec-web'),
     condicion_pago: $('ec-condicion-pago'),
     activo: $('ec-activo'),
+    referido_por: $('ec-referido'),
     notas: $('ec-notas'),
   };
   try {
@@ -3201,8 +3204,13 @@ async function addActividad(cotId) {
 }
 
 // ─── Fase 4: Drag & Drop Pipeline ───
+let _kanbanDragRetries = 0;
 function initKanbanDragDrop() {
-  if (typeof Sortable === 'undefined') { setTimeout(initKanbanDragDrop, 500); return; }
+  if (typeof Sortable === 'undefined') {
+    if (_kanbanDragRetries++ < 10) setTimeout(initKanbanDragDrop, 500);
+    return;
+  }
+  _kanbanDragRetries = 0;
   const etapas = ['pendiente','cotizado','produccion','entregado'];
   etapas.forEach(estado => {
     const col = document.getElementById(`kb-${estado}`);

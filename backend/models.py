@@ -49,6 +49,7 @@ class Cotizacion(Base):
     cliente = relationship("Cliente", back_populates="cotizaciones")
     pedido = relationship("Pedido", back_populates="cotizacion", uselist=False)
     productos = relationship("ProductoCotizacion", back_populates="cotizacion", cascade="all, delete-orphan")
+    actividades = relationship("Actividad", back_populates="cotizacion", cascade="all, delete-orphan")
 
 
 class ProductoCotizacion(Base):
@@ -183,3 +184,4 @@ class Actividad(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     cliente = relationship("Cliente", back_populates="actividades")
+    cotizacion = relationship("Cotizacion", back_populates="actividades")

@@ -1362,6 +1362,22 @@ def dashboard_metrics(db: Session = Depends(get_db)):
     mes_actual = [c for c in cots if c.created_at and c.created_at.month == now.month and c.created_at.year == now.year]
     ganados_mes = [c for c in mes_actual if c.estado == "entregado"]
 
+    # Calcular valor total de ganados del mes (desde productos)
+    import re as _re
+    def _valor_cot(cot):
+        prods = db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == cot.id).all()
+        total = 0.0
+        for p in prods:
+            try:
+                price_m = _re.search(r'[\d,\.]+', (p.precio_objetivo or "").replace(",", "."))
+                qty_m = _re.search(r'\d+', p.cantidad or "")
+                if price_m and qty_m:
+                    total += float(price_m.group()) * int(qty_m.group())
+            except Exception:
+                pass
+        return total
+    ganados_valor = sum(_valor_cot(c) for c in ganados_mes)
+
     # Actividad reciente (últimos 30 días)
     from datetime import timedelta
     hace_30 = now - timedelta(days=30)
@@ -1372,7 +1388,7 @@ def dashboard_metrics(db: Session = Depends(get_db)):
         "valor_pipeline": valor_pipeline,
         "valor_ponderado": valor_ponderado,
         "win_rate": round(win_rate, 1),
-        "ganados_mes": {"count": len(ganados_mes), "valor": sum(0 for _ in ganados_mes)},
+        "ganados_mes": {"count": len(ganados_mes), "valor": ganados_valor},
         "perdidos_mes": {"count": 0, "valor": 0},
         "total_clientes": clientes_q.count(),
         "total_cotizaciones": len(cots),

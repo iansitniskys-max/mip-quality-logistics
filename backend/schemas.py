@@ -187,6 +187,8 @@ class ActividadCreate(BaseModel):
     tipo: str = "nota"
     titulo: Optional[str] = ""
     descripcion: str = ""
+    etapa_anterior: Optional[str] = None
+    etapa_nueva: Optional[str] = None
     autor: Optional[str] = ""
 
 class ActividadOut(BaseModel):
