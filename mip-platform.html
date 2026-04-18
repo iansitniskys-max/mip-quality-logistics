@@ -496,7 +496,8 @@ html,body{overflow-x:hidden;max-width:100vw}
   .sidebar{transform:translateX(-100%)}
   .sidebar.open{transform:translateX(0)}
   .sb-close{display:block}
-  .main{margin-left:0}
+  .main,.app>.page-body{margin-left:0}
+  .page-body{max-width:100%}
   .topbar{padding:0 12px;gap:8px}
   .topbar h1{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
   .topbar-search{display:none}
@@ -553,10 +554,12 @@ html,body{overflow-x:hidden;max-width:100vw}
   .kanban-col{min-width:220px;max-width:260px}
   .kanban-card{padding:10px}
   .kanban-card .kc-product{font-size:12px}
-  /* KPI cards responsive */
-  .kpi-grid{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
-  .kpi-card{min-width:180px;flex:1;padding:12px 14px}
-  .kpi-card .kpi-value{font-size:20px}
+  /* KPI cards responsive - grid 2 cols on mobile */
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kpi-card{padding:12px 14px}
+  .kpi-card .kpi-value{font-size:18px}
+  .kpi-card .kpi-label{font-size:10px}
+  .kpi-card .kpi-sub{font-size:10px}
   /* Charts stack vertical */
   .charts-grid{grid-template-columns:1fr;gap:12px}
   .chart-card canvas{max-height:200px}
