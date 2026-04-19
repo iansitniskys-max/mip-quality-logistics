@@ -467,3 +467,134 @@ class MateoCalendarBooking(Base):
     estado = Column(String(30), default="confirmada")  # confirmada, cancelada, completada
     meet_link = Column(String(500))
     created_at = Column(DateTime, server_default=func.now())
+
+
+# ═══════════════════════════════════════════════════
+# AGENT BUILDER (Vambe-style)
+# Permite crear/editar/desplegar agentes IA desde UI
+# sin tocar codigo ni redeployar.
+# ═══════════════════════════════════════════════════
+
+class AgentConfig(Base):
+    """Configuracion de un agente IA completo."""
+    __tablename__ = "agent_configs"
+    id = Column(Integer, primary_key=True, index=True)
+    agent_type = Column(String(100), unique=True, nullable=False, index=True)  # identificador legible (ej: "mateo-sdr")
+    display_name = Column(String(200), nullable=False)
+    descripcion = Column(Text)
+    avatar = Column(String(500))  # emoji o URL
+    modelo = Column(String(100), default="gemini-2.5-flash")
+    activo = Column(Boolean, default=True)
+    tools_allowed = Column(Text, default="[]")  # JSON array de tool names
+    max_tool_calls = Column(Integer, default=8)
+    kb_folder_ids = Column(Text, default="[]")  # JSON array de folder ids
+    stages = Column(Text, default="[]")  # etapas de embudo donde opera
+    temperatura = Column(Float, default=0.7)
+    max_tokens = Column(Integer, default=800)
+    # Metricas agregadas
+    total_conversations = Column(Integer, default=0)
+    total_tokens_in = Column(Integer, default=0)
+    total_tokens_out = Column(Integer, default=0)
+    total_cost_usd = Column(Float, default=0.0)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    blocks = relationship("AgentBlock", cascade="all, delete-orphan", back_populates="agent", order_by="AgentBlock.orden")
+
+
+class AgentBlock(Base):
+    """Bloque modular del prompt de un agente.
+    El prompt final se compone concatenando blocks activos en orden.
+
+    Categorias:
+      - identidad: personificacion, objetivo, formato
+      - instrucciones: pasos, casos
+      - info_clave: info_empresa, info_precios, info_productos, info_despachos, etc.
+    """
+    __tablename__ = "agent_blocks"
+    id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(Integer, ForeignKey("agent_configs.id", ondelete="CASCADE"), nullable=False, index=True)
+    tipo = Column(String(50), nullable=False)  # personificacion, objetivo, formato, pasos, casos, info_*
+    categoria = Column(String(30), default="identidad")  # identidad, instrucciones, info_clave
+    nombre = Column(String(200), nullable=False)
+    contenido = Column(Text, nullable=False)
+    orden = Column(Integer, default=0)
+    activo = Column(Boolean, default=True)
+    sub_steps = Column(Text, default="[]")  # JSON: [{orden:"1.1", texto:"...", tool_assigned:"calendar_create"}]
+    # Para bloques info_clave reusables entre agentes
+    es_reusable = Column(Boolean, default=False)
+    block_key = Column(String(200))  # si es reusable, identificador global
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    agent = relationship("AgentConfig", back_populates="blocks")
+
+
+class Tool(Base):
+    """Funciones/tools que los agentes pueden invocar."""
+    __tablename__ = "agent_tools"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=False)  # descripcion que lee el LLM
+    categoria = Column(String(50), default="utility")  # calendar, shopify, kb, webhook, crm, utility
+    schema_input = Column(Text, default="{}")  # JSONSchema del input
+    activo = Column(Boolean, default=True)
+    peligroso = Column(Boolean, default=False)  # requiere confirmacion humana
+    handler = Column(String(100))  # nombre del handler interno a invocar
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class KnowledgeFolder(Base):
+    __tablename__ = "kb_folders"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), unique=True, nullable=False)
+    descripcion = Column(Text)
+    color = Column(String(10), default="#0A6FE0")
+    created_at = Column(DateTime, server_default=func.now())
+
+    docs = relationship("KnowledgeDoc", cascade="all, delete-orphan", back_populates="folder")
+
+
+class KnowledgeDoc(Base):
+    __tablename__ = "kb_docs"
+    id = Column(Integer, primary_key=True, index=True)
+    folder_id = Column(Integer, ForeignKey("kb_folders.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(300), nullable=False)
+    contenido = Column(Text, nullable=False)
+    tokens_totales = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    folder = relationship("KnowledgeFolder", back_populates="docs")
+    chunks = relationship("KnowledgeChunk", cascade="all, delete-orphan", back_populates="doc", order_by="KnowledgeChunk.orden")
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "kb_chunks"
+    id = Column(Integer, primary_key=True, index=True)
+    doc_id = Column(Integer, ForeignKey("kb_docs.id", ondelete="CASCADE"), nullable=False, index=True)
+    contenido = Column(Text, nullable=False)
+    embedding = Column(Text)  # JSON array de floats (768d para Gemini text-embedding-004)
+    dim = Column(Integer, default=768)
+    orden = Column(Integer, default=0)
+    tokens = Column(Integer, default=0)
+
+    doc = relationship("KnowledgeDoc", back_populates="chunks")
+
+
+class AgentTrace(Base):
+    """Observability: cada llamada al LLM se registra aqui."""
+    __tablename__ = "agent_traces"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), index=True)
+    agent_id = Column(Integer, ForeignKey("agent_configs.id"), index=True)
+    prompt_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+    latency_ms = Column(Integer, default=0)
+    tool_calls = Column(Text, default="[]")  # JSON array
+    input_summary = Column(Text)
+    output_summary = Column(Text)
+    error = Column(Text)
+    provider = Column(String(30))  # gemini, claude, openai
+    created_at = Column(DateTime, server_default=func.now(), index=True)

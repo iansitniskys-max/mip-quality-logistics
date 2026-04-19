@@ -499,3 +499,102 @@ class MateoConversationOut(BaseModel):
     ultimo_mensaje_at: datetime
     class Config:
         from_attributes = True
+
+
+# --- Agent Builder ---
+class AgentBlockOut(BaseModel):
+    id: int
+    agent_id: int
+    tipo: str
+    categoria: str
+    nombre: str
+    contenido: str
+    orden: int
+    activo: bool
+    sub_steps: Optional[str] = "[]"
+    es_reusable: bool
+    block_key: Optional[str] = ""
+    class Config:
+        from_attributes = True
+
+
+class AgentBlockCreate(BaseModel):
+    agent_id: Optional[int] = None
+    tipo: str
+    categoria: str = "identidad"
+    nombre: str
+    contenido: str
+    orden: int = 0
+    activo: bool = True
+    sub_steps: str = "[]"
+    es_reusable: bool = False
+    block_key: Optional[str] = ""
+
+
+class AgentConfigOut(BaseModel):
+    id: int
+    agent_type: str
+    display_name: str
+    descripcion: Optional[str] = ""
+    avatar: Optional[str] = ""
+    modelo: str
+    activo: bool
+    tools_allowed: str
+    max_tool_calls: int
+    kb_folder_ids: str
+    stages: str
+    temperatura: float
+    max_tokens: int
+    total_conversations: int
+    total_tokens_in: int
+    total_tokens_out: int
+    total_cost_usd: float
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class AgentConfigCreate(BaseModel):
+    agent_type: str
+    display_name: str
+    descripcion: str = ""
+    avatar: str = "🤖"
+    modelo: str = "gemini-2.5-flash"
+    activo: bool = True
+    tools_allowed: str = "[]"
+    max_tool_calls: int = 8
+    kb_folder_ids: str = "[]"
+    stages: str = "[]"
+    temperatura: float = 0.7
+    max_tokens: int = 800
+
+
+class ToolOut(BaseModel):
+    id: int
+    name: str
+    description: str
+    categoria: str
+    schema_input: str
+    activo: bool
+    peligroso: bool
+    handler: Optional[str] = ""
+    class Config:
+        from_attributes = True
+
+
+class KBFolderOut(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str] = ""
+    color: str
+    class Config:
+        from_attributes = True
+
+
+class KBDocOut(BaseModel):
+    id: int
+    folder_id: int
+    nombre: str
+    tokens_totales: int
+    class Config:
+        from_attributes = True

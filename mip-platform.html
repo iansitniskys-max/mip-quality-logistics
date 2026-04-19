@@ -1407,6 +1407,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" data-feature="emails" onclick="aView('a-emails')"><i class="fas fa-envelope-open-text"></i> Automatizaciones</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Sistema</div>
+        <a class="sb-link" onclick="aView('a-agents')"><i class="fas fa-robot"></i> Agent Builder</a>
         <a class="sb-link" onclick="aView('a-config')"><i class="fas fa-cog"></i> Configuración</a>
         <a class="sb-link" onclick="aView('a-integrations')"><i class="fas fa-plug"></i> Integraciones</a>
         <a class="sb-link" onclick="aView('a-editor')"><i class="fas fa-paint-brush"></i> Editor Web</a>
@@ -1685,6 +1686,154 @@ html,body{overflow-x:hidden;max-width:100vw}
     </div>
 
     <!-- ADMIN: Configuración -->
+    <!-- ═══ AGENT BUILDER ═══ -->
+    <div class="page-body" id="a-agents" style="display:none">
+      <div class="admin-header-flex">
+        <div>
+          <h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Agent Builder</h2>
+          <p style="font-size:12px;color:var(--text-muted)">Construye agentes IA con bloques modulares de prompt · Tools, RAG y pipelines</p>
+        </div>
+        <div class="admin-btn-group">
+          <button class="btn btn-outline btn-sm" onclick="loadAgentTools()"><i class="fas fa-cubes"></i> Tools</button>
+          <button class="btn btn-outline btn-sm" onclick="loadKBFolders()"><i class="fas fa-book"></i> Knowledge Base</button>
+          <button class="btn btn-dark btn-sm" onclick="openAgentModal()"><i class="fas fa-plus"></i> Nuevo agente</button>
+        </div>
+      </div>
+
+      <!-- Lista de agentes -->
+      <div id="agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:16px">
+        <div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;grid-column:1/-1">Cargando agentes...</div>
+      </div>
+
+      <!-- Editor de agente (aparece al seleccionar uno) -->
+      <div id="agent-editor" style="display:none;margin-top:20px">
+        <div class="card" style="padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <div>
+              <h3 style="font-size:16px;font-weight:600;margin-bottom:4px"><span id="aed-avatar" style="font-size:20px;margin-right:8px"></span><span id="aed-name">—</span></h3>
+              <p style="font-size:12px;color:var(--text-muted)" id="aed-desc">—</p>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-sm" onclick="previewAgentPrompt()"><i class="fas fa-eye"></i> Preview prompt</button>
+              <button class="btn btn-outline btn-sm" onclick="testAgentChat()"><i class="fas fa-comment-dots"></i> Probar chat</button>
+              <button class="btn btn-outline btn-sm" onclick="loadAgentTraces()"><i class="fas fa-chart-line"></i> Traces</button>
+              <button class="btn btn-dark btn-sm" onclick="saveAgentSettings()"><i class="fas fa-save"></i> Guardar</button>
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('agent-editor').style.display='none'" style="color:var(--text-muted)">&times;</button>
+            </div>
+          </div>
+
+          <!-- Stats del agente -->
+          <div class="stat-grid" style="margin-bottom:16px">
+            <div class="stat-card"><div class="s-label">Conversaciones</div><div class="s-val" id="aed-stat-convs">0</div></div>
+            <div class="stat-card"><div class="s-label">Tokens in</div><div class="s-val" style="font-size:14px" id="aed-stat-in">0</div></div>
+            <div class="stat-card"><div class="s-label">Tokens out</div><div class="s-val" style="font-size:14px" id="aed-stat-out">0</div></div>
+            <div class="stat-card"><div class="s-label">Costo USD</div><div class="s-val" style="font-size:14px" id="aed-stat-cost">$0</div></div>
+          </div>
+
+          <!-- Settings basicos del agente -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="form-group"><label class="form-label">agent_type (único)</label><input type="text" class="form-input" id="aed-type" readonly style="background:var(--bg-surface)"></div>
+            <div class="form-group"><label class="form-label">Nombre visible</label><input type="text" class="form-input" id="aed-display-name"></div>
+            <div class="form-group"><label class="form-label">Avatar (emoji o URL)</label><input type="text" class="form-input" id="aed-avatar-input"></div>
+            <div class="form-group"><label class="form-label">Modelo AI</label>
+              <select class="form-input" id="aed-modelo">
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Temperatura</label><input type="number" class="form-input" id="aed-temp" step="0.1" min="0" max="2" value="0.7"></div>
+            <div class="form-group"><label class="form-label">Max tokens</label><input type="number" class="form-input" id="aed-max-tokens" min="100" max="4000" value="800"></div>
+            <div class="form-group" style="grid-column:span 3"><label class="form-label">Descripción</label><textarea class="form-input" id="aed-descripcion" style="min-height:50px"></textarea></div>
+            <div class="form-group" style="grid-column:span 2"><label class="form-label">Tools permitidos (JSON array)</label><input type="text" class="form-input" id="aed-tools" placeholder='["search_kb","create_prospect"]'></div>
+            <div class="form-group"><label class="form-label">Activo</label><div style="padding:10px 0"><div class="switch" id="aed-activo" onclick="this.classList.toggle('on')"></div></div></div>
+          </div>
+
+          <!-- BLOQUES DE PROMPT -->
+          <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+              <h4 style="font-size:14px;font-weight:600;margin:0"><i class="fas fa-cubes" style="margin-right:6px;color:var(--info)"></i>Bloques del prompt</h4>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-outline btn-sm" onclick="openBlockModal()"><i class="fas fa-plus"></i> Agregar bloque</button>
+              </div>
+            </div>
+            <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Los bloques activos se concatenan en orden para formar el prompt final. Categorías: <b>Identidad</b> (quién es) · <b>Instrucciones</b> (cómo actúa) · <b>Información clave</b> (datos de referencia)</p>
+            <div id="aed-blocks-list">
+              <div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">Cargando bloques...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Area de output: preview prompt / traces / chat de prueba -->
+      <div id="agent-extras"></div>
+    </div>
+
+    <!-- Modal crear agente -->
+    <div class="modal-bg" id="agentModal">
+      <div class="modal-box" style="max-width:520px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:15px"><i class="fas fa-robot" style="margin-right:6px"></i>Nuevo agente</h3>
+          <button onclick="document.getElementById('agentModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); createAgent();">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">agent_type * <span style="font-weight:400;color:var(--text-muted)">(slug único)</span></label><input type="text" class="form-input" id="ag-type" placeholder="mateo-soporte" required pattern="[a-z0-9-]+"></div>
+            <div class="form-group"><label class="form-label">Nombre visible *</label><input type="text" class="form-input" id="ag-name" placeholder="Mateo Soporte" required></div>
+          </div>
+          <div class="form-group"><label class="form-label">Avatar (emoji)</label><input type="text" class="form-input" id="ag-avatar" value="🤖" maxlength="4"></div>
+          <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="ag-desc" style="min-height:60px" placeholder="Agente de soporte post-venta"></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Modelo</label><select class="form-input" id="ag-modelo"><option value="gemini-2.5-flash">Gemini 2.5 Flash</option><option value="claude-sonnet-4-20250514">Claude Sonnet 4</option></select></div>
+            <div class="form-group"><label class="form-label">Temperatura</label><input type="number" class="form-input" id="ag-temp" step="0.1" min="0" max="2" value="0.7"></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border);margin-top:10px">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('agentModal').classList.remove('open')">Cancelar</button>
+            <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Crear</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal crear/editar block -->
+    <div class="modal-bg" id="blockModal">
+      <div class="modal-box" style="max-width:640px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:15px" id="bl-title"><i class="fas fa-cube" style="margin-right:6px"></i>Nuevo bloque</h3>
+          <button onclick="document.getElementById('blockModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); saveBlock();">
+          <input type="hidden" id="bl-id">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Categoría *</label>
+              <select class="form-input" id="bl-categoria" onchange="updateBlockTipos()">
+                <option value="identidad">Identidad (quién es)</option>
+                <option value="instrucciones">Instrucciones (cómo actúa)</option>
+                <option value="info_clave">Información clave</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Tipo *</label>
+              <select class="form-input" id="bl-tipo">
+                <option value="personificacion">Personificación</option>
+                <option value="objetivo">Objetivo general</option>
+                <option value="formato">Formato de respuesta</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group"><label class="form-label">Nombre del bloque *</label><input type="text" class="form-input" id="bl-nombre" required placeholder="Ej: Personalidad y tono"></div>
+          <div class="form-group"><label class="form-label">Contenido *</label><textarea class="form-input" id="bl-contenido" style="min-height:180px;font-family:monospace;font-size:12px" required placeholder="Texto del bloque que se concatena en el prompt..."></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Orden</label><input type="number" class="form-input" id="bl-orden" value="0"></div>
+            <div class="form-group"><label class="form-label">Activo</label><div style="padding:10px 0"><div class="switch on" id="bl-activo" onclick="this.classList.toggle('on')"></div></div></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border);margin-top:10px">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('blockModal').classList.remove('open')">Cancelar</button>
+            <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Guardar bloque</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="page-body" id="a-config" style="display:none">
       <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Configuración</h2>
       <div class="admin-grid-half">
@@ -2856,10 +3005,10 @@ async function downloadBulkCSV() {
 
 // ─── Admin ───
 function aView(id) {
-  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-config','a-integrations','a-editor','a-history','a-tickets'];
+  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-agents','a-config','a-integrations','a-editor','a-history','a-tickets'];
   ALL_VIEWS.forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
   const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
-  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-config':'Configuración','a-integrations':'Integraciones','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte' };
+  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-agents':'Agent Builder','a-config':'Configuración','a-integrations':'Integraciones','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte' };
   document.getElementById('aTitle').textContent = t[id] || 'Admin';
   const links = document.querySelectorAll('#page-admin .sb-link');
   links.forEach(l => l.classList.remove('active'));
@@ -4747,8 +4896,380 @@ async function viewMateoConv(id) {
     if (id === 'a-acc') {
       setTimeout(loadSociosBalance, 80);
     }
+    if (id === 'a-agents') {
+      setTimeout(loadAgents, 50);
+    }
   };
 })();
+
+// ═══════════════════════════════════════════════════
+// AGENT BUILDER - UI handlers
+// ═══════════════════════════════════════════════════
+let _currentAgentId = null;
+
+const TIPOS_POR_CATEGORIA = {
+  identidad: [
+    { v:'personificacion', l:'Personificación' },
+    { v:'objetivo', l:'Objetivo general' },
+    { v:'formato', l:'Formato de respuesta' },
+  ],
+  instrucciones: [
+    { v:'pasos', l:'Pasos a seguir' },
+    { v:'casos', l:'Casos posibles' },
+  ],
+  info_clave: [
+    { v:'info_empresa', l:'Info empresa/tienda' },
+    { v:'info_precios', l:'Precios y política comercial' },
+    { v:'info_productos', l:'Productos / catálogo' },
+    { v:'info_pagos', l:'Métodos de pago' },
+    { v:'info_devoluciones', l:'Políticas de devolución' },
+    { v:'info_despachos', l:'Información de despachos' },
+    { v:'info_garantias', l:'Certificaciones / garantías' },
+    { v:'info_otro', l:'Otra información de referencia' },
+  ],
+};
+
+function updateBlockTipos() {
+  const cat = document.getElementById('bl-categoria').value;
+  const sel = document.getElementById('bl-tipo');
+  const opts = TIPOS_POR_CATEGORIA[cat] || [];
+  sel.innerHTML = opts.map(o => `<option value="${o.v}">${o.l}</option>`).join('');
+}
+
+async function loadAgents() {
+  try {
+    const agents = await api('/api/agents');
+    const grid = document.getElementById('agents-grid');
+    if (!grid) return;
+    if (!agents.length) {
+      grid.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;grid-column:1/-1">No hay agentes. Crea el primero.</div>';
+      return;
+    }
+    grid.innerHTML = agents.map(a => {
+      const activo = a.activo ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-neutral">Inactivo</span>';
+      return `<div class="card" style="padding:16px;cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--info)'" onmouseout="this.style.borderColor=''" onclick="loadAgent(${a.id})">
+        <div style="display:flex;align-items:start;justify-content:space-between;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:28px">${a.avatar || '🤖'}</span>
+            <div>
+              <div style="font-weight:600;font-size:14px">${a.display_name}</div>
+              <div style="font-size:10px;color:var(--text-muted)">${a.agent_type}</div>
+            </div>
+          </div>
+          ${activo}
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);min-height:30px;margin:6px 0">${(a.descripcion||'').substring(0,80) || '—'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:10px;color:var(--text-muted);padding-top:8px;border-top:1px solid var(--border)">
+          <div><i class="fas fa-comments"></i> ${a.total_conversations||0}</div>
+          <div><i class="fas fa-cube"></i> ${a.blocks_count||0} bloques</div>
+          <div><i class="fas fa-dollar-sign"></i> $${(a.total_cost_usd||0).toFixed(4)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('loadAgents:', err);
+    document.getElementById('agents-grid').innerHTML = `<div style="color:var(--danger);padding:12px;grid-column:1/-1">Error: ${err.message}</div>`;
+  }
+}
+
+async function loadAgent(id) {
+  try {
+    const a = await api('/api/agents/' + id);
+    _currentAgentId = id;
+    document.getElementById('agent-editor').style.display = 'block';
+    document.getElementById('agent-editor').scrollIntoView({behavior:'smooth',block:'start'});
+    document.getElementById('aed-name').textContent = a.display_name;
+    document.getElementById('aed-avatar').textContent = a.avatar || '🤖';
+    document.getElementById('aed-desc').textContent = a.descripcion || '';
+    document.getElementById('aed-type').value = a.agent_type;
+    document.getElementById('aed-display-name').value = a.display_name;
+    document.getElementById('aed-avatar-input').value = a.avatar || '';
+    document.getElementById('aed-descripcion').value = a.descripcion || '';
+    document.getElementById('aed-modelo').value = a.modelo;
+    document.getElementById('aed-temp').value = a.temperatura;
+    document.getElementById('aed-max-tokens').value = a.max_tokens;
+    document.getElementById('aed-tools').value = a.tools_allowed || '[]';
+    const sw = document.getElementById('aed-activo');
+    if (sw) sw.classList.toggle('on', !!a.activo);
+    // Stats
+    document.getElementById('aed-stat-convs').textContent = a.total_conversations || 0;
+    document.getElementById('aed-stat-in').textContent = (a.total_tokens_in||0).toLocaleString();
+    document.getElementById('aed-stat-out').textContent = (a.total_tokens_out||0).toLocaleString();
+    document.getElementById('aed-stat-cost').textContent = '$' + (a.total_cost_usd||0).toFixed(4);
+    // Render blocks
+    renderBlocksList(a.blocks || []);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function renderBlocksList(blocks) {
+  const wrap = document.getElementById('aed-blocks-list');
+  if (!blocks.length) {
+    wrap.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;font-size:12px">Sin bloques. Agrega el primero.</div>';
+    return;
+  }
+  const catLabels = { identidad:'IDENTIDAD', instrucciones:'INSTRUCCIONES', info_clave:'INFORMACIÓN CLAVE' };
+  const catColors = { identidad:'var(--info)', instrucciones:'var(--warning)', info_clave:'var(--success)' };
+  // Group by categoria
+  const grouped = {};
+  blocks.forEach(b => { (grouped[b.categoria] = grouped[b.categoria] || []).push(b); });
+  wrap.innerHTML = Object.keys(grouped).map(cat => {
+    const bs = grouped[cat].sort((x,y) => x.orden - y.orden);
+    return `<div style="margin-bottom:18px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:${catColors[cat]};margin-bottom:6px">${catLabels[cat] || cat.toUpperCase()}</div>
+      ${bs.map(b => `<div style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${catColors[cat]};opacity:${b.activo?1:0.5}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-weight:500;font-size:13px">${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span></div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;color:var(--text-muted)">orden ${b.orden}</span>
+            <div class="switch ${b.activo?'on':''}" onclick="toggleBlockActive(${b.id}, this)" style="width:30px;height:16px"></div>
+            <button class="btn btn-outline btn-sm" onclick='editBlock(${JSON.stringify(b).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button>
+            <button class="btn btn-outline btn-sm" onclick="deleteBlock(${b.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:80px;overflow:hidden;line-height:1.4">${(b.contenido||'').substring(0,250)}${(b.contenido||'').length>250?'...':''}</div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+async function toggleBlockActive(id, el) {
+  el.classList.toggle('on');
+  const activo = el.classList.contains('on');
+  try {
+    await api('/api/blocks/' + id, { method: 'PUT', body: JSON.stringify({ activo }) });
+    loadAgent(_currentAgentId);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function openAgentModal() {
+  ['ag-type','ag-name','ag-desc'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+  document.getElementById('ag-avatar').value = '🤖';
+  document.getElementById('ag-temp').value = '0.7';
+  document.getElementById('agentModal').classList.add('open');
+}
+
+async function createAgent() {
+  const data = {
+    agent_type: document.getElementById('ag-type').value.trim().toLowerCase(),
+    display_name: document.getElementById('ag-name').value.trim(),
+    avatar: document.getElementById('ag-avatar').value || '🤖',
+    descripcion: document.getElementById('ag-desc').value,
+    modelo: document.getElementById('ag-modelo').value,
+    temperatura: parseFloat(document.getElementById('ag-temp').value) || 0.7,
+  };
+  if (!data.agent_type || !data.display_name) { toast('error', 'Error', 'Tipo y nombre requeridos'); return; }
+  try {
+    const r = await api('/api/agents', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('agentModal').classList.remove('open');
+    toast('success', 'Agente creado', data.display_name);
+    await loadAgents();
+    loadAgent(r.id);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function saveAgentSettings() {
+  if (!_currentAgentId) return;
+  const data = {
+    display_name: document.getElementById('aed-display-name').value,
+    avatar: document.getElementById('aed-avatar-input').value,
+    descripcion: document.getElementById('aed-descripcion').value,
+    modelo: document.getElementById('aed-modelo').value,
+    temperatura: parseFloat(document.getElementById('aed-temp').value) || 0.7,
+    max_tokens: parseInt(document.getElementById('aed-max-tokens').value) || 800,
+    tools_allowed: document.getElementById('aed-tools').value || '[]',
+    activo: document.getElementById('aed-activo').classList.contains('on'),
+  };
+  try {
+    await api('/api/agents/' + _currentAgentId, { method: 'PUT', body: JSON.stringify(data) });
+    toast('success', 'Guardado', 'Configuración del agente actualizada');
+    loadAgents();
+    loadAgent(_currentAgentId);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function openBlockModal() {
+  if (!_currentAgentId) { toast('error','Error','Selecciona un agente primero'); return; }
+  document.getElementById('bl-title').innerHTML = '<i class="fas fa-cube" style="margin-right:6px"></i>Nuevo bloque';
+  ['bl-id','bl-nombre','bl-contenido'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+  document.getElementById('bl-categoria').value = 'identidad';
+  document.getElementById('bl-orden').value = '10';
+  document.getElementById('bl-activo').classList.add('on');
+  updateBlockTipos();
+  document.getElementById('blockModal').classList.add('open');
+}
+
+function editBlock(b) {
+  document.getElementById('bl-title').innerHTML = '<i class="fas fa-edit" style="margin-right:6px"></i>Editar bloque';
+  document.getElementById('bl-id').value = b.id;
+  document.getElementById('bl-categoria').value = b.categoria;
+  updateBlockTipos();
+  document.getElementById('bl-tipo').value = b.tipo;
+  document.getElementById('bl-nombre').value = b.nombre;
+  document.getElementById('bl-contenido').value = b.contenido;
+  document.getElementById('bl-orden').value = b.orden;
+  document.getElementById('bl-activo').classList.toggle('on', !!b.activo);
+  document.getElementById('blockModal').classList.add('open');
+}
+
+async function saveBlock() {
+  if (!_currentAgentId) return;
+  const id = document.getElementById('bl-id').value;
+  const data = {
+    tipo: document.getElementById('bl-tipo').value,
+    categoria: document.getElementById('bl-categoria').value,
+    nombre: document.getElementById('bl-nombre').value,
+    contenido: document.getElementById('bl-contenido').value,
+    orden: parseInt(document.getElementById('bl-orden').value) || 0,
+    activo: document.getElementById('bl-activo').classList.contains('on'),
+  };
+  try {
+    if (id) await api('/api/blocks/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/agents/' + _currentAgentId + '/blocks', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('blockModal').classList.remove('open');
+    toast('success', 'Bloque guardado', data.nombre);
+    loadAgent(_currentAgentId);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function deleteBlock(id) {
+  if (!confirm('¿Eliminar bloque?')) return;
+  try {
+    await api('/api/blocks/' + id, { method: 'DELETE' });
+    toast('success', 'Eliminado', '');
+    loadAgent(_currentAgentId);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function previewAgentPrompt() {
+  if (!_currentAgentId) return;
+  try {
+    const r = await api('/api/agents/' + _currentAgentId + '/prompt-preview');
+    const html = `<div class="card" style="padding:20px;margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h4 style="margin:0;font-size:14px"><i class="fas fa-eye" style="margin-right:6px"></i>Preview del prompt compuesto</h4>
+        <div style="font-size:11px;color:var(--text-muted)">~${r.approx_tokens} tokens · ${r.length_chars} chars</div>
+      </div>
+      <pre style="background:var(--bg-surface);padding:14px;border-radius:var(--radius);font-size:11px;white-space:pre-wrap;max-height:400px;overflow-y:auto;font-family:monospace">${r.prompt.replace(/</g,'&lt;')}</pre>
+    </div>`;
+    document.getElementById('agent-extras').innerHTML = html;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function testAgentChat() {
+  if (!_currentAgentId) return;
+  const html = `<div class="card" style="padding:20px;margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h4 style="margin:0;font-size:14px"><i class="fas fa-comments" style="margin-right:6px"></i>Chat de prueba</h4>
+      <button class="btn btn-outline btn-sm" onclick="_testChatHistory=[];document.getElementById('test-chat-body').innerHTML=''">Reset</button>
+    </div>
+    <div id="test-chat-body" style="min-height:200px;max-height:400px;overflow-y:auto;padding:10px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:10px;font-size:12px"></div>
+    <div style="display:flex;gap:6px">
+      <input type="text" class="form-input" id="test-chat-input" placeholder="Escribe un mensaje...">
+      <button class="btn btn-dark btn-sm" onclick="sendTestChat()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>`;
+  document.getElementById('agent-extras').innerHTML = html;
+  window._testChatHistory = [];
+}
+
+let _testChatHistory = [];
+async function sendTestChat() {
+  const input = document.getElementById('test-chat-input');
+  const msg = input.value.trim();
+  if (!msg || !_currentAgentId) return;
+  const body = document.getElementById('test-chat-body');
+  body.innerHTML += `<div style="margin-bottom:8px"><b>Tú:</b> ${msg}</div>`;
+  _testChatHistory.push({ role: 'user', content: msg });
+  input.value = '';
+  body.innerHTML += `<div id="test-typing" style="margin-bottom:8px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Pensando...</div>`;
+  body.scrollTop = body.scrollHeight;
+  try {
+    const r = await api('/api/agents/' + _currentAgentId + '/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: msg, history: _testChatHistory.slice(-10) })
+    });
+    document.getElementById('test-typing')?.remove();
+    body.innerHTML += `<div style="margin-bottom:8px;padding:8px 10px;background:var(--bg-white);border-radius:var(--radius);border-left:3px solid var(--info)">
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">${r.provider} · ${r.tokens.input}+${r.tokens.output} tokens · ${r.latency_ms}ms · $${r.cost_usd.toFixed(6)}</div>
+      <div style="white-space:pre-wrap">${r.reply.replace(/</g,'&lt;')}</div>
+    </div>`;
+    _testChatHistory.push({ role: 'assistant', content: r.reply });
+    body.scrollTop = body.scrollHeight;
+  } catch (err) {
+    document.getElementById('test-typing')?.remove();
+    body.innerHTML += `<div style="color:var(--danger)">Error: ${err.message}</div>`;
+  }
+}
+
+async function loadAgentTraces() {
+  if (!_currentAgentId) return;
+  try {
+    const traces = await api('/api/agents/' + _currentAgentId + '/traces?limit=20');
+    const html = `<div class="card" style="padding:20px;margin-top:16px">
+      <h4 style="font-size:14px;margin-bottom:12px"><i class="fas fa-chart-line" style="margin-right:6px"></i>Traces recientes (${traces.length})</h4>
+      ${traces.length ? `<div class="dtable-wrap"><table class="dtable"><thead><tr><th>Fecha</th><th>Provider</th><th>In</th><th>Out</th><th>Latencia</th><th>Costo</th><th>Input</th></tr></thead><tbody>
+        ${traces.map(t => `<tr>
+          <td style="font-size:10px">${new Date(t.created_at).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+          <td style="font-size:11px">${t.provider||'?'}</td>
+          <td>${t.prompt_tokens}</td>
+          <td>${t.output_tokens}</td>
+          <td>${t.latency_ms}ms</td>
+          <td>$${(t.cost_usd||0).toFixed(5)}</td>
+          <td style="font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(t.input_summary||'').substring(0,60)}</td>
+        </tr>`).join('')}
+      </tbody></table></div>` : '<div style="color:var(--text-muted);padding:20px;text-align:center">Sin traces</div>'}
+    </div>`;
+    document.getElementById('agent-extras').innerHTML = html;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function loadAgentTools() {
+  try {
+    const tools = await api('/api/agent-tools');
+    const html = `<div class="card" style="padding:20px;margin-top:16px">
+      <h4 style="font-size:14px;margin-bottom:12px"><i class="fas fa-cubes" style="margin-right:6px"></i>Tools disponibles (${tools.length})</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px">
+        ${tools.map(t => `<div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid ${t.peligroso?'var(--danger)':'var(--info)'}">
+          <div style="font-weight:600;font-size:12px;font-family:monospace">${t.name} ${t.peligroso?'<i class="fas fa-exclamation-triangle" style="color:var(--danger)" title="Requiere confirmacion"></i>':''}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin:3px 0">${t.categoria}</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">${t.description}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+    document.getElementById('agent-extras').innerHTML = html;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function loadKBFolders() {
+  try {
+    const folders = await api('/api/kb/folders');
+    const html = `<div class="card" style="padding:20px;margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h4 style="margin:0;font-size:14px"><i class="fas fa-book" style="margin-right:6px"></i>Knowledge Base (${folders.length} carpetas)</h4>
+        <button class="btn btn-dark btn-sm" onclick="createKBFolder()"><i class="fas fa-plus"></i> Nueva carpeta</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Organiza documentos que los agentes pueden consultar con RAG (embeddings via Gemini)</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+        ${folders.length ? folders.map(f => `<div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid ${f.color}">
+          <div style="font-weight:600;font-size:13px">${f.nombre}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${f.descripcion || '—'}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:8px"><i class="fas fa-file-alt"></i> ${f.docs_count} docs</div>
+        </div>`).join('') : '<div style="color:var(--text-muted);padding:14px;text-align:center;grid-column:1/-1">Sin carpetas</div>'}
+      </div>
+    </div>`;
+    document.getElementById('agent-extras').innerHTML = html;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function createKBFolder() {
+  const nombre = prompt('Nombre de la carpeta (ej: Politicas de Venta)');
+  if (!nombre) return;
+  try {
+    await api('/api/kb/folders', { method: 'POST', body: JSON.stringify({ nombre }) });
+    toast('success', 'Carpeta creada', nombre);
+    loadKBFolders();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
 </script>
 </body>
 </html>

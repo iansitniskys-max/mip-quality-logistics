@@ -18,6 +18,7 @@ from models import (
     Proyecto, ProyectoSeccion, Tarea, ComentarioTarea, CotizacionFormal,
     Socio, GastoSplit,
     MateoConfig, MateoConversation, MateoMessage, MateoCalendarBooking,
+    AgentConfig, AgentBlock, Tool, KnowledgeFolder, KnowledgeDoc, KnowledgeChunk, AgentTrace,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -29,9 +30,12 @@ from schemas import (
     ProyectoCreate, ProyectoOut, TareaCreate, TareaOut,
     SocioCreate, SocioOut, GastoSplitOut,
     MateoConfigOut, MateoConversationOut,
+    AgentConfigOut, AgentConfigCreate, AgentBlockOut, AgentBlockCreate,
+    ToolOut, KBFolderOut, KBDocOut,
 )
 import csv
 import io
+import json
 
 app = FastAPI(title="MIP Q&L API", version="1.0.0")
 
@@ -91,6 +95,13 @@ def on_startup():
                     print(f"Added column movimientos_contables.{col}")
                 except Exception:
                     conn.rollback()
+        # Seed Agent Builder defaults (tools + Mateo como primer agente)
+        try:
+            from sqlalchemy.orm import Session as _Sess
+            with _Sess(engine) as _db:
+                _seed_agent_builder(_db)
+        except Exception as e:
+            print(f"[agent-builder seed] warning: {e}")
     except Exception as e:
         print(f"Warning: Could not create tables: {e}")
 
@@ -1887,6 +1898,739 @@ def chat_with_mateo_v2(data: dict, db: Session = Depends(get_db)):
         "lead_captured": bool(lead.get('email')) if lead else False,
         "booking": booking_result,
     }
+
+
+# ═══════════════════════════════════════════════════
+# AGENT BUILDER (Vambe-style)
+# Permite crear agentes con bloques modulares de prompt
+# desde UI sin tocar codigo.
+# ═══════════════════════════════════════════════════
+
+# --- Default tools registry ---
+DEFAULT_TOOLS = [
+    {
+        "name": "search_kb",
+        "description": "Busca en la Knowledge Base informacion relevante para responder la pregunta del usuario. Usar cuando el usuario pregunte por politicas, productos, precios o detalles especificos.",
+        "categoria": "kb",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Texto a buscar"},
+                "folder_id": {"type": "integer", "description": "Opcional: filtrar por carpeta"},
+                "top_k": {"type": "integer", "default": 3},
+            },
+            "required": ["query"],
+        }),
+        "handler": "kb_search",
+        "peligroso": False,
+    },
+    {
+        "name": "calendar_create_event",
+        "description": "Crea una reunion en Google Calendar. Usar cuando el cliente acepta agendar una llamada/demo/reunion.",
+        "categoria": "calendar",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "email": {"type": "string"},
+                "nombre": {"type": "string"},
+                "fecha_iso": {"type": "string", "description": "ISO 8601"},
+                "duracion_min": {"type": "integer", "default": 30},
+                "motivo": {"type": "string"},
+            },
+            "required": ["email", "fecha_iso"],
+        }),
+        "handler": "calendar_book",
+        "peligroso": False,
+    },
+    {
+        "name": "create_prospect",
+        "description": "Registra un nuevo prospect en el CRM con los datos capturados durante la conversacion.",
+        "categoria": "crm",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string"},
+                "email": {"type": "string"},
+                "telefono": {"type": "string"},
+                "empresa": {"type": "string"},
+                "interes": {"type": "string"},
+            },
+            "required": ["nombre"],
+        }),
+        "handler": "prospect_create",
+        "peligroso": False,
+    },
+    {
+        "name": "escalate_to_human",
+        "description": "Escala la conversacion a un humano. Usar cuando la consulta es muy compleja o el cliente lo pide explicitamente.",
+        "categoria": "utility",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "motivo": {"type": "string"},
+                "urgencia": {"type": "string", "enum": ["baja", "media", "alta"]},
+            },
+            "required": ["motivo"],
+        }),
+        "handler": "escalate",
+        "peligroso": False,
+    },
+    {
+        "name": "send_webhook",
+        "description": "Llama a un webhook externo (integraciones custom). Requiere URL pre-configurada.",
+        "categoria": "webhook",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "payload": {"type": "object"},
+            },
+            "required": ["url", "payload"],
+        }),
+        "handler": "webhook_send",
+        "peligroso": True,
+    },
+]
+
+
+def _descompose_mateo_prompt_to_blocks(system_prompt: str):
+    """Extrae los bloques identidad/instrucciones/info del prompt monolitico de Mateo.
+    Cada bloque se identifica por los headers conocidos. Si no se encuentra, se omite.
+    Retorna lista de (tipo, categoria, nombre, contenido, orden).
+    """
+    blocks = []
+    txt = system_prompt or ""
+    # Section markers del prompt actual
+    sections = [
+        ("PERSONALIDAD Y TONO", "personificacion", "identidad", "Personalidad y tono", 10),
+        ("TECNICAS DE VENTA QUE USAS", "instrucciones", "instrucciones", "Tecnicas de venta", 30),
+        ("TÉCNICAS DE VENTA QUE USAS", "instrucciones", "instrucciones", "Tecnicas de venta", 30),
+        ("CONOCIMIENTO DE MIP", "info_empresa", "info_clave", "Conocimiento de MIP", 40),
+        ("CALL TO ACTIONS PRECISOS", "pasos", "instrucciones", "Call to actions", 50),
+        ("DETECCION DE SENTIMIENTO Y RETENCION", "casos", "instrucciones", "Deteccion de sentimiento", 60),
+        ("DETECCIÓN DE SENTIMIENTO Y RETENCION", "casos", "instrucciones", "Deteccion de sentimiento", 60),
+        ("DETECCIÓN DE SENTIMIENTO Y RETENCIÓN", "casos", "instrucciones", "Deteccion de sentimiento", 60),
+        ("REGLAS ESTRICTAS", "formato", "identidad", "Reglas estrictas", 20),
+    ]
+    # Extract the intro (before first section header)
+    intro_end = len(txt)
+    for marker, _, _, _, _ in sections:
+        idx = txt.find(marker)
+        if idx >= 0:
+            intro_end = min(intro_end, idx)
+    intro = txt[:intro_end].strip()
+    if intro:
+        blocks.append(("personificacion", "identidad", "Personificacion", intro, 0))
+
+    # Parse each section
+    seen = set()
+    for marker, tipo, categoria, nombre, orden in sections:
+        if tipo in seen:
+            continue
+        idx = txt.find(marker)
+        if idx < 0:
+            continue
+        # Find next marker
+        start = idx
+        end = len(txt)
+        for m2, _, _, _, _ in sections:
+            if m2 == marker:
+                continue
+            i2 = txt.find(m2, start + len(marker))
+            if i2 > 0:
+                end = min(end, i2)
+        content = txt[start:end].strip()
+        if content:
+            blocks.append((tipo, categoria, nombre, content, orden))
+            seen.add(tipo)
+    return blocks
+
+
+def _seed_agent_builder(db):
+    """Crea tools default + Mateo como primer agente si no existen."""
+    # Seed tools
+    for t in DEFAULT_TOOLS:
+        existing = db.query(Tool).filter(Tool.name == t["name"]).first()
+        if not existing:
+            db.add(Tool(
+                name=t["name"], description=t["description"],
+                categoria=t["categoria"], schema_input=t["schema_input"],
+                handler=t.get("handler", ""), peligroso=t.get("peligroso", False),
+                activo=True,
+            ))
+    db.commit()
+
+    # Seed Mateo as first agent (solo si no existe)
+    existing_mateo = db.query(AgentConfig).filter(AgentConfig.agent_type == "mateo-sdr").first()
+    if existing_mateo:
+        return
+    # Carry over config from legacy MateoConfig if exists
+    legacy = db.query(MateoConfig).order_by(MateoConfig.id).first()
+    modelo = (legacy.modelo_ia if legacy else None) or "gemini-2.5-flash"
+    display_name = (legacy.nombre_bot if legacy else None) or "Mateo"
+    max_tokens = (legacy.max_tokens_respuesta if legacy else None) or 500
+    base_prompt = (legacy.system_prompt if legacy and legacy.system_prompt else MATEO_SYSTEM_PROMPT)
+
+    tools_allowed = ["search_kb", "create_prospect", "calendar_create_event", "escalate_to_human"]
+    agent = AgentConfig(
+        agent_type="mateo-sdr",
+        display_name=display_name,
+        descripcion="Asesor senior de importaciones MIP Quality & Logistics. Atiende leads entrantes, califica, cotiza y agenda reuniones.",
+        avatar="🤵",
+        modelo=modelo,
+        activo=True,
+        tools_allowed=json.dumps(tools_allowed),
+        max_tool_calls=6,
+        kb_folder_ids="[]",
+        stages=json.dumps(["lead_inicial", "calificando", "cotizando"]),
+        temperatura=0.7,
+        max_tokens=max_tokens,
+    )
+    db.add(agent)
+    db.commit()
+    db.refresh(agent)
+
+    # Descomponer prompt monolitico en bloques
+    decomposed = _descompose_mateo_prompt_to_blocks(base_prompt)
+    if not decomposed:
+        # Fallback: un solo bloque personificacion con todo
+        decomposed = [("personificacion", "identidad", "Personalidad base", base_prompt, 0)]
+
+    for tipo, categoria, nombre, contenido, orden in decomposed:
+        db.add(AgentBlock(
+            agent_id=agent.id,
+            tipo=tipo, categoria=categoria,
+            nombre=nombre, contenido=contenido,
+            orden=orden, activo=True,
+        ))
+
+    # Agregar bloques info_clave adicionales si hay info extra en legacy config
+    if legacy:
+        if legacy.reglas_negocio:
+            db.add(AgentBlock(
+                agent_id=agent.id, tipo="formato", categoria="identidad",
+                nombre="Reglas de negocio custom", contenido=legacy.reglas_negocio,
+                orden=25, activo=True,
+            ))
+        if legacy.flujo_conversacion:
+            db.add(AgentBlock(
+                agent_id=agent.id, tipo="pasos", categoria="instrucciones",
+                nombre="Flujo de conversacion", contenido=legacy.flujo_conversacion,
+                orden=45, activo=True,
+            ))
+        if legacy.precios_publicos:
+            db.add(AgentBlock(
+                agent_id=agent.id, tipo="info_precios", categoria="info_clave",
+                nombre="Precios publicos", contenido=legacy.precios_publicos,
+                orden=70, activo=True, es_reusable=True, block_key="precios_mip",
+            ))
+    db.commit()
+    print(f"[agent-builder] Seeded Mateo agent with {len(db.query(AgentBlock).filter(AgentBlock.agent_id==agent.id).all())} blocks")
+
+
+def _compose_agent_prompt(agent: "AgentConfig", db, extra_context: str = "") -> str:
+    """Compone el system prompt final concatenando bloques activos en orden.
+    Orden: identidad -> instrucciones -> info_clave -> contexto externo.
+    """
+    blocks = db.query(AgentBlock).filter(
+        AgentBlock.agent_id == agent.id,
+        AgentBlock.activo == True,
+    ).order_by(AgentBlock.categoria, AgentBlock.orden, AgentBlock.id).all()
+
+    # Group by categoria para ordenar categorias semanticamente
+    cat_order = {"identidad": 0, "instrucciones": 1, "info_clave": 2}
+    blocks.sort(key=lambda b: (cat_order.get(b.categoria, 99), b.orden, b.id))
+
+    parts = []
+    last_cat = None
+    for b in blocks:
+        if b.categoria != last_cat:
+            last_cat = b.categoria
+            # Category header for LLM readability
+            header_map = {
+                "identidad": "# IDENTIDAD",
+                "instrucciones": "# INSTRUCCIONES",
+                "info_clave": "# INFORMACION CLAVE",
+            }
+            parts.append("\n\n" + header_map.get(b.categoria, "# " + b.categoria.upper()))
+        parts.append(f"\n\n## {b.nombre}\n{b.contenido}")
+        # Render sub_steps if any
+        try:
+            subs = json.loads(b.sub_steps or "[]")
+            if subs:
+                for s in subs:
+                    line = f"\n- [{s.get('orden','')}] {s.get('texto','')}"
+                    if s.get("tool_assigned"):
+                        line += f"   (tool: `{s['tool_assigned']}`)"
+                    parts.append(line)
+        except Exception:
+            pass
+
+    # Append allowed tools hint
+    try:
+        allowed = json.loads(agent.tools_allowed or "[]")
+    except Exception:
+        allowed = []
+    if allowed:
+        tool_rows = db.query(Tool).filter(Tool.name.in_(allowed), Tool.activo == True).all()
+        if tool_rows:
+            parts.append("\n\n# TOOLS DISPONIBLES")
+            for t in tool_rows:
+                parts.append(f"\n- `{t.name}`: {t.description}")
+
+    if extra_context:
+        parts.append("\n\n# CONTEXTO DINAMICO\n" + extra_context)
+
+    return "".join(parts).strip()
+
+
+# ─── Endpoints: Agents CRUD ───
+@app.get("/api/agents")
+def list_agents(db: Session = Depends(get_db)):
+    agents = db.query(AgentConfig).order_by(AgentConfig.id).all()
+    return [{
+        "id": a.id, "agent_type": a.agent_type, "display_name": a.display_name,
+        "descripcion": a.descripcion or "", "avatar": a.avatar or "",
+        "modelo": a.modelo, "activo": a.activo,
+        "total_conversations": a.total_conversations or 0,
+        "total_tokens_in": a.total_tokens_in or 0,
+        "total_tokens_out": a.total_tokens_out or 0,
+        "total_cost_usd": a.total_cost_usd or 0,
+        "blocks_count": len(a.blocks) if a.blocks else 0,
+    } for a in agents]
+
+
+@app.post("/api/agents", response_model=AgentConfigOut)
+def create_agent(data: AgentConfigCreate, db: Session = Depends(get_db)):
+    existing = db.query(AgentConfig).filter(AgentConfig.agent_type == data.agent_type).first()
+    if existing:
+        raise HTTPException(400, f"Ya existe un agente con agent_type={data.agent_type}")
+    a = AgentConfig(**data.model_dump())
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return a
+
+
+@app.get("/api/agents/{id}")
+def get_agent(id: int, db: Session = Depends(get_db)):
+    a = db.query(AgentConfig).get(id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    blocks = db.query(AgentBlock).filter(AgentBlock.agent_id == id).order_by(AgentBlock.orden).all()
+    return {
+        "id": a.id, "agent_type": a.agent_type, "display_name": a.display_name,
+        "descripcion": a.descripcion or "", "avatar": a.avatar or "",
+        "modelo": a.modelo, "activo": a.activo,
+        "tools_allowed": a.tools_allowed, "max_tool_calls": a.max_tool_calls,
+        "kb_folder_ids": a.kb_folder_ids, "stages": a.stages,
+        "temperatura": a.temperatura, "max_tokens": a.max_tokens,
+        "total_conversations": a.total_conversations or 0,
+        "total_tokens_in": a.total_tokens_in or 0,
+        "total_tokens_out": a.total_tokens_out or 0,
+        "total_cost_usd": a.total_cost_usd or 0,
+        "blocks": [{
+            "id": b.id, "tipo": b.tipo, "categoria": b.categoria,
+            "nombre": b.nombre, "contenido": b.contenido,
+            "orden": b.orden, "activo": b.activo,
+            "sub_steps": b.sub_steps, "es_reusable": b.es_reusable,
+            "block_key": b.block_key,
+        } for b in blocks],
+    }
+
+
+@app.put("/api/agents/{id}")
+def update_agent(id: int, data: dict, db: Session = Depends(get_db)):
+    a = db.query(AgentConfig).get(id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    for k, v in data.items():
+        if hasattr(a, k) and k not in ("id", "created_at"):
+            setattr(a, k, v)
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "agent_type": a.agent_type, "updated": True}
+
+
+@app.delete("/api/agents/{id}")
+def delete_agent(id: int, db: Session = Depends(get_db)):
+    a = db.query(AgentConfig).get(id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    db.delete(a)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/agents/{id}/prompt-preview")
+def preview_agent_prompt(id: int, db: Session = Depends(get_db)):
+    """Preview del prompt compuesto que se enviara al LLM."""
+    a = db.query(AgentConfig).get(id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    prompt = _compose_agent_prompt(a, db)
+    return {"agent_id": a.id, "prompt": prompt, "length_chars": len(prompt), "approx_tokens": len(prompt) // 4}
+
+
+# ─── Endpoints: Blocks CRUD ───
+@app.post("/api/agents/{agent_id}/blocks")
+def create_block(agent_id: int, data: dict, db: Session = Depends(get_db)):
+    a = db.query(AgentConfig).get(agent_id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    b = AgentBlock(
+        agent_id=agent_id,
+        tipo=data.get("tipo", "personificacion"),
+        categoria=data.get("categoria", "identidad"),
+        nombre=data.get("nombre", "Sin nombre"),
+        contenido=data.get("contenido", ""),
+        orden=data.get("orden", 0),
+        activo=data.get("activo", True),
+        sub_steps=data.get("sub_steps", "[]"),
+        es_reusable=data.get("es_reusable", False),
+        block_key=data.get("block_key"),
+    )
+    db.add(b)
+    db.commit()
+    db.refresh(b)
+    return {"id": b.id, "agent_id": b.agent_id}
+
+
+@app.put("/api/blocks/{id}")
+def update_block(id: int, data: dict, db: Session = Depends(get_db)):
+    b = db.query(AgentBlock).get(id)
+    if not b:
+        raise HTTPException(404, "Block no encontrado")
+    for k, v in data.items():
+        if hasattr(b, k) and k not in ("id", "agent_id", "created_at"):
+            setattr(b, k, v)
+    db.commit()
+    db.refresh(b)
+    return {"id": b.id, "updated": True}
+
+
+@app.delete("/api/blocks/{id}")
+def delete_block(id: int, db: Session = Depends(get_db)):
+    b = db.query(AgentBlock).get(id)
+    if not b:
+        raise HTTPException(404, "Block no encontrado")
+    db.delete(b)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.post("/api/blocks/reorder")
+def reorder_blocks(data: dict, db: Session = Depends(get_db)):
+    """Recibe {block_ids: [1,5,3,2,...]} y ajusta orden en bulk."""
+    ids = data.get("block_ids", [])
+    for i, bid in enumerate(ids):
+        b = db.query(AgentBlock).get(bid)
+        if b:
+            b.orden = i
+    db.commit()
+    return {"reordered": len(ids)}
+
+
+# ─── Endpoints: Tools registry ───
+@app.get("/api/agent-tools")
+def list_tools(db: Session = Depends(get_db)):
+    tools = db.query(Tool).order_by(Tool.categoria, Tool.name).all()
+    return [{
+        "id": t.id, "name": t.name, "description": t.description,
+        "categoria": t.categoria, "schema_input": t.schema_input,
+        "activo": t.activo, "peligroso": t.peligroso, "handler": t.handler,
+    } for t in tools]
+
+
+@app.post("/api/agent-tools")
+def create_tool(data: dict, db: Session = Depends(get_db)):
+    t = Tool(
+        name=data["name"],
+        description=data.get("description", ""),
+        categoria=data.get("categoria", "utility"),
+        schema_input=data.get("schema_input", "{}"),
+        activo=data.get("activo", True),
+        peligroso=data.get("peligroso", False),
+        handler=data.get("handler", ""),
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "name": t.name}
+
+
+# ─── Endpoints: Knowledge Base ───
+@app.get("/api/kb/folders")
+def list_kb_folders(db: Session = Depends(get_db)):
+    folders = db.query(KnowledgeFolder).order_by(KnowledgeFolder.nombre).all()
+    return [{
+        "id": f.id, "nombre": f.nombre, "descripcion": f.descripcion or "",
+        "color": f.color, "docs_count": len(f.docs) if f.docs else 0,
+    } for f in folders]
+
+
+@app.post("/api/kb/folders")
+def create_kb_folder(data: dict, db: Session = Depends(get_db)):
+    f = KnowledgeFolder(
+        nombre=data["nombre"],
+        descripcion=data.get("descripcion", ""),
+        color=data.get("color", "#0A6FE0"),
+    )
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    return {"id": f.id, "nombre": f.nombre}
+
+
+@app.post("/api/kb/docs")
+def create_kb_doc(data: dict, db: Session = Depends(get_db)):
+    """Crea un doc y lo chunking + genera embeddings via Gemini."""
+    d = KnowledgeDoc(
+        folder_id=data["folder_id"],
+        nombre=data["nombre"],
+        contenido=data["contenido"],
+        tokens_totales=len(data["contenido"]) // 4,
+    )
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+
+    # Simple chunking (by paragraphs, max 500 chars)
+    chunks = []
+    buf = []
+    cur_len = 0
+    for para in d.contenido.split("\n\n"):
+        para = para.strip()
+        if not para:
+            continue
+        if cur_len + len(para) > 500 and buf:
+            chunks.append("\n\n".join(buf))
+            buf = [para]
+            cur_len = len(para)
+        else:
+            buf.append(para)
+            cur_len += len(para)
+    if buf:
+        chunks.append("\n\n".join(buf))
+
+    # Generate embeddings via Gemini
+    for idx, chunk in enumerate(chunks):
+        emb = _gemini_embed(chunk)
+        db.add(KnowledgeChunk(
+            doc_id=d.id,
+            contenido=chunk,
+            embedding=json.dumps(emb) if emb else None,
+            dim=len(emb) if emb else 0,
+            orden=idx,
+            tokens=len(chunk) // 4,
+        ))
+    db.commit()
+    return {"id": d.id, "chunks_created": len(chunks)}
+
+
+@app.get("/api/kb/folders/{id}/docs")
+def list_kb_docs(id: int, db: Session = Depends(get_db)):
+    docs = db.query(KnowledgeDoc).filter(KnowledgeDoc.folder_id == id).all()
+    return [{
+        "id": d.id, "nombre": d.nombre,
+        "tokens_totales": d.tokens_totales,
+        "chunks_count": len(d.chunks) if d.chunks else 0,
+    } for d in docs]
+
+
+def _gemini_embed(text: str):
+    """Genera embedding via Gemini text-embedding-004 (768d)."""
+    if not GEMINI_API_KEY or not text:
+        return None
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=text,
+            task_type="retrieval_document",
+        )
+        return result.get("embedding") or result.get("embeddings")
+    except Exception as e:
+        print(f"[embed] error: {e}")
+        return None
+
+
+def _cosine_sim(a, b):
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x*y for x, y in zip(a, b))
+    na = sum(x*x for x in a) ** 0.5
+    nb = sum(x*x for x in b) ** 0.5
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)
+
+
+def _kb_search(query: str, folder_ids: list, top_k: int, db) -> list:
+    """Busca chunks relevantes via cosine similarity. Fallback: LIKE."""
+    q_emb = _gemini_embed(query)
+    q = db.query(KnowledgeChunk).join(KnowledgeDoc)
+    if folder_ids:
+        q = q.filter(KnowledgeDoc.folder_id.in_(folder_ids))
+    if q_emb:
+        chunks = q.all()
+        scored = []
+        for c in chunks:
+            try:
+                emb = json.loads(c.embedding) if c.embedding else None
+                score = _cosine_sim(q_emb, emb) if emb else 0
+                scored.append((score, c))
+            except Exception:
+                continue
+        scored.sort(key=lambda x: -x[0])
+        top = scored[:top_k]
+        return [{"score": round(s, 3), "contenido": c.contenido, "doc_id": c.doc_id} for s, c in top]
+    # Fallback LIKE search
+    chunks = q.filter(KnowledgeChunk.contenido.ilike(f"%{query}%")).limit(top_k).all()
+    return [{"score": 0.5, "contenido": c.contenido, "doc_id": c.doc_id} for c in chunks]
+
+
+# ─── Endpoints: Agent chat runtime ───
+@app.post("/api/agents/{id}/chat")
+def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
+    """Chat runtime usando el agente con su prompt compuesto."""
+    import uuid as _uuid
+    import time as _time
+    a = db.query(AgentConfig).get(id)
+    if not a or not a.activo:
+        raise HTTPException(404, "Agente no encontrado o inactivo")
+    message = data.get("message", "").strip()
+    history = data.get("history", [])
+    session_id = data.get("session_id") or str(_uuid.uuid4())
+    extra_context = data.get("context", "")
+
+    if not message:
+        raise HTTPException(400, "Mensaje vacio")
+
+    # RAG: buscar en KB si hay folders configurados
+    try:
+        folder_ids = json.loads(a.kb_folder_ids or "[]")
+    except Exception:
+        folder_ids = []
+    if folder_ids:
+        kb_results = _kb_search(message, folder_ids, 3, db)
+        if kb_results:
+            extra_context += "\n\n[RESULTADOS KB]:\n" + "\n---\n".join(
+                [f"({r['score']}) {r['contenido']}" for r in kb_results]
+            )
+
+    system = _compose_agent_prompt(a, db, extra_context)
+
+    messages = []
+    for h in history[-10:]:
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+    messages.append({"role": "user", "content": message})
+
+    t0 = _time.time()
+    reply_text = None
+    provider_used = "fallback"
+    tokens_in = 0
+    tokens_out = 0
+    error_msg = None
+
+    # Model routing
+    use_gemini = a.modelo.startswith("gemini") if a.modelo else True
+
+    if use_gemini and GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(a.modelo or "gemini-2.5-flash", system_instruction=system)
+            gemini_history = []
+            for m in messages[:-1]:
+                gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+            chat = model.start_chat(history=gemini_history)
+            response = chat.send_message(message)
+            reply_text = response.text
+            provider_used = "gemini"
+            if hasattr(response, "usage_metadata") and response.usage_metadata:
+                tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+                tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+            else:
+                tokens_in = len(system + message) // 4
+                tokens_out = len(reply_text) // 4
+        except Exception as e:
+            error_msg = str(e)
+            print(f"[agent-chat gemini] error: {e}")
+
+    if not reply_text and ANTHROPIC_API_KEY:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            response = client.messages.create(
+                model=(a.modelo if a.modelo.startswith("claude") else "claude-sonnet-4-20250514"),
+                max_tokens=a.max_tokens or 800,
+                system=system,
+                messages=messages,
+            )
+            reply_text = response.content[0].text
+            provider_used = "claude"
+            if hasattr(response, "usage"):
+                tokens_in = response.usage.input_tokens or 0
+                tokens_out = response.usage.output_tokens or 0
+        except Exception as e:
+            error_msg = str(e)
+            print(f"[agent-chat claude] error: {e}")
+
+    if not reply_text:
+        reply_text = f"Hola, soy {a.display_name}. Ahora no puedo procesar tu mensaje. Escribenos a contacto@mipquality.com."
+        provider_used = "fallback"
+
+    latency_ms = int((_time.time() - t0) * 1000)
+    # Cost estimation (Gemini Flash default rates)
+    cost = (tokens_in * 0.075 / 1_000_000) + (tokens_out * 0.30 / 1_000_000)
+
+    # Save trace
+    trace = AgentTrace(
+        session_id=session_id,
+        agent_id=a.id,
+        prompt_tokens=tokens_in,
+        output_tokens=tokens_out,
+        cost_usd=cost,
+        latency_ms=latency_ms,
+        tool_calls="[]",
+        input_summary=message[:200],
+        output_summary=reply_text[:200] if reply_text else "",
+        error=error_msg,
+        provider=provider_used,
+    )
+    db.add(trace)
+
+    # Aggregate on agent
+    a.total_conversations = (a.total_conversations or 0) + 1
+    a.total_tokens_in = (a.total_tokens_in or 0) + tokens_in
+    a.total_tokens_out = (a.total_tokens_out or 0) + tokens_out
+    a.total_cost_usd = (a.total_cost_usd or 0) + cost
+    db.commit()
+
+    return {
+        "reply": reply_text,
+        "provider": provider_used,
+        "session_id": session_id,
+        "trace_id": trace.id,
+        "tokens": {"input": tokens_in, "output": tokens_out},
+        "cost_usd": round(cost, 6),
+        "latency_ms": latency_ms,
+    }
+
+
+@app.get("/api/agents/{id}/traces")
+def list_agent_traces(id: int, limit: int = 50, db: Session = Depends(get_db)):
+    traces = db.query(AgentTrace).filter(AgentTrace.agent_id == id).order_by(AgentTrace.created_at.desc()).limit(limit).all()
+    return [{
+        "id": t.id, "session_id": t.session_id,
+        "prompt_tokens": t.prompt_tokens, "output_tokens": t.output_tokens,
+        "cost_usd": t.cost_usd, "latency_ms": t.latency_ms,
+        "provider": t.provider, "error": t.error,
+        "input_summary": t.input_summary, "output_summary": t.output_summary,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    } for t in traces]
 
 
 # ═══ FASE 1: EXPORT/IMPORT EXCEL DE CLIENTES ═══
