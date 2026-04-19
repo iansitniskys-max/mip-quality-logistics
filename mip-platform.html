@@ -1490,7 +1490,6 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group"><label class="form-label">Condiciones de pago</label><select class="form-input" id="np-condiciones-pago"><option value="">Seleccionar...</option><option>50/50 (50% anticipo, 50% pre-embarque)</option><option>30/70 (30% anticipo, 70% pre-embarque)</option><option>100% anticipo</option><option>LC (Carta de crédito)</option><option>A convenir</option></select></div>
           </div>
           <div class="form-group"><label class="form-label">Financiamiento</label><select class="form-input" id="np-financiamiento"><option value="">Sin financiamiento</option><option>MIP financia anticipo</option><option>MIP financia 100%</option><option>Financiamiento parcial</option><option>Leasing / Arriendo</option><option>A convenir</option></select></div>
-          </div>
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-truck" style="margin-right:4px"></i> PEDIDO (opcional)</div>
           <div class="switch-wrap" style="margin-bottom:12px"><div class="switch" id="sw-crear-pedido" onclick="toggleSw('sw-crear-pedido','np-pedido-fields')"></div><span style="font-size:13px;color:var(--text-secondary)">Crear pedido asociado</span></div>
           <div id="np-pedido-fields" style="display:none">
@@ -2010,13 +2009,28 @@ html,body{overflow-x:hidden;max-width:100vw}
 
     <!-- Modal Nuevo Proyecto -->
     <div class="modal-bg" id="proyectoModal">
-      <div class="modal-box" style="max-width:500px">
-        <h3 style="font-size:16px;font-weight:600;margin-bottom:16px"><i class="fas fa-tasks" style="margin-right:6px"></i> Nuevo Proyecto</h3>
-        <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="proy-nombre" placeholder="Importación gorras personalizadas" required></div>
-        <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="proy-desc" style="min-height:70px"></textarea></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Fecha inicio</label><input type="date" class="form-input" id="proy-inicio"></div><div class="form-group"><label class="form-label">Fecha fin</label><input type="date" class="form-input" id="proy-fin"></div></div>
-        <div class="form-group"><label class="form-label">Cotización asociada (opcional)</label><select class="form-input" id="proy-cotizacion"><option value="">Ninguna</option></select></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('proyectoModal').classList.remove('open')">Cancelar</button><button class="btn btn-dark btn-sm" onclick="saveProyecto()"><i class="fas fa-save"></i> Crear proyecto</button></div>
+      <div class="modal-box" style="max-width:520px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <h3 style="font-size:16px;font-weight:600;margin:0"><i class="fas fa-tasks" style="margin-right:6px;color:var(--info)"></i> Nuevo Proyecto</h3>
+          <button type="button" aria-label="Cerrar" onclick="document.getElementById('proyectoModal').classList.remove('open')" style="background:none;border:none;font-size:18px;color:var(--text-muted);cursor:pointer;padding:4px 8px">&times;</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 18px">Crea un proyecto standalone o vincúlalo a una cotización existente.</p>
+        <form onsubmit="event.preventDefault(); saveProyecto();">
+          <div class="form-group"><label class="form-label">Nombre del proyecto *</label><input type="text" class="form-input" id="proy-nombre" placeholder="Importación gorras personalizadas" required autofocus></div>
+          <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="proy-desc" style="min-height:72px;resize:vertical" placeholder="Detalles generales del proyecto..."></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Fecha inicio</label><input type="date" class="form-input" id="proy-inicio"></div>
+            <div class="form-group"><label class="form-label">Fecha fin estimada</label><input type="date" class="form-input" id="proy-fin"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex:2"><label class="form-label">Cotización asociada</label><select class="form-input" id="proy-cotizacion"><option value="">Ninguna (proyecto standalone)</option></select></div>
+            <div class="form-group" style="flex:1;max-width:120px"><label class="form-label">Color</label><input type="color" class="form-input" id="proy-color" value="#1d6fa5" style="height:38px;padding:4px;cursor:pointer"></div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('proyectoModal').classList.remove('open')">Cancelar</button>
+            <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Crear proyecto</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -3921,28 +3935,41 @@ async function loadProyectos() {
   } catch (err) { console.error('Proyectos error:', err); }
 }
 
-function openProyectoModal() {
+async function openProyectoModal() {
   ['proy-nombre','proy-desc','proy-inicio','proy-fin'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  document.getElementById('proy-cotizacion').value = '';
+  const sel = document.getElementById('proy-cotizacion');
+  if (sel) sel.value = '';
+  const color = document.getElementById('proy-color');
+  if (color) color.value = '#1d6fa5';
+  // Populate cotizaciones dropdown
+  try {
+    const cots = await api('/api/cotizaciones');
+    if (sel && cots.length) {
+      sel.innerHTML = '<option value="">Ninguna (proyecto standalone)</option>' +
+        cots.map(c => `<option value="${c.id}">#SOL-${String(c.id).padStart(3,'0')} — ${(c.producto || 'Sin producto').substring(0,40)}</option>`).join('');
+    }
+  } catch {}
   document.getElementById('proyectoModal').classList.add('open');
 }
 
 async function saveProyecto() {
-  const $ = id => document.getElementById(id).value;
+  const getVal = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  const nombre = getVal('proy-nombre').trim();
+  if (!nombre) { toast('error', 'Error', 'Nombre requerido'); return; }
   const data = {
-    nombre: $('proy-nombre'),
-    descripcion: $('proy-desc'),
-    fecha_inicio: $('proy-inicio') || null,
-    fecha_fin: $('proy-fin') || null,
-    cotizacion_id: $('proy-cotizacion') ? parseInt($('proy-cotizacion')) : null,
+    nombre,
+    descripcion: getVal('proy-desc') || '',
+    fecha_inicio: getVal('proy-inicio') || null,
+    fecha_fin: getVal('proy-fin') || null,
+    cotizacion_id: getVal('proy-cotizacion') ? parseInt(getVal('proy-cotizacion')) : null,
+    color: getVal('proy-color') || '#1d6fa5',
   };
-  if (!data.nombre) { toast('error', 'Error', 'Nombre requerido'); return; }
   try {
     await api('/api/proyectos', { method: 'POST', body: JSON.stringify(data) });
     document.getElementById('proyectoModal').classList.remove('open');
-    toast('success', 'Proyecto creado', '');
-    loadProyectos();
-  } catch (err) { toast('error', 'Error', err.message); }
+    toast('success', 'Proyecto creado', 'Se creó exitosamente');
+    if (typeof loadProyectos === 'function') loadProyectos();
+  } catch (err) { toast('error', 'Error al crear proyecto', err.message || 'Intenta nuevamente'); }
 }
 
 async function openProyectoDetalle(id) {

@@ -599,10 +599,18 @@ def update_cotizacion(id: int, data: CotizacionUpdate, db: Session = Depends(get
     c = db.query(Cotizacion).get(id)
     if not c:
         raise HTTPException(404, "Cotización no encontrada")
-    for k, v in data.model_dump(exclude_unset=True).items():
+    estado_anterior = c.estado
+    payload = data.model_dump(exclude_unset=True)
+    for k, v in payload.items():
         setattr(c, k, v)
     db.commit()
     db.refresh(c)
+    # Auto-trigger email automation si cambio el estado
+    try:
+        if "estado" in payload and payload["estado"] != estado_anterior:
+            _trigger_email_automation(c.estado, c, db)
+    except Exception as e:
+        print(f"[email-automation] error en update_cotizacion: {e}")
     return c
 
 
@@ -1447,6 +1455,145 @@ def eliminar_actividad(id: int, db: Session = Depends(get_db)):
 
 
 # ═══ FASE 4: PIPELINE DRAG & DROP (cambio de estado rápido) ═══
+# ═══════════════════════════════════════════════════
+# EMAIL AUTOMATION — trigger + render + scheduler
+# ═══════════════════════════════════════════════════
+def _render_email_template(tpl: str, cot: Cotizacion, cliente: Optional[Cliente]) -> str:
+    """Substitute {{variables}} with real cotizacion/cliente data."""
+    if not tpl:
+        return ""
+    vars_map = {
+        "cliente": (cliente.nombre if cliente else "") or "",
+        "cliente_nombre": (cliente.nombre if cliente else "") or "",
+        "cliente_email": (cliente.email if cliente else "") or "",
+        "empresa": (cliente.empresa if cliente else "") or "",
+        "producto": cot.producto or "",
+        "cantidad": cot.cantidad or "",
+        "precio": cot.precio_objetivo or "",
+        "numero_cotizacion": f"SOL-{cot.id:04d}",
+        "numero_solicitud": f"SOL-{cot.id:04d}",
+        "estado": cot.estado or "",
+        "plazo": cot.plazo or "",
+        "uso_final": cot.uso_final or "",
+        "fecha": datetime.now().strftime("%d-%m-%Y"),
+    }
+    out = tpl
+    for k, v in vars_map.items():
+        out = out.replace("{{" + k + "}}", str(v)).replace("{{ " + k + " }}", str(v))
+    return out
+
+
+def _trigger_email_automation(nueva_etapa: str, cot: Cotizacion, db: Session):
+    """Look for active EmailSequences matching nueva_etapa and enqueue EmailLogs."""
+    if not cot or not cot.cliente_id:
+        return
+    cliente = db.query(Cliente).get(cot.cliente_id)
+    if not cliente or not cliente.email:
+        return
+    sequences = db.query(EmailSequence).filter(
+        EmailSequence.etapa_trigger == nueva_etapa,
+        EmailSequence.activo == "true",
+    ).all()
+    created = 0
+    for seq in sequences:
+        # Skip if already queued/sent for this cot+sequence to avoid duplicates on repeated stage changes
+        existing = db.query(EmailLog).filter(
+            EmailLog.cotizacion_id == cot.id,
+            EmailLog.sequence_id == seq.id,
+            EmailLog.estado.in_(["pendiente", "enviado"]),
+        ).first()
+        if existing:
+            continue
+        asunto = _render_email_template(seq.asunto_template or "", cot, cliente)
+        cuerpo = _render_email_template(seq.cuerpo_template or "", cot, cliente)
+        programado = datetime.now() + timedelta(hours=int(seq.delay_horas or 0))
+        log = EmailLog(
+            cotizacion_id=cot.id,
+            sequence_id=seq.id,
+            destinatario=cliente.email,
+            asunto=asunto,
+            cuerpo=cuerpo,
+            estado="pendiente",
+            programado_para=programado,
+        )
+        db.add(log)
+        created += 1
+    if created:
+        db.commit()
+    return created
+
+
+def _send_email_log_now(log: EmailLog) -> bool:
+    """Physically send via SMTP. Returns True on success."""
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+        SMTP_USER = os.getenv("SMTP_USER", "")
+        SMTP_PASS = os.getenv("SMTP_PASS", "")
+        if not (SMTP_USER and SMTP_PASS):
+            log.estado = "error"
+            log.error_msg = "SMTP no configurado (SMTP_USER/SMTP_PASS vacíos)"
+            return False
+        msg = MIMEText(log.cuerpo or "", "plain", "utf-8")
+        msg["Subject"] = log.asunto or "MIP Quality & Logistics"
+        msg["From"] = SMTP_USER
+        msg["To"] = log.destinatario
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+            s.starttls()
+            s.login(SMTP_USER, SMTP_PASS)
+            s.sendmail(SMTP_USER, [log.destinatario], msg.as_string())
+        log.estado = "enviado"
+        log.enviado_at = datetime.now()
+        log.error_msg = None
+        return True
+    except Exception as e:
+        log.estado = "error"
+        log.error_msg = str(e)[:500]
+        return False
+
+
+@app.post("/api/email-scheduler/run")
+def run_email_scheduler(limit: int = 50, db: Session = Depends(get_db)):
+    """Procesa emails pendientes cuyo programado_para <= now. Idempotente.
+    Pensado para ser invocado por Cloud Scheduler cada 5 minutos."""
+    now = datetime.now()
+    pendientes = db.query(EmailLog).filter(
+        EmailLog.estado == "pendiente",
+        (EmailLog.programado_para == None) | (EmailLog.programado_para <= now),
+    ).order_by(EmailLog.programado_para.asc().nullsfirst() if hasattr(EmailLog.programado_para, 'asc') else EmailLog.id).limit(limit).all()
+    enviados = 0
+    errores = 0
+    for log in pendientes:
+        ok = _send_email_log_now(log)
+        if ok:
+            enviados += 1
+        else:
+            errores += 1
+        db.commit()
+    return {
+        "procesados": len(pendientes),
+        "enviados": enviados,
+        "errores": errores,
+        "pendientes_restantes": db.query(EmailLog).filter(EmailLog.estado == "pendiente").count(),
+    }
+
+
+@app.post("/api/email-automation/trigger-manual")
+def trigger_automation_manual(data: dict, db: Session = Depends(get_db)):
+    """Util de prueba: disparar automation para una cotizacion en una etapa especifica."""
+    cot_id = data.get("cotizacion_id")
+    etapa = data.get("etapa")
+    if not cot_id or not etapa:
+        raise HTTPException(400, "Requiere cotizacion_id y etapa")
+    cot = db.query(Cotizacion).get(cot_id)
+    if not cot:
+        raise HTTPException(404, "Cotización no encontrada")
+    created = _trigger_email_automation(etapa, cot, db)
+    return {"logs_creados": created or 0, "etapa": etapa, "cotizacion_id": cot_id}
+
+
 @app.put("/api/cotizaciones/{id}/estado")
 def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)):
     """Quick state change for pipeline drag & drop"""
@@ -1474,7 +1621,18 @@ def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)
     )
     db.add(act)
     db.commit()
-    return {"id": cot.id, "estado": nuevo_estado, "estado_anterior": estado_anterior}
+    # AUTO-TRIGGER EMAIL AUTOMATION para la nueva etapa
+    try:
+        logs_created = _trigger_email_automation(nuevo_estado, cot, db)
+    except Exception as e:
+        print(f"[email-automation] error trigger: {e}")
+        logs_created = 0
+    return {
+        "id": cot.id,
+        "estado": nuevo_estado,
+        "estado_anterior": estado_anterior,
+        "emails_programados": logs_created or 0,
+    }
 
 
 # ═══════════════════════════════════════════════════
@@ -1684,7 +1842,27 @@ def listar_email_logs(estado: Optional[str] = None, limit: int = 100, db: Sessio
     q = db.query(EmailLog)
     if estado:
         q = q.filter(EmailLog.estado == estado)
-    return q.order_by(EmailLog.created_at.desc()).limit(limit).all()
+    logs = q.order_by(EmailLog.created_at.desc()).limit(limit).all()
+    # Enrich with sequence and cotizacion names
+    seq_ids = list({l.sequence_id for l in logs if l.sequence_id})
+    cot_ids = list({l.cotizacion_id for l in logs if l.cotizacion_id})
+    seqs = {s.id: s for s in db.query(EmailSequence).filter(EmailSequence.id.in_(seq_ids)).all()} if seq_ids else {}
+    cots = {c.id: c for c in db.query(Cotizacion).filter(Cotizacion.id.in_(cot_ids)).all()} if cot_ids else {}
+    return [{
+        "id": l.id,
+        "cotizacion_id": l.cotizacion_id,
+        "cotizacion_producto": cots.get(l.cotizacion_id).producto if cots.get(l.cotizacion_id) else None,
+        "sequence_id": l.sequence_id,
+        "sequence_nombre": seqs.get(l.sequence_id).nombre if seqs.get(l.sequence_id) else None,
+        "destinatario": l.destinatario,
+        "asunto": l.asunto,
+        "cuerpo": l.cuerpo,
+        "estado": l.estado,
+        "programado_para": l.programado_para.isoformat() if l.programado_para else None,
+        "enviado_at": l.enviado_at.isoformat() if l.enviado_at else None,
+        "error_msg": l.error_msg,
+        "created_at": l.created_at.isoformat() if l.created_at else None,
+    } for l in logs]
 
 
 @app.post("/api/email-logs/{id}/enviar")
