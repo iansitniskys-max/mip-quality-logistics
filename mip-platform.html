@@ -2562,6 +2562,25 @@ function toggleProductCard(n) {
 document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('productCards')?.children.length === 0) addProduct(); });
 setTimeout(() => { if (document.getElementById('productCards')?.children.length === 0) addProduct(); }, 100);
 
+// ═══════════════════════════════════════════════════
+// Modal relocator: mueve todos los .modal-bg al body root
+// para que no queden atrapados dentro de .page-section
+// con display:none cuando el usuario cambia de pagina.
+// Fix del bug: "boton Nuevo ticket no funciona" cuando
+// el admin estaba en #page-admin pero #feedbackModal vivia
+// dentro de #page-client que tenia display:none.
+// ═══════════════════════════════════════════════════
+function _relocateModalsToBody() {
+  document.querySelectorAll('.modal-bg').forEach(m => {
+    if (m.parentElement && m.parentElement !== document.body) {
+      document.body.appendChild(m);
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', _relocateModalsToBody);
+// Tambien al cargar tardio (por si algun modal se agrega dinamicamente)
+setTimeout(_relocateModalsToBody, 500);
+
 async function doQuote(e) {
   e.preventDefault();
   if (!currentUser) { toast('error', 'Error', 'Debes iniciar sesión'); return; }
