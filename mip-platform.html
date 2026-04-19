@@ -364,9 +364,10 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
 .budget-top .b-nums{color:var(--text-muted)}
 .budget-bar{height:5px;background:var(--bg-surface);border-radius:3px;overflow:hidden}
 .budget-fill{height:100%;border-radius:3px}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:300;display:none;align-items:center;justify-content:center}
+.modal-bg{position:fixed;inset:0;background:rgba(15,15,20,0.55);backdrop-filter:blur(3px);z-index:1000;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto}
 .modal-bg.open{display:flex}
-.modal-box{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:500px;box-shadow:var(--shadow-lg);animation:scaleIn .25s ease}
+.modal-box{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,0.25);animation:scaleIn .25s ease;margin:auto;position:relative}
+@media(max-width:768px){.modal-bg{padding:16px 10px}.modal-box{padding:20px 16px}}
 
 .faq-item{border-bottom:1px solid var(--border);padding:12px 0;cursor:pointer}
 .faq-q{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px}
@@ -2623,20 +2624,25 @@ async function downloadBulkCSV() {
 
 // ─── Admin ───
 function aView(id) {
-  ['a-req', 'a-ops', 'a-acc', 'a-clients', 'a-reports', 'a-config', 'a-integrations', 'a-editor', 'a-history', 'a-tickets'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-config','a-integrations','a-editor','a-history','a-tickets'];
+  ALL_VIEWS.forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
   const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
-  const t = { 'a-req': 'Solicitudes entrantes', 'a-ops': 'Gestión Operacional', 'a-acc': 'Contabilidad & Gastos', 'a-clients': 'Maestra de Clientes', 'a-reports': 'Reportes & Análisis', 'a-config': 'Configuración', 'a-integrations': 'Integraciones', 'a-editor': 'Editor Web', 'a-history': 'Historial del Sistema', 'a-tickets': 'Tickets de Soporte' };
+  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-config':'Configuración','a-integrations':'Integraciones','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte' };
   document.getElementById('aTitle').textContent = t[id] || 'Admin';
   const links = document.querySelectorAll('#page-admin .sb-link');
   links.forEach(l => l.classList.remove('active'));
-  const idx = { 'a-req': 0, 'a-ops': 1, 'a-acc': 2, 'a-clients': 3, 'a-reports': 4, 'a-config': 5, 'a-integrations': 6, 'a-editor': 7, 'a-history': 8 };
-  if (links[idx[id]]) links[idx[id]].classList.add('active');
+  // Highlight by matching onclick attribute (robust to added/removed items)
+  links.forEach(l => { const oc = l.getAttribute('onclick') || ''; if (oc.includes("'"+id+"'")) l.classList.add('active'); });
   if (id === 'a-acc') { loadContabilidad(); loadContabilidadDynamic(); }
   if (id === 'a-clients') loadAdminClients();
-  if (id === 'a-config') loadAdminUsers();
+  if (id === 'a-config') { loadAdminUsers(); if (typeof loadFeatures === 'function') loadFeatures(); }
   if (id === 'a-reports') { loadAdminReports(); loadAdminReportsKPIs(); }
   if (id === 'a-history') loadAdminHistory();
   if (id === 'a-tickets') loadAdminTickets();
+  if (id === 'a-proveedores' && typeof loadProveedores === 'function') loadProveedores();
+  if (id === 'a-prospects' && typeof loadProspects === 'function') loadProspects();
+  if (id === 'a-proyectos' && typeof loadProyectos === 'function') loadProyectos();
+  if (id === 'a-emails' && typeof loadEmailSequences === 'function') loadEmailSequences();
 }
 
 // ─── View Toggle: Pipeline / Table ───
@@ -4104,19 +4110,8 @@ async function generarPDF(cotId) {
 }
 
 // ═══════════════════════════════════════════════════
-// Enchufar aView con nuevos modulos
+// aView ahora maneja nativamente los nuevos modulos (ver funcion aView arriba)
 // ═══════════════════════════════════════════════════
-const _origAView = typeof aView === 'function' ? aView : null;
-if (_origAView) {
-  window.aView = function(id) {
-    _origAView(id);
-    if (id === 'a-proveedores') loadProveedores();
-    if (id === 'a-prospects') loadProspects();
-    if (id === 'a-proyectos') loadProyectos();
-    if (id === 'a-emails') loadEmailSequences();
-    if (id === 'a-config') loadFeatures();
-  };
-}
 
 // ─── Chatbot Mateo ───
 let chatHistory = [];
