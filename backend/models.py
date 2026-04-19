@@ -124,12 +124,46 @@ class MovimientoContable(Base):
     tipo = Column(String(20), nullable=False)  # gasto, ingreso
     categoria = Column(String(100))
     descripcion = Column(String(300))
-    monto = Column(Float, nullable=False)
+    monto = Column(Float, nullable=False)  # monto en CLP
+    moneda = Column(String(3), default="CLP")
     fecha = Column(DateTime, nullable=False)
     estado = Column(String(20), default="pendiente")  # pagado, pendiente
     pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=True)
     comprobante_url = Column(String(500))
+    # Split Wise — quien pago y como se reparte (la empresa es la deudora)
+    pagado_por_socio_id = Column(Integer, ForeignKey("socios.id"), nullable=True)
+    medio_pago = Column(String(50))  # transferencia, tarjeta, efectivo, otro
+    notas = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+    splits = relationship("GastoSplit", cascade="all, delete-orphan", back_populates="movimiento")
+    pagado_por = relationship("Socio", foreign_keys=[pagado_por_socio_id])
+
+
+class Socio(Base):
+    __tablename__ = "socios"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False)
+    email = Column(String(200))
+    porcentaje_equity = Column(Float, default=0)  # % de participacion en la empresa
+    activo = Column(Boolean, default=True)
+    color = Column(String(7), default="#e8af43")  # hex para UI
+    notas = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class GastoSplit(Base):
+    """
+    Detalla cuanto le toca asumir a cada socio de un gasto.
+    Si 3 socios y split igual: cada uno asume monto/3.
+    La empresa le debe al socio que pago: (monto_total - su parte).
+    """
+    __tablename__ = "gastos_splits"
+    id = Column(Integer, primary_key=True, index=True)
+    movimiento_id = Column(Integer, ForeignKey("movimientos_contables.id"), nullable=False)
+    socio_id = Column(Integer, ForeignKey("socios.id"), nullable=False)
+    monto_asumido = Column(Float, default=0)  # lo que este socio asume
+    movimiento = relationship("MovimientoContable", back_populates="splits")
+    socio = relationship("Socio")
 
 
 class HistorialEvento(Base):
@@ -361,4 +395,75 @@ class CotizacionFormal(Base):
     notas = Column(Text)
     pdf_url = Column(String(500))
     estado = Column(String(30), default="borrador")  # borrador, enviada, aceptada, rechazada
+    created_at = Column(DateTime, server_default=func.now())
+
+
+# ═══ MATEO AI TRAINER ═══
+class MateoConfig(Base):
+    """Configuracion del chatbot Mateo - editable desde UI."""
+    __tablename__ = "mateo_config"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_bot = Column(String(100), default="Mateo")
+    tono = Column(String(50), default="profesional_cercano")  # profesional_cercano, formal, casual, agresivo_ventas
+    longitud_respuesta = Column(String(30), default="media")  # corta, media, larga
+    system_prompt = Column(Text)
+    reglas_negocio = Column(Text)  # reglas custom del admin
+    flujo_conversacion = Column(Text)  # pasos y decisiones
+    precios_publicos = Column(Text)  # JSON de precios que puede mencionar
+    auto_agendar_reuniones = Column(Boolean, default=False)
+    calendar_email = Column(String(200))  # email para Google Calendar
+    idioma = Column(String(10), default="es")
+    max_tokens_respuesta = Column(Integer, default=500)
+    modelo_ia = Column(String(50), default="gemini-2.5-flash")
+    activo = Column(Boolean, default=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class MateoConversation(Base):
+    """Historial de conversaciones completas con Mateo."""
+    __tablename__ = "mateo_conversations"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), index=True)  # ID unico por sesion de chat
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    prospect_id = Column(Integer, ForeignKey("prospects.id"), nullable=True)
+    visitor_email = Column(String(200))  # email si no es cliente logueado
+    visitor_nombre = Column(String(200))
+    visitor_telefono = Column(String(50))
+    visitor_empresa = Column(String(200))
+    interes_detectado = Column(String(200))  # "cotizar", "info_general", "agendar_reunion"
+    sentimiento = Column(String(30))  # positivo, neutral, negativo
+    tokens_input = Column(Integer, default=0)
+    tokens_output = Column(Integer, default=0)
+    mensajes_count = Column(Integer, default=0)
+    convertido_a_prospect = Column(Boolean, default=False)
+    proveedor_ia = Column(String(30), default="gemini")
+    duracion_seg = Column(Integer, default=0)
+    inicio_at = Column(DateTime, server_default=func.now())
+    ultimo_mensaje_at = Column(DateTime, server_default=func.now())
+
+
+class MateoMessage(Base):
+    """Mensajes individuales dentro de una conversacion."""
+    __tablename__ = "mateo_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("mateo_conversations.id"), nullable=False)
+    role = Column(String(20), nullable=False)  # user, assistant
+    content = Column(Text, nullable=False)
+    tokens_usados = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class MateoCalendarBooking(Base):
+    """Reuniones agendadas por Mateo via Google Calendar."""
+    __tablename__ = "mateo_calendar_bookings"
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("mateo_conversations.id"), nullable=True)
+    calendar_event_id = Column(String(200))  # ID del evento en Google Calendar
+    visitor_email = Column(String(200))
+    visitor_nombre = Column(String(200))
+    fecha_reunion = Column(DateTime)
+    duracion_min = Column(Integer, default=30)
+    motivo = Column(Text)
+    estado = Column(String(30), default="confirmada")  # confirmada, cancelada, completada
+    meet_link = Column(String(500))
     created_at = Column(DateTime, server_default=func.now())

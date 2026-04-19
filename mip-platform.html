@@ -1564,26 +1564,38 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- ADMIN: Accounting -->
     <div class="page-body" id="a-acc" style="display:none">
       <div class="admin-header-flex">
-        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Control de Gastos</h2></div>
-        <div class="admin-btn-group"><select class="form-input" style="max-width:140px;padding:7px 12px;font-size:12px"><option>2026</option><option>2025</option></select><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-outline btn-sm"><i class="fas fa-file-export"></i> Exportar</button></div>
+        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Control de Gastos</h2><p style="font-size:12px;color:var(--text-muted)">Montos en CLP · Split automático entre socios</p></div>
+        <div class="admin-btn-group"><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo movimiento</button><button class="btn btn-outline btn-sm" onclick="loadSociosBalance()"><i class="fas fa-balance-scale"></i> Balance socios</button></div>
       </div>
       <div class="acc-grid">
-        <div class="stat-card"><div class="s-label">Ingresos</div><div class="s-val" id="acc-ingresos" style="color:var(--success)">$0</div><div class="s-sub"></div></div>
-        <div class="stat-card"><div class="s-label">Gastos</div><div class="s-val" id="acc-gastos" style="color:var(--danger)">$0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Ingresos (CLP)</div><div class="s-val" id="acc-ingresos" style="color:var(--success)">$0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Gastos (CLP)</div><div class="s-val" id="acc-gastos" style="color:var(--danger)">$0</div><div class="s-sub"></div></div>
         <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val" id="acc-utilidad">$0</div><div class="s-sub" id="acc-margen"></div></div>
         <div class="stat-card"><div class="s-label">Facturas pendientes</div><div class="s-val" id="acc-pendientes">0</div><div class="s-sub"></div></div>
       </div>
-      <div class="admin-grid-2">
+
+      <!-- SPLITWISE: Balance por socio -->
+      <div class="card" style="padding:20px;margin-top:16px" id="socios-balance-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="font-size:14px;font-weight:600"><i class="fas fa-users" style="margin-right:6px;color:var(--info)"></i>Cuenta corriente por socio (la empresa debe a...)</h3>
+          <button class="btn btn-outline btn-sm" onclick="loadSociosBalance()"><i class="fas fa-sync"></i> Actualizar</button>
+        </div>
+        <div id="socios-balance-body">
+          <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Cargando balance...</div>
+        </div>
+      </div>
+
+      <div class="admin-grid-2" style="margin-top:16px">
         <div class="dtable-wrap">
           <div class="dtable-header"><h3>Libro de gastos & ingresos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Ingresos</button><button class="chip">Gastos</button></div></div>
           <div style="max-height:420px;overflow-y:auto" id="acc-libro-body">
-            <div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto</div><div>Estado</div></div>
+            <div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto CLP</div><div>Estado</div></div>
           </div>
           <div class="table-pg" id="acc-libro-pg"></div>
         </div>
         <div>
           <div class="card" style="padding:24px;margin-bottom:16px">
-            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px">Estado de resultados</h3>
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px">Estado de resultados (CLP)</h3>
             <div id="acc-pl-body">
               <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sin movimientos registrados</div>
             </div>
@@ -1741,6 +1753,156 @@ html,body{overflow-x:hidden;max-width:100vw}
                 <div class="switch" id="ft-pdf" onclick="toggleFeature('pdf')"></div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SOCIOS (Splitwise) ═══ -->
+      <div style="margin-top:24px">
+        <div class="card" style="padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <h3 style="font-size:16px;font-weight:600"><i class="fas fa-users" style="color:var(--info);margin-right:8px"></i>Socios de la empresa <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(para split de gastos tipo Splitwise)</span></h3>
+            <button class="btn btn-dark btn-sm" onclick="openSocioModal()"><i class="fas fa-plus"></i> Nuevo socio</button>
+          </div>
+          <div class="dtable-wrap">
+            <table class="dtable"><thead><tr><th>Nombre</th><th>Email</th><th>% Equity</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="socios-body"><tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Sin socios configurados</td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Socio -->
+      <div class="modal-bg" id="socioModal">
+        <div class="modal-box" style="max-width:440px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h3 style="margin:0;font-size:15px" id="socio-title"><i class="fas fa-user" style="margin-right:6px"></i>Nuevo socio</h3>
+            <button onclick="document.getElementById('socioModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+          </div>
+          <form onsubmit="event.preventDefault(); saveSocio();">
+            <input type="hidden" id="socio-id">
+            <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="socio-nombre" required></div>
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="socio-email"></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">% Equity</label><input type="number" class="form-input" id="socio-equity" min="0" max="100" step="0.1" value="0"></div>
+              <div class="form-group"><label class="form-label">Color</label><input type="color" class="form-input" id="socio-color" value="#e8af43" style="height:38px;padding:4px"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Notas</label><textarea class="form-input" id="socio-notas" style="min-height:50px"></textarea></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border);margin-top:10px">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('socioModal').classList.remove('open')">Cancelar</button>
+              <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ═══ MATEO AI TRAINER ═══ -->
+      <div style="margin-top:24px">
+        <div class="card" style="padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px">
+            <h3 style="font-size:16px;font-weight:600"><i class="fas fa-robot" style="color:var(--info);margin-right:8px"></i>Entrenador de Mateo AI</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-outline btn-sm" onclick="loadMateoConversations()"><i class="fas fa-history"></i> Ver historial</button>
+              <button class="btn btn-dark btn-sm" onclick="saveMateoConfig()"><i class="fas fa-save"></i> Guardar config</button>
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:20px">Entrena el comportamiento del chatbot Mateo: tono, flujos, reglas, precios y auto-agendamiento.</p>
+
+          <!-- Stats de consumo -->
+          <div class="stat-grid" style="margin-bottom:20px" id="mateo-stats-grid">
+            <div class="stat-card"><div class="s-label">Conversaciones</div><div class="s-val" id="mateo-stat-convs">0</div></div>
+            <div class="stat-card"><div class="s-label">Tokens totales</div><div class="s-val" id="mateo-stat-tokens" style="font-size:16px">0</div></div>
+            <div class="stat-card"><div class="s-label">Costo estimado</div><div class="s-val" id="mateo-stat-cost" style="font-size:16px">$0</div></div>
+            <div class="stat-card"><div class="s-label">Leads capturados</div><div class="s-val" id="mateo-stat-leads">0</div></div>
+            <div class="stat-card"><div class="s-label">Reuniones</div><div class="s-val" id="mateo-stat-meetings">0</div></div>
+            <div class="stat-card"><div class="s-label">Tasa conversión</div><div class="s-val" id="mateo-stat-conv" style="font-size:16px">0%</div></div>
+          </div>
+
+          <!-- Config form -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">Activar chatbot</label>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 0"><div class="switch" id="mateo-activo" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:var(--text-secondary)">Mateo visible en la web pública</span></div>
+            </div>
+            <div class="form-group"><label class="form-label">Nombre del bot</label><input type="text" class="form-input" id="mateo-nombre" value="Mateo"></div>
+            <div class="form-group">
+              <label class="form-label">Tono de voz</label>
+              <select class="form-input" id="mateo-tono">
+                <option value="profesional_cercano">Profesional cercano (Chile / "tú")</option>
+                <option value="formal">Formal corporativo ("usted")</option>
+                <option value="casual">Casual / relajado</option>
+                <option value="agresivo_ventas">Agresivo en ventas (urgencia + cierre)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Longitud de respuesta</label>
+              <select class="form-input" id="mateo-longitud">
+                <option value="corta">Corta (1-2 frases)</option>
+                <option value="media" selected>Media (2-3 párrafos)</option>
+                <option value="larga">Larga (detallada con ejemplos)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Modelo AI</label>
+              <select class="form-input" id="mateo-modelo">
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (rápido, gratis/barato)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (premium)</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Max tokens respuesta</label><input type="number" class="form-input" id="mateo-max-tokens" value="500" min="100" max="2000"></div>
+          </div>
+
+          <!-- Prompt base -->
+          <div class="form-group">
+            <label class="form-label">System prompt (personalidad base)</label>
+            <textarea class="form-input" id="mateo-prompt" style="min-height:140px;font-family:monospace;font-size:11px" placeholder="Define quién es Mateo, su conocimiento, tono base..."></textarea>
+          </div>
+
+          <!-- Reglas negocio -->
+          <div class="form-group">
+            <label class="form-label">Reglas de negocio custom <span style="color:var(--text-muted);font-weight:400">(qué puede/no puede decir)</span></label>
+            <textarea class="form-input" id="mateo-reglas" style="min-height:80px;font-size:12px" placeholder="Ej: No dar descuentos por encima del 10%. Si preguntan por plazos urgentes, ofrecer aéreo. Siempre mencionar QC en fábrica."></textarea>
+          </div>
+
+          <!-- Flujo conversación -->
+          <div class="form-group">
+            <label class="form-label">Flujo de conversación <span style="color:var(--text-muted);font-weight:400">(pasos y decisiones)</span></label>
+            <textarea class="form-input" id="mateo-flujo" style="min-height:80px;font-size:12px" placeholder="Ej: 1) Saludar y preguntar rubro. 2) Si es retail -> mencionar caso Ironman. 3) Si pregunta precio -> rango + pedir cantidad. 4) Cerrar con CTA agendar reunión."></textarea>
+          </div>
+
+          <!-- Precios publicos -->
+          <div class="form-group">
+            <label class="form-label">Precios que puede mencionar <span style="color:var(--text-muted);font-weight:400">(opcional, formato libre)</span></label>
+            <textarea class="form-input" id="mateo-precios" style="min-height:60px;font-size:12px" placeholder="Ej: Gorras personalizadas: USD 1.2 - 2.5/un desde 1000u. Máquinas hielo: USD 800-1200 FOB. Flete marítimo: 8-12% del FOB."></textarea>
+          </div>
+
+          <!-- Auto-agendamiento Google Calendar -->
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius);margin-top:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div>
+                <div style="font-size:13px;font-weight:600"><i class="fab fa-google" style="margin-right:6px;color:#4285F4"></i>Auto-agendar reuniones via Google Calendar</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Mateo puede agendar directo al detectar interés real del cliente</div>
+              </div>
+              <div class="switch" id="mateo-autoagendar" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" style="font-size:11px">Email de calendario (organizador)</label>
+              <input type="email" class="form-input" id="mateo-calendar-email" placeholder="tu-email@mipquality.com">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historial de conversaciones Mateo -->
+      <div style="margin-top:24px;display:none" id="mateo-history-wrap">
+        <div class="card" style="padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:600"><i class="fas fa-comments" style="margin-right:8px;color:var(--info)"></i>Historial de conversaciones</h3>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('mateo-history-wrap').style.display='none'"><i class="fas fa-times"></i> Cerrar</button>
+          </div>
+          <div class="dtable-wrap">
+            <table class="dtable"><thead><tr><th>Fecha</th><th>Visitante</th><th>Email</th><th>Interés</th><th>Msjs</th><th>Tokens</th><th>Lead</th><th></th></tr></thead>
+            <tbody id="mateo-history-body"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted)">Cargando...</td></tr></tbody></table>
           </div>
         </div>
       </div>
@@ -2099,15 +2261,52 @@ html,body{overflow-x:hidden;max-width:100vw}
 
 <!-- EXPENSE MODAL -->
 <div class="modal-bg" id="expModal">
-  <div class="modal-box">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><h3 style="font-size:16px;font-weight:600">Registrar movimiento</h3><button onclick="closeExpModal()" style="font-size:16px;color:var(--text-muted)"><i class="fas fa-times"></i></button></div>
-    <form onsubmit="doExpense(event)">
-      <div class="form-row"><div class="form-group"><label class="form-label">Tipo</label><select class="form-input" required><option value="">Seleccionar...</option><option>Gasto</option><option>Ingreso</option></select></div><div class="form-group"><label class="form-label">Categoría</label><select class="form-input" required><option value="">Seleccionar...</option><option>Proveedores</option><option>Flete & Logística</option><option>Aduanas</option><option>Personal</option><option>QC & Muestras</option><option>Marketing</option><option>Pago cliente</option><option>Otro</option></select></div></div>
-      <div class="form-group"><label class="form-label">Descripción</label><input type="text" class="form-input" placeholder="Ej: Pago anticipo fábrica — SOL-047" required></div>
-      <div class="form-row"><div class="form-group"><label class="form-label">Monto (USD)</label><input type="text" class="form-input" placeholder="$0.00" required></div><div class="form-group"><label class="form-label">Fecha</label><input type="date" class="form-input" required></div></div>
-      <div class="form-row"><div class="form-group"><label class="form-label">Pedido asociado</label><select class="form-input"><option value="">Sin asociar</option><option>#SOL-047</option><option>#SOL-046</option><option>#SOL-038</option></select></div><div class="form-group"><label class="form-label">Estado</label><select class="form-input"><option>Pagado</option><option>Pendiente</option></select></div></div>
-      <div class="form-group"><label class="form-label">Comprobante</label><div class="upload-zone" onclick="simUpload('expUp')" style="padding:14px"><i class="fas fa-paperclip" style="font-size:16px"></i><h4 style="font-size:12px">Adjuntar</h4></div><div class="upload-preview" id="expUp"></div></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="closeExpModal()">Cancelar</button><button type="submit" class="btn btn-dark"><i class="fas fa-save"></i> Registrar</button></div>
+  <div class="modal-box" style="max-width:600px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h3 style="font-size:16px;font-weight:600"><i class="fas fa-receipt" style="margin-right:6px;color:var(--info)"></i>Registrar movimiento</h3>
+      <button onclick="closeExpModal()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer">&times;</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Montos en CLP. Si es un gasto de la empresa, marca quién pagó para calcular cuánto le debe la empresa.</p>
+    <form onsubmit="event.preventDefault(); doExpense();">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo *</label>
+          <select class="form-input" id="exp-tipo" required onchange="toggleSplitwiseSection()"><option value="">Seleccionar...</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Categoría *</label>
+          <select class="form-input" id="exp-categoria" required><option value="">Seleccionar...</option><option>Proveedores China</option><option>Flete & Logística</option><option>Aduanas</option><option>Personal</option><option>QC & Muestras</option><option>Marketing</option><option>Oficina / SaaS</option><option>Pago a cliente</option><option>Otro</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Descripción *</label><input type="text" class="form-input" id="exp-desc" placeholder="Ej: Pago anticipo fábrica SOL-047" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Monto (CLP) *</label><input type="number" class="form-input" id="exp-monto" placeholder="350000" required min="0" step="1"></div>
+        <div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-input" id="exp-fecha" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Medio de pago</label>
+          <select class="form-input" id="exp-medio"><option value="">—</option><option value="transferencia">Transferencia</option><option value="tarjeta_credito">Tarjeta crédito</option><option value="tarjeta_debito">Tarjeta débito</option><option value="efectivo">Efectivo</option><option value="paypal">PayPal</option><option value="otro">Otro</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-input" id="exp-estado"><option value="pagado">Pagado</option><option value="pendiente">Pendiente</option></select>
+        </div>
+      </div>
+      <!-- SPLITWISE SECTION — solo visible cuando tipo=gasto -->
+      <div id="exp-splitwise-section" style="display:none;margin-top:12px;padding:14px;background:var(--bg-surface);border-radius:var(--radius);border:1px dashed var(--border)">
+        <h4 style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:10px"><i class="fas fa-users" style="margin-right:4px"></i>SPLITWISE · Reparto entre socios</h4>
+        <div class="form-group">
+          <label class="form-label">¿Quién pagó este gasto? (la empresa le deberá lo que no le toca)</label>
+          <select class="form-input" id="exp-pagador"><option value="">— Nadie / gasto directo empresa —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">¿Entre qué socios dividir el gasto?</label>
+          <div id="exp-split-socios" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"></div>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:6px">Se divide en partes iguales entre los seleccionados. Si no seleccionas a nadie, el gasto no se splitea.</p>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Notas / comentarios</label><textarea class="form-input" id="exp-notas" style="min-height:60px;resize:vertical" placeholder="Notas internas, referencias, contexto..."></textarea></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border);margin-top:14px">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeExpModal()">Cancelar</button>
+        <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Registrar</button>
+      </div>
     </form>
   </div>
 </div>
@@ -2774,26 +2973,172 @@ async function loadContabilidad() {
   } catch (err) { console.error('Contabilidad load error:', err); }
 }
 
-async function doExpense(e) {
-  e.preventDefault();
-  const form = e.target;
-  const inputs = form.querySelectorAll('.form-input');
+async function doExpense() {
+  const $ = id => document.getElementById(id);
+  const tipo = $('exp-tipo').value;
+  const categoria = $('exp-categoria').value;
+  const desc = $('exp-desc').value.trim();
+  const monto = parseFloat($('exp-monto').value) || 0;
+  const fecha = $('exp-fecha').value;
+  if (!tipo || !categoria || !desc || !monto || !fecha) {
+    toast('error', 'Error', 'Completa los campos requeridos'); return;
+  }
+  // Splitwise data
+  const pagador = $('exp-pagador')?.value;
+  const splitSocios = Array.from(document.querySelectorAll('#exp-split-socios input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
   const data = {
-    tipo: inputs[0].value.toLowerCase() === 'ingreso' ? 'ingreso' : 'gasto',
-    categoria: inputs[1].value,
-    descripcion: inputs[2].value,
-    monto: parseFloat(inputs[3].value.replace(/[^0-9.-]/g, '')) || 0,
-    fecha: new Date(inputs[4].value).toISOString(),
-    pedido_id: inputs[5].value ? parseInt(inputs[5].value.replace('#SOL-', '')) : null,
-    estado: inputs[6].value.toLowerCase() === 'pagado' ? 'pagado' : 'pendiente',
+    tipo, categoria,
+    descripcion: desc,
+    monto, moneda: 'CLP',
+    fecha: new Date(fecha).toISOString(),
+    estado: $('exp-estado').value,
+    medio_pago: $('exp-medio').value || '',
+    notas: $('exp-notas').value || '',
+    pagado_por_socio_id: pagador ? parseInt(pagador) : null,
+    split_socio_ids: splitSocios,
   };
   try {
     await api('/api/contabilidad', { method: 'POST', body: JSON.stringify(data) });
     closeExpModal();
-    toast('success', 'Registrado', 'Movimiento contable registrado.');
-    loadContabilidad();
+    toast('success', 'Movimiento registrado', monto.toLocaleString('es-CL') + ' CLP');
+    if (typeof loadContabilidad === 'function') loadContabilidad();
+    if (typeof loadSociosBalance === 'function') loadSociosBalance();
   } catch (err) {
     toast('error', 'Error', err.message);
+  }
+}
+
+// Mostrar/ocultar seccion Splitwise segun tipo
+function toggleSplitwiseSection() {
+  const tipo = document.getElementById('exp-tipo')?.value;
+  const section = document.getElementById('exp-splitwise-section');
+  if (section) section.style.display = (tipo === 'gasto') ? 'block' : 'none';
+}
+
+// Populate pagador select y checkboxes de socios al abrir modal
+async function _populateSplitwiseInputs() {
+  try {
+    const socios = await api('/api/socios?activos_only=true');
+    const sel = document.getElementById('exp-pagador');
+    const checks = document.getElementById('exp-split-socios');
+    if (sel) {
+      sel.innerHTML = '<option value="">— Nadie / gasto directo empresa —</option>' +
+        socios.map(s => `<option value="${s.id}">${s.nombre}${s.email ? ' ('+s.email+')' : ''}</option>`).join('');
+    }
+    if (checks) {
+      checks.innerHTML = socios.length ? socios.map(s => `
+        <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg-white);border-radius:var(--radius);cursor:pointer;font-size:12px">
+          <input type="checkbox" value="${s.id}" checked>
+          <span>${s.nombre}${s.porcentaje_equity ? ' <span style="color:var(--text-muted)">('+s.porcentaje_equity+'%)</span>' : ''}</span>
+        </label>`).join('') : '<p style="font-size:11px;color:var(--text-muted);grid-column:1/-1;margin:0">No hay socios. Agrégalos en Configuración → Socios.</p>';
+    }
+  } catch (err) { console.error('populate splitwise err:', err); }
+}
+
+// SOCIOS CRUD
+async function loadSocios() {
+  try {
+    const socios = await api('/api/socios');
+    const tbody = document.getElementById('socios-body');
+    if (!tbody) return;
+    if (!socios.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">Sin socios. Agrega al menos 2 para empezar a dividir gastos.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = socios.map(s => {
+      const activo = s.activo ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-neutral">Inactivo</span>';
+      return `<tr>
+        <td style="font-weight:500"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color || '#e8af43'};margin-right:8px"></span>${s.nombre}</td>
+        <td style="color:var(--text-muted);font-size:12px">${s.email || '—'}</td>
+        <td>${s.porcentaje_equity || 0}%</td>
+        <td>${activo}</td>
+        <td><button class="btn btn-outline btn-sm" onclick='editSocio(${JSON.stringify(s).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button> <button class="btn btn-outline btn-sm" onclick="deleteSocio(${s.id}, '${(s.nombre||'').replace(/'/g,"&#39;")}')" style="color:var(--danger)"><i class="fas fa-trash"></i></button></td>
+      </tr>`;
+    }).join('');
+  } catch (err) { console.error('Socios error:', err); }
+}
+
+function openSocioModal() {
+  document.getElementById('socio-title').innerHTML = '<i class="fas fa-user" style="margin-right:6px"></i>Nuevo socio';
+  ['socio-id','socio-nombre','socio-email','socio-notas'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('socio-equity').value = '0';
+  document.getElementById('socio-color').value = '#e8af43';
+  document.getElementById('socioModal').classList.add('open');
+}
+
+function editSocio(s) {
+  document.getElementById('socio-title').innerHTML = '<i class="fas fa-user-edit" style="margin-right:6px"></i>Editar socio';
+  document.getElementById('socio-id').value = s.id;
+  document.getElementById('socio-nombre').value = s.nombre || '';
+  document.getElementById('socio-email').value = s.email || '';
+  document.getElementById('socio-equity').value = s.porcentaje_equity || 0;
+  document.getElementById('socio-color').value = s.color || '#e8af43';
+  document.getElementById('socio-notas').value = s.notas || '';
+  document.getElementById('socioModal').classList.add('open');
+}
+
+async function saveSocio() {
+  const $ = id => document.getElementById(id).value;
+  const id = $('socio-id');
+  const data = {
+    nombre: $('socio-nombre').trim(),
+    email: $('socio-email').trim(),
+    porcentaje_equity: parseFloat($('socio-equity')) || 0,
+    color: $('socio-color'),
+    notas: $('socio-notas'),
+    activo: true,
+  };
+  if (!data.nombre) { toast('error', 'Error', 'Nombre requerido'); return; }
+  try {
+    if (id) await api('/api/socios/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/socios', { method: 'POST', body: JSON.stringify(data) });
+    document.getElementById('socioModal').classList.remove('open');
+    toast('success', 'Socio guardado', data.nombre);
+    loadSocios();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function deleteSocio(id, nombre) {
+  if (!confirm('¿Eliminar socio "' + nombre + '"? Si tiene movimientos asociados se marcará como inactivo en vez de borrarse.')) return;
+  try {
+    const r = await api('/api/socios/' + id, { method: 'DELETE' });
+    toast('success', r.deactivated ? 'Socio desactivado' : 'Socio eliminado', r.reason || '');
+    loadSocios();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// BALANCE SPLITWISE
+async function loadSociosBalance() {
+  try {
+    const d = await api('/api/socios/balance');
+    const body = document.getElementById('socios-balance-body');
+    if (!body) return;
+    if (!d.socios || !d.socios.length) {
+      body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Sin socios configurados. Agrega socios en Configuración.</div>';
+      return;
+    }
+    const fmt = v => (v >= 0 ? '+' : '') + Math.round(v).toLocaleString('es-CL') + ' CLP';
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+        ${d.socios.map(s => {
+          const saldo = s.saldo_empresa_debe;
+          const color = saldo > 0 ? 'var(--success)' : saldo < 0 ? 'var(--danger)' : 'var(--text-muted)';
+          const label = saldo > 0 ? 'la empresa le debe' : saldo < 0 ? 'le debe a la empresa' : 'saldo cero';
+          return `<div style="padding:14px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid ${s.color || '#e8af43'}">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px">${s.nombre}</div>
+            <div style="font-size:18px;font-weight:600;color:${color}">${fmt(saldo)}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${label}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Pagó: $${Math.round(s.total_pagado).toLocaleString('es-CL')} · Le toca: $${Math.round(s.total_asumido).toLocaleString('es-CL')}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);font-size:11px;color:var(--text-muted)">
+        <i class="fas fa-info-circle"></i> Total gastos empresa: <b>$${Math.round(d.total_gastos_clp).toLocaleString('es-CL')} CLP</b>.
+        La empresa es el deudor. Saldo positivo = socio tiene crédito con la empresa.
+      </div>
+    `;
+  } catch (err) {
+    document.getElementById('socios-balance-body').innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Error: ${err.message}</div>`;
   }
 }
 
@@ -2911,7 +3256,16 @@ async function openDetail(cotId) {
 function closeDetail() { document.getElementById('dPanel').classList.remove('open'); document.getElementById('dOverlay').classList.remove('open'); }
 function sendQuote() { closeDetail(); toast('success', 'Cotización enviada', 'Email generado vía IA Copilot y enviado al cliente.'); }
 function toggleSw(sid, did) { const s = document.getElementById(sid); const d = document.getElementById(did); s.classList.toggle('on'); d.style.display = s.classList.contains('on') ? 'block' : 'none'; }
-function openExpModal() { document.getElementById('expModal').classList.add('open'); }
+function openExpModal() {
+  // Reset form
+  ['exp-tipo','exp-categoria','exp-desc','exp-monto','exp-fecha','exp-medio','exp-notas','exp-pagador'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  const today = new Date().toISOString().split('T')[0];
+  const f = document.getElementById('exp-fecha'); if (f) f.value = today;
+  const es = document.getElementById('exp-estado'); if (es) es.value = 'pagado';
+  const sec = document.getElementById('exp-splitwise-section'); if (sec) sec.style.display = 'none';
+  _populateSplitwiseInputs();
+  document.getElementById('expModal').classList.add('open');
+}
 function closeExpModal() { document.getElementById('expModal').classList.remove('open'); }
 function toast(type, title, msg) {
   const t = document.getElementById('toast'); const ic = document.getElementById('toastIcon');
@@ -4220,13 +4574,22 @@ async function sendChat() {
   body.innerHTML += '<div class="chat-msg typing" id="chatTyping"><div class="dots"><span></span><span></span><span></span></div></div>';
   body.scrollTop = body.scrollHeight;
 
+  // Persist session id across messages
+  if (!window._mateoSessionId) {
+    window._mateoSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,9);
+  }
   try {
     const payload = {
       message: msg,
       history: chatHistory.slice(-10),
       cliente_id: currentUser?.id || null,
+      session_id: window._mateoSessionId,
+      visitor: {
+        email: currentUser?.email || '',
+        nombre: currentUser?.nombre || '',
+      },
     };
-    const r = await fetch(API + '/api/chat', {
+    const r = await fetch(API + '/api/chat/v2', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -4241,6 +4604,12 @@ async function sendChat() {
     const reply = data.reply || 'Lo siento, hubo un error. Intenta de nuevo.';
     body.innerHTML += `<div class="chat-msg bot">${reply.replace(/\n/g, '<br>')}</div>`;
     chatHistory.push({ role: 'assistant', content: reply });
+    if (data.lead_captured) {
+      body.innerHTML += `<div class="chat-msg bot" style="background:var(--success-bg);color:var(--success);font-size:11px"><i class="fas fa-check-circle"></i> Tus datos quedaron guardados. Un asesor se pondra en contacto.</div>`;
+    }
+    if (data.booking) {
+      body.innerHTML += `<div class="chat-msg bot" style="background:var(--info-bg);color:var(--info);font-size:11px"><i class="fas fa-calendar-check"></i> Reunion agendada. Revisa tu email.</div>`;
+    }
   } catch (err) {
     const typing = document.getElementById('chatTyping');
     if (typing) typing.remove();
@@ -4250,6 +4619,136 @@ async function sendChat() {
   btn.disabled = false;
   body.scrollTop = body.scrollHeight;
 }
+
+// ═══════════════════════════════════════════════════
+// MATEO AI TRAINER — UI handlers
+// ═══════════════════════════════════════════════════
+async function loadMateoConfig() {
+  try {
+    const cfg = await api('/api/mateo/config');
+    const $ = id => document.getElementById(id);
+    if ($('mateo-nombre')) $('mateo-nombre').value = cfg.nombre_bot || 'Mateo';
+    if ($('mateo-tono')) $('mateo-tono').value = cfg.tono || 'profesional_cercano';
+    if ($('mateo-longitud')) $('mateo-longitud').value = cfg.longitud_respuesta || 'media';
+    if ($('mateo-modelo')) $('mateo-modelo').value = cfg.modelo_ia || 'gemini-2.5-flash';
+    if ($('mateo-max-tokens')) $('mateo-max-tokens').value = cfg.max_tokens_respuesta || 500;
+    if ($('mateo-prompt')) $('mateo-prompt').value = cfg.system_prompt || '';
+    if ($('mateo-reglas')) $('mateo-reglas').value = cfg.reglas_negocio || '';
+    if ($('mateo-flujo')) $('mateo-flujo').value = cfg.flujo_conversacion || '';
+    if ($('mateo-precios')) $('mateo-precios').value = cfg.precios_publicos || '';
+    if ($('mateo-calendar-email')) $('mateo-calendar-email').value = cfg.calendar_email || '';
+    const sw1 = $('mateo-activo'); if (sw1) sw1.classList.toggle('on', !!cfg.activo);
+    const sw2 = $('mateo-autoagendar'); if (sw2) sw2.classList.toggle('on', !!cfg.auto_agendar_reuniones);
+    await loadMateoStats();
+  } catch (err) { console.error('Mateo config error:', err); }
+}
+
+async function loadMateoStats() {
+  try {
+    const s = await api('/api/mateo/stats');
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('mateo-stat-convs', s.total_conversaciones);
+    const tt = (s.total_tokens || 0);
+    set('mateo-stat-tokens', tt >= 1000 ? (tt/1000).toFixed(1)+'k' : tt);
+    set('mateo-stat-cost', '$' + (s.costo_estimado_usd || 0).toFixed(3));
+    set('mateo-stat-leads', s.leads_convertidos || 0);
+    set('mateo-stat-meetings', s.reuniones_agendadas || 0);
+    set('mateo-stat-conv', (s.tasa_conversion_lead || 0) + '%');
+  } catch (err) { console.error('Mateo stats error:', err); }
+}
+
+async function saveMateoConfig() {
+  try {
+    const $ = id => document.getElementById(id);
+    const data = {
+      nombre_bot: $('mateo-nombre').value.trim() || 'Mateo',
+      tono: $('mateo-tono').value,
+      longitud_respuesta: $('mateo-longitud').value,
+      modelo_ia: $('mateo-modelo').value,
+      max_tokens_respuesta: parseInt($('mateo-max-tokens').value) || 500,
+      system_prompt: $('mateo-prompt').value,
+      reglas_negocio: $('mateo-reglas').value,
+      flujo_conversacion: $('mateo-flujo').value,
+      precios_publicos: $('mateo-precios').value,
+      calendar_email: $('mateo-calendar-email').value,
+      activo: $('mateo-activo').classList.contains('on'),
+      auto_agendar_reuniones: $('mateo-autoagendar').classList.contains('on'),
+    };
+    await api('/api/mateo/config', { method: 'PUT', body: JSON.stringify(data) });
+    toast('success', 'Mateo actualizado', 'Configuración guardada');
+    loadMateoStats();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function loadMateoConversations() {
+  const wrap = document.getElementById('mateo-history-wrap');
+  const tbody = document.getElementById('mateo-history-body');
+  if (!wrap) return;
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({behavior:'smooth', block:'start'});
+  try {
+    const d = await api('/api/mateo/conversations?limit=100');
+    const convs = d.conversations || [];
+    if (!convs.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Sin conversaciones aún</td></tr>';
+      return;
+    }
+    tbody.innerHTML = convs.map(c => {
+      const fecha = c.inicio_at ? new Date(c.inicio_at).toLocaleString('es-CL', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '—';
+      const leadBadge = c.convertido_a_prospect ? '<span class="badge badge-success">Sí</span>' : '<span class="badge badge-neutral">No</span>';
+      return `<tr>
+        <td style="font-size:11px">${fecha}</td>
+        <td>${c.visitor_nombre || '—'}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${c.visitor_email || '—'}</td>
+        <td style="font-size:11px">${(c.interes_detectado || '').substring(0,40) || '—'}</td>
+        <td>${c.mensajes_count}</td>
+        <td style="font-size:11px">${c.tokens_total}</td>
+        <td>${leadBadge}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="viewMateoConv(${c.id})"><i class="fas fa-eye"></i></button></td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger)">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function viewMateoConv(id) {
+  try {
+    const d = await api('/api/mateo/conversations/' + id);
+    const msgs = (d.messages || []).map(m => {
+      const icon = m.role === 'user' ? 'fa-user' : 'fa-robot';
+      const color = m.role === 'user' ? 'var(--text)' : 'var(--info)';
+      return `<div style="margin-bottom:10px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px"><div style="font-weight:600;margin-bottom:4px;color:${color}"><i class="fas ${icon}"></i> ${m.role}</div><div style="white-space:pre-wrap">${m.content.replace(/</g,'&lt;')}</div></div>`;
+    }).join('');
+    const content = `<div style="padding:16px;max-height:70vh;overflow-y:auto"><h4 style="margin-bottom:12px">Sesión ${d.session_id}</h4><div style="font-size:11px;color:var(--text-muted);margin-bottom:16px">${d.visitor.nombre || '?'} | ${d.visitor.email || '?'} | ${d.mensajes_count} mensajes | ${d.tokens_input + d.tokens_output} tokens</div>${msgs}</div>`;
+    // Render in a temp modal
+    let modal = document.getElementById('mateoConvModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'mateoConvModal';
+      modal.className = 'modal-bg';
+      modal.innerHTML = `<div class="modal-box" style="max-width:720px;max-height:85vh"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0;font-size:15px">Conversación</h3><button onclick="this.closest('.modal-bg').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button></div><div id="mateoConvContent"></div></div>`;
+      document.body.appendChild(modal);
+    }
+    document.getElementById('mateoConvContent').innerHTML = content;
+    modal.classList.add('open');
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// Hook into aView to load config/socios/balance when entering views
+(function() {
+  const _orig = window.aView;
+  window.aView = function(id) {
+    if (_orig) _orig(id);
+    if (id === 'a-config') {
+      setTimeout(loadMateoConfig, 50);
+      setTimeout(loadSocios, 60);
+    }
+    if (id === 'a-acc') {
+      setTimeout(loadSociosBalance, 80);
+    }
+  };
+})();
 </script>
 </body>
 </html>

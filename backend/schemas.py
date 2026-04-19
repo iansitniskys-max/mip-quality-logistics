@@ -133,23 +133,61 @@ class MovimientoCreate(BaseModel):
     tipo: str
     categoria: str = ""
     descripcion: str = ""
-    monto: float
+    monto: float  # CLP
+    moneda: str = "CLP"
     fecha: datetime
     estado: str = "pendiente"
     pedido_id: Optional[int] = None
     comprobante_url: str = ""
+    pagado_por_socio_id: Optional[int] = None
+    medio_pago: str = ""
+    notas: str = ""
+    split_socio_ids: List[int] = []  # socios entre los cuales se divide (split igual)
 
 class MovimientoOut(BaseModel):
     id: int
     tipo: str
-    categoria: str
-    descripcion: str
+    categoria: Optional[str] = ""
+    descripcion: Optional[str] = ""
     monto: float
+    moneda: Optional[str] = "CLP"
     fecha: datetime
     estado: str
     pedido_id: Optional[int]
-    comprobante_url: str
+    comprobante_url: Optional[str] = ""
+    pagado_por_socio_id: Optional[int] = None
+    medio_pago: Optional[str] = ""
+    notas: Optional[str] = ""
     created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# --- Socios (Splitwise) ---
+class SocioCreate(BaseModel):
+    nombre: str
+    email: Optional[str] = ""
+    porcentaje_equity: float = 0
+    activo: bool = True
+    color: str = "#e8af43"
+    notas: str = ""
+
+class SocioOut(BaseModel):
+    id: int
+    nombre: str
+    email: Optional[str] = ""
+    porcentaje_equity: float
+    activo: bool
+    color: Optional[str] = "#e8af43"
+    notas: Optional[str] = ""
+    class Config:
+        from_attributes = True
+
+class GastoSplitOut(BaseModel):
+    id: int
+    movimiento_id: int
+    socio_id: int
+    monto_asumido: float
     class Config:
         from_attributes = True
 
@@ -416,5 +454,48 @@ class SiteContentOut(BaseModel):
     value: str
     content_type: str
     updated_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# --- Mateo AI Trainer ---
+class MateoConfigOut(BaseModel):
+    id: int
+    nombre_bot: str
+    tono: str
+    longitud_respuesta: str
+    system_prompt: Optional[str] = ""
+    reglas_negocio: Optional[str] = ""
+    flujo_conversacion: Optional[str] = ""
+    precios_publicos: Optional[str] = ""
+    auto_agendar_reuniones: bool
+    calendar_email: Optional[str] = ""
+    idioma: str
+    max_tokens_respuesta: int
+    modelo_ia: str
+    activo: bool
+    class Config:
+        from_attributes = True
+
+
+class MateoConversationOut(BaseModel):
+    id: int
+    session_id: str
+    cliente_id: Optional[int] = None
+    prospect_id: Optional[int] = None
+    visitor_email: Optional[str] = ""
+    visitor_nombre: Optional[str] = ""
+    visitor_telefono: Optional[str] = ""
+    visitor_empresa: Optional[str] = ""
+    interes_detectado: Optional[str] = ""
+    sentimiento: Optional[str] = ""
+    tokens_input: int
+    tokens_output: int
+    mensajes_count: int
+    convertido_a_prospect: bool
+    proveedor_ia: Optional[str] = "gemini"
+    duracion_seg: int
+    inicio_at: datetime
+    ultimo_mensaje_at: datetime
     class Config:
         from_attributes = True

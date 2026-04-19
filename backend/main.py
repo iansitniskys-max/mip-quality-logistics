@@ -16,6 +16,8 @@ from models import (
     MovimientoContable, HistorialEvento, SiteContent, Ticket, Actividad,
     FeatureFlag, Proveedor, ProductoProveedor, Prospect, EmailSequence, EmailLog,
     Proyecto, ProyectoSeccion, Tarea, ComentarioTarea, CotizacionFormal,
+    Socio, GastoSplit,
+    MateoConfig, MateoConversation, MateoMessage, MateoCalendarBooking,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -25,6 +27,8 @@ from schemas import (
     FeatureFlagOut, ProveedorCreate, ProveedorOut, ProductoProveedorCreate, ProductoProveedorOut,
     ProspectCreate, ProspectOut, EmailSequenceCreate, EmailSequenceOut, EmailLogOut,
     ProyectoCreate, ProyectoOut, TareaCreate, TareaOut,
+    SocioCreate, SocioOut, GastoSplitOut,
+    MateoConfigOut, MateoConversationOut,
 )
 import csv
 import io
@@ -72,6 +76,19 @@ def on_startup():
                     conn.execute(text(f"ALTER TABLE archivos ADD COLUMN {col} {col_type}"))
                     conn.commit()
                     print(f"Added column archivos.{col}")
+                except Exception:
+                    conn.rollback()
+            # Migrate movimientos_contables table (Splitwise)
+            for col, col_type in [
+                ("moneda", "VARCHAR(3) DEFAULT 'CLP'"),
+                ("pagado_por_socio_id", "INTEGER"),
+                ("medio_pago", "VARCHAR(50)"),
+                ("notas", "TEXT"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE movimientos_contables ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column movimientos_contables.{col}")
                 except Exception:
                     conn.rollback()
     except Exception as e:
@@ -807,11 +824,158 @@ def listar_movimientos(
 
 @app.post("/api/contabilidad", response_model=MovimientoOut)
 def crear_movimiento(data: MovimientoCreate, db: Session = Depends(get_db)):
-    m = MovimientoContable(**data.model_dump())
+    payload = data.model_dump()
+    split_ids = payload.pop("split_socio_ids", []) or []
+    m = MovimientoContable(**payload)
     db.add(m)
     db.commit()
     db.refresh(m)
+    # Si es gasto con socios para splittear, crear GastoSplit igual entre todos
+    if m.tipo == "gasto" and split_ids and m.monto:
+        cuota = float(m.monto) / len(split_ids)
+        for sid in split_ids:
+            db.add(GastoSplit(movimiento_id=m.id, socio_id=sid, monto_asumido=cuota))
+        db.commit()
     return m
+
+
+@app.put("/api/contabilidad/{id}", response_model=MovimientoOut)
+def update_movimiento(id: int, data: dict, db: Session = Depends(get_db)):
+    m = db.query(MovimientoContable).get(id)
+    if not m:
+        raise HTTPException(404, "Movimiento no encontrado")
+    split_ids = data.pop("split_socio_ids", None)
+    for k, v in data.items():
+        if hasattr(m, k):
+            setattr(m, k, v)
+    # Rebuild splits if provided
+    if split_ids is not None:
+        db.query(GastoSplit).filter(GastoSplit.movimiento_id == id).delete()
+        if m.tipo == "gasto" and split_ids and m.monto:
+            cuota = float(m.monto) / len(split_ids)
+            for sid in split_ids:
+                db.add(GastoSplit(movimiento_id=id, socio_id=sid, monto_asumido=cuota))
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+@app.delete("/api/contabilidad/{id}")
+def delete_movimiento(id: int, db: Session = Depends(get_db)):
+    m = db.query(MovimientoContable).get(id)
+    if not m:
+        raise HTTPException(404, "Movimiento no encontrado")
+    db.query(GastoSplit).filter(GastoSplit.movimiento_id == id).delete()
+    db.delete(m)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/contabilidad/{id}/splits")
+def listar_splits_gasto(id: int, db: Session = Depends(get_db)):
+    rows = db.query(GastoSplit).filter(GastoSplit.movimiento_id == id).all()
+    return [{"id": s.id, "socio_id": s.socio_id, "monto_asumido": s.monto_asumido} for s in rows]
+
+
+# ═══════════════════════════════════════════════════
+# SOCIOS (Splitwise)
+# ═══════════════════════════════════════════════════
+@app.get("/api/socios", response_model=list[SocioOut])
+def listar_socios(activos_only: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Socio)
+    if activos_only:
+        q = q.filter(Socio.activo == True)
+    return q.order_by(Socio.nombre).all()
+
+
+@app.post("/api/socios", response_model=SocioOut)
+def crear_socio(data: SocioCreate, db: Session = Depends(get_db)):
+    s = Socio(**data.model_dump())
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@app.put("/api/socios/{id}", response_model=SocioOut)
+def update_socio(id: int, data: dict, db: Session = Depends(get_db)):
+    s = db.query(Socio).get(id)
+    if not s:
+        raise HTTPException(404, "Socio no encontrado")
+    for k, v in data.items():
+        if hasattr(s, k):
+            setattr(s, k, v)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@app.delete("/api/socios/{id}")
+def delete_socio(id: int, db: Session = Depends(get_db)):
+    s = db.query(Socio).get(id)
+    if not s:
+        raise HTTPException(404, "Socio no encontrado")
+    # No permitir eliminar si tiene movimientos asociados: desactivar
+    has_moves = db.query(MovimientoContable).filter(MovimientoContable.pagado_por_socio_id == id).count()
+    has_splits = db.query(GastoSplit).filter(GastoSplit.socio_id == id).count()
+    if has_moves or has_splits:
+        s.activo = False
+        db.commit()
+        return {"deleted": False, "deactivated": True, "reason": "Tiene movimientos asociados; se marco inactivo."}
+    db.delete(s)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/socios/balance")
+def balance_socios(
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve cuanto le debe la empresa a cada socio (o al reves).
+    Para cada socio:
+      - total_pagado = suma de gastos que el pago
+      - total_asumido = suma de sus splits (su parte)
+      - saldo_empresa = total_pagado - total_asumido
+        * positivo: la empresa le debe al socio
+        * negativo: el socio le debe a la empresa
+    """
+    socios = db.query(Socio).all()
+    # Gastos filter
+    q_m = db.query(MovimientoContable).filter(MovimientoContable.tipo == "gasto")
+    if mes:
+        q_m = q_m.filter(extract("month", MovimientoContable.fecha) == mes)
+    if anio:
+        q_m = q_m.filter(extract("year", MovimientoContable.fecha) == anio)
+    movimientos = q_m.all()
+    move_ids = [m.id for m in movimientos]
+
+    splits_all = db.query(GastoSplit).filter(GastoSplit.movimiento_id.in_(move_ids)).all() if move_ids else []
+
+    result = []
+    total_gastos = 0.0
+    for s in socios:
+        pagado = sum(float(m.monto or 0) for m in movimientos if m.pagado_por_socio_id == s.id)
+        asumido = sum(float(sp.monto_asumido or 0) for sp in splits_all if sp.socio_id == s.id)
+        saldo = pagado - asumido
+        result.append({
+            "socio_id": s.id,
+            "nombre": s.nombre,
+            "color": s.color,
+            "porcentaje_equity": float(s.porcentaje_equity or 0),
+            "activo": bool(s.activo),
+            "total_pagado": round(pagado, 2),
+            "total_asumido": round(asumido, 2),
+            "saldo_empresa_debe": round(saldo, 2),
+        })
+        total_gastos += pagado
+    return {
+        "mes": mes, "anio": anio,
+        "total_gastos_clp": round(total_gastos, 2),
+        "socios": result,
+    }
 
 
 @app.get("/api/contabilidad/resumen")
@@ -1229,6 +1393,499 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
     return {
         "reply": "¡Hola! Soy Mateo de MIP Quality & Logistics. En este momento estoy teniendo problemas técnicos, pero puedes escribirnos a contacto@mipquality.com o al +56 9 8765 4321 por WhatsApp y te atendemos de inmediato.",
         "provider": "fallback"
+    }
+
+
+# ═══════════════════════════════════════════════════
+# MATEO AI TRAINER — config, history, lead capture
+# ═══════════════════════════════════════════════════
+def _get_or_create_mateo_config(db: Session) -> MateoConfig:
+    cfg = db.query(MateoConfig).order_by(MateoConfig.id).first()
+    if not cfg:
+        cfg = MateoConfig(
+            nombre_bot="Mateo",
+            tono="profesional_cercano",
+            longitud_respuesta="media",
+            system_prompt=MATEO_SYSTEM_PROMPT,
+            idioma="es",
+            max_tokens_respuesta=500,
+            modelo_ia="gemini-2.5-flash",
+            activo=True,
+        )
+        db.add(cfg)
+        db.commit()
+        db.refresh(cfg)
+    return cfg
+
+
+def _build_mateo_system_prompt(cfg: MateoConfig, context: str = "") -> str:
+    """Construye el system prompt completo usando la config editable."""
+    base = cfg.system_prompt or MATEO_SYSTEM_PROMPT
+    tono_map = {
+        "profesional_cercano": "Cercano, seguro, persuasivo, usando 'tú' en español chileno.",
+        "formal": "Formal, corporativo, usando 'usted' y estructura empresarial.",
+        "casual": "Relajado, informal, conversacional como con un amigo.",
+        "agresivo_ventas": "Directo, enfocado en cierre, con urgencia y CTAs fuertes en cada mensaje.",
+    }
+    long_map = {
+        "corta": "Respuestas MUY CORTAS, maximo 1-2 frases. Directo al punto.",
+        "media": "Respuestas medianas, 2-3 parrafos cortos con valor.",
+        "larga": "Respuestas detalladas con contexto, ejemplos y pruebas sociales.",
+    }
+    extras = []
+    extras.append(f"\n[TONO CONFIGURADO]: {tono_map.get(cfg.tono, '')}")
+    extras.append(f"[LONGITUD]: {long_map.get(cfg.longitud_respuesta, '')}")
+    if cfg.reglas_negocio:
+        extras.append(f"\n[REGLAS DE NEGOCIO CUSTOM]:\n{cfg.reglas_negocio}")
+    if cfg.flujo_conversacion:
+        extras.append(f"\n[FLUJO DE CONVERSACION A SEGUIR]:\n{cfg.flujo_conversacion}")
+    if cfg.precios_publicos:
+        extras.append(f"\n[PRECIOS QUE PUEDES MENCIONAR]:\n{cfg.precios_publicos}")
+    if cfg.auto_agendar_reuniones:
+        extras.append(
+            "\n[AUTO-AGENDAR]: Si el cliente muestra interés real (pregunta por reunión, llamada, "
+            "demo, cotización personalizada), ofrece agendar directo. Pide: fecha preferida, "
+            "hora, email y motivo. Cuando tengas los 4 datos di exactamente: "
+            "'ACTION:BOOK_MEETING|email=<X>|nombre=<Y>|fecha=<YYYY-MM-DD HH:MM>|motivo=<Z>'"
+        )
+    extras.append(
+        "\n[LEAD CAPTURE]: Durante la conversacion intenta obtener email, nombre, empresa y "
+        "telefono de manera natural. Cuando recopiles datos emite al final: "
+        "'LEAD_DATA:email=<X>|nombre=<Y>|empresa=<E>|telefono=<T>|interes=<describe>'"
+    )
+    return base + "\n".join(extras) + context
+
+
+@app.get("/api/mateo/config", response_model=MateoConfigOut)
+def get_mateo_config(db: Session = Depends(get_db)):
+    return _get_or_create_mateo_config(db)
+
+
+@app.put("/api/mateo/config", response_model=MateoConfigOut)
+def update_mateo_config(data: dict, db: Session = Depends(get_db)):
+    cfg = _get_or_create_mateo_config(db)
+    # Whitelist updatable fields
+    for field in [
+        "nombre_bot", "tono", "longitud_respuesta", "system_prompt",
+        "reglas_negocio", "flujo_conversacion", "precios_publicos",
+        "auto_agendar_reuniones", "calendar_email", "idioma",
+        "max_tokens_respuesta", "modelo_ia", "activo",
+    ]:
+        if field in data:
+            setattr(cfg, field, data[field])
+    db.commit()
+    db.refresh(cfg)
+    return cfg
+
+
+@app.get("/api/mateo/conversations")
+def list_mateo_conversations(limit: int = 50, offset: int = 0, db: Session = Depends(get_db)):
+    q = db.query(MateoConversation).order_by(MateoConversation.inicio_at.desc())
+    total = q.count()
+    rows = q.offset(offset).limit(limit).all()
+    return {
+        "total": total,
+        "conversations": [{
+            "id": c.id,
+            "session_id": c.session_id,
+            "visitor_nombre": c.visitor_nombre,
+            "visitor_email": c.visitor_email,
+            "visitor_telefono": c.visitor_telefono,
+            "visitor_empresa": c.visitor_empresa,
+            "cliente_id": c.cliente_id,
+            "prospect_id": c.prospect_id,
+            "interes_detectado": c.interes_detectado,
+            "sentimiento": c.sentimiento,
+            "tokens_input": c.tokens_input,
+            "tokens_output": c.tokens_output,
+            "tokens_total": (c.tokens_input or 0) + (c.tokens_output or 0),
+            "mensajes_count": c.mensajes_count,
+            "convertido_a_prospect": c.convertido_a_prospect,
+            "proveedor_ia": c.proveedor_ia,
+            "inicio_at": c.inicio_at.isoformat() if c.inicio_at else None,
+            "ultimo_mensaje_at": c.ultimo_mensaje_at.isoformat() if c.ultimo_mensaje_at else None,
+        } for c in rows],
+    }
+
+
+@app.get("/api/mateo/conversations/{id}")
+def get_mateo_conversation(id: int, db: Session = Depends(get_db)):
+    conv = db.query(MateoConversation).get(id)
+    if not conv:
+        raise HTTPException(404, "Conversacion no encontrada")
+    messages = db.query(MateoMessage).filter(
+        MateoMessage.conversation_id == id
+    ).order_by(MateoMessage.created_at.asc()).all()
+    return {
+        "id": conv.id,
+        "session_id": conv.session_id,
+        "visitor": {
+            "nombre": conv.visitor_nombre,
+            "email": conv.visitor_email,
+            "telefono": conv.visitor_telefono,
+            "empresa": conv.visitor_empresa,
+        },
+        "interes_detectado": conv.interes_detectado,
+        "sentimiento": conv.sentimiento,
+        "tokens_input": conv.tokens_input,
+        "tokens_output": conv.tokens_output,
+        "mensajes_count": conv.mensajes_count,
+        "convertido_a_prospect": conv.convertido_a_prospect,
+        "inicio_at": conv.inicio_at.isoformat() if conv.inicio_at else None,
+        "ultimo_mensaje_at": conv.ultimo_mensaje_at.isoformat() if conv.ultimo_mensaje_at else None,
+        "messages": [{
+            "role": m.role,
+            "content": m.content,
+            "tokens_usados": m.tokens_usados,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        } for m in messages],
+    }
+
+
+@app.get("/api/mateo/stats")
+def mateo_stats(db: Session = Depends(get_db)):
+    """Dashboard stats para el trainer."""
+    total_convs = db.query(MateoConversation).count()
+    total_tokens_in = db.query(func.coalesce(func.sum(MateoConversation.tokens_input), 0)).scalar() or 0
+    total_tokens_out = db.query(func.coalesce(func.sum(MateoConversation.tokens_output), 0)).scalar() or 0
+    total_leads = db.query(MateoConversation).filter(MateoConversation.convertido_a_prospect == True).count()
+    total_emails_capturados = db.query(MateoConversation).filter(
+        MateoConversation.visitor_email != None,
+        MateoConversation.visitor_email != "",
+    ).count()
+    total_reuniones = db.query(MateoCalendarBooking).count()
+    # Costos estimados (Gemini Flash: ~$0.075/1M input, $0.30/1M output)
+    cost_usd = (total_tokens_in * 0.075 / 1_000_000) + (total_tokens_out * 0.30 / 1_000_000)
+    return {
+        "total_conversaciones": total_convs,
+        "total_tokens_input": total_tokens_in,
+        "total_tokens_output": total_tokens_out,
+        "total_tokens": total_tokens_in + total_tokens_out,
+        "costo_estimado_usd": round(cost_usd, 4),
+        "leads_convertidos": total_leads,
+        "emails_capturados": total_emails_capturados,
+        "reuniones_agendadas": total_reuniones,
+        "tasa_conversion_lead": round((total_leads / total_convs * 100) if total_convs else 0, 1),
+    }
+
+
+def _extract_lead_data(text: str):
+    """Parsea 'LEAD_DATA:email=X|nombre=Y|...' del reply de Mateo."""
+    import re
+    m = re.search(r'LEAD_DATA:([^\n]+)', text)
+    if not m:
+        return {}
+    data = {}
+    for chunk in m.group(1).split('|'):
+        if '=' in chunk:
+            k, v = chunk.split('=', 1)
+            k = k.strip().lower()
+            v = v.strip()
+            if k and v and v.lower() not in ('<x>', '<y>', '<e>', '<t>', 'x', 'y'):
+                data[k] = v
+    return data
+
+
+def _extract_booking_request(text: str):
+    """Parsea 'ACTION:BOOK_MEETING|email=X|...' del reply."""
+    import re
+    m = re.search(r'ACTION:BOOK_MEETING\|([^\n]+)', text)
+    if not m:
+        return {}
+    data = {}
+    for chunk in m.group(1).split('|'):
+        if '=' in chunk:
+            k, v = chunk.split('=', 1)
+            data[k.strip().lower()] = v.strip()
+    return data
+
+
+def _create_prospect_from_lead(lead: dict, session_id: str, db: Session):
+    """Crea/actualiza un Prospect a partir del lead capturado."""
+    email = lead.get('email')
+    if not email or '@' not in email:
+        return None
+    # Dedupe por email
+    existing = db.query(Prospect).filter(Prospect.email == email).first()
+    if existing:
+        # Update any missing fields
+        if not existing.nombre and lead.get('nombre'):
+            existing.nombre = lead['nombre']
+        if not existing.telefono and lead.get('telefono'):
+            existing.telefono = lead['telefono']
+        if not existing.empresa and lead.get('empresa'):
+            existing.empresa = lead['empresa']
+        if not existing.notas and lead.get('interes'):
+            existing.notas = f"Interes: {lead['interes']}\nSesion chat: {session_id}"
+        db.commit()
+        return existing
+    p = Prospect(
+        nombre=lead.get('nombre', '') or email.split('@')[0],
+        email=email,
+        telefono=lead.get('telefono', ''),
+        empresa=lead.get('empresa', ''),
+        fuente="chatbot_mateo",
+        estado="nuevo",
+        notas=f"Interes detectado: {lead.get('interes', 'via chatbot')}\nSesion: {session_id}",
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@app.post("/api/mateo/calendar/book")
+def mateo_book_meeting(data: dict, db: Session = Depends(get_db)):
+    """Stub para crear reunion. Integracion real con Google Calendar se activa
+    si el admin configura GOOGLE_CALENDAR_EMAIL + OAuth. Por ahora guarda el
+    booking localmente y devuelve un meet link stub. El cliente recibe email
+    via secuencia o SMTP."""
+    cfg = _get_or_create_mateo_config(db)
+    if not cfg.auto_agendar_reuniones:
+        raise HTTPException(400, "Auto-agendar esta desactivado en la config")
+    email = data.get('email', '').strip()
+    nombre = data.get('nombre', '').strip()
+    fecha_str = data.get('fecha', '').strip()
+    motivo = data.get('motivo', 'Reunion MIP Quality & Logistics')
+    conversation_id = data.get('conversation_id')
+    if not email or not fecha_str:
+        raise HTTPException(400, "Requiere email y fecha")
+    try:
+        fecha = datetime.fromisoformat(fecha_str.replace('Z', ''))
+    except Exception:
+        raise HTTPException(400, "fecha debe ser formato ISO (YYYY-MM-DD HH:MM)")
+    meet_link = f"https://meet.google.com/new"  # stub; reemplazar con integracion real
+    booking = MateoCalendarBooking(
+        conversation_id=conversation_id,
+        visitor_email=email,
+        visitor_nombre=nombre,
+        fecha_reunion=fecha,
+        duracion_min=data.get('duracion_min', 30),
+        motivo=motivo,
+        estado="confirmada",
+        meet_link=meet_link,
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    # Enqueue confirmation email
+    try:
+        log = EmailLog(
+            destinatario=email,
+            asunto=f"Reunion MIP confirmada - {fecha.strftime('%d/%m/%Y %H:%M')}",
+            cuerpo=f"Hola {nombre},\n\nTu reunion con MIP Quality & Logistics esta confirmada.\n\n"
+                   f"Fecha: {fecha.strftime('%d/%m/%Y a las %H:%M')}\nMotivo: {motivo}\n"
+                   f"Link Meet: {meet_link}\n\nSaludos,\nEquipo MIP",
+            estado="pendiente",
+        )
+        db.add(log)
+        db.commit()
+    except Exception:
+        pass
+    return {
+        "booking_id": booking.id,
+        "meet_link": meet_link,
+        "fecha": fecha.isoformat(),
+        "estado": "confirmada",
+    }
+
+
+@app.get("/api/mateo/calendar/bookings")
+def list_mateo_bookings(db: Session = Depends(get_db)):
+    rows = db.query(MateoCalendarBooking).order_by(MateoCalendarBooking.fecha_reunion.desc()).all()
+    return [{
+        "id": b.id,
+        "visitor_email": b.visitor_email,
+        "visitor_nombre": b.visitor_nombre,
+        "fecha_reunion": b.fecha_reunion.isoformat() if b.fecha_reunion else None,
+        "duracion_min": b.duracion_min,
+        "motivo": b.motivo,
+        "estado": b.estado,
+        "meet_link": b.meet_link,
+        "created_at": b.created_at.isoformat() if b.created_at else None,
+    } for b in rows]
+
+
+@app.post("/api/chat/v2")
+def chat_with_mateo_v2(data: dict, db: Session = Depends(get_db)):
+    """Chat v2 con config editable, tracking de tokens, historial y lead capture."""
+    import uuid
+    message = data.get("message", "").strip()
+    history = data.get("history", [])
+    cliente_id = data.get("cliente_id")
+    session_id = data.get("session_id") or str(uuid.uuid4())
+    visitor_info = data.get("visitor", {})
+
+    if not message:
+        raise HTTPException(400, "Mensaje vacio")
+
+    cfg = _get_or_create_mateo_config(db)
+    if not cfg.activo:
+        return {"reply": "Chatbot desactivado. Contactanos en contacto@mipquality.com", "provider": "disabled", "session_id": session_id}
+
+    # Get or create conversation
+    conv = db.query(MateoConversation).filter(MateoConversation.session_id == session_id).first()
+    if not conv:
+        conv = MateoConversation(
+            session_id=session_id,
+            cliente_id=cliente_id,
+            visitor_email=visitor_info.get('email', ''),
+            visitor_nombre=visitor_info.get('nombre', ''),
+            visitor_telefono=visitor_info.get('telefono', ''),
+            visitor_empresa=visitor_info.get('empresa', ''),
+        )
+        db.add(conv)
+        db.commit()
+        db.refresh(conv)
+
+    # Build context
+    context = ""
+    if cliente_id:
+        try:
+            cliente = db.query(Cliente).get(cliente_id)
+            if cliente:
+                context += f"\n[DATOS DEL CLIENTE LOGUEADO]\nNombre: {cliente.nombre}\nEmpresa: {cliente.empresa}\nRubro: {cliente.rubro}\nEmail: {cliente.email}\n"
+        except Exception:
+            pass
+
+    system = _build_mateo_system_prompt(cfg, context)
+
+    # Build messages with history from DB if any
+    messages = []
+    for h in history[-10:]:
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+    messages.append({"role": "user", "content": message})
+
+    # Save user message
+    db.add(MateoMessage(conversation_id=conv.id, role="user", content=message))
+    db.commit()
+
+    reply_text = None
+    provider_used = "fallback"
+    tokens_in = 0
+    tokens_out = 0
+
+    # Try Gemini first
+    if GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(cfg.modelo_ia or "gemini-2.5-flash", system_instruction=system)
+            gemini_history = []
+            for m in messages[:-1]:
+                gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+            chat = model.start_chat(history=gemini_history)
+            response = chat.send_message(message)
+            reply_text = response.text
+            provider_used = "gemini"
+            # Token counts if available
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                tokens_in = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+                tokens_out = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+            else:
+                tokens_in = len(system + message) // 4
+                tokens_out = len(reply_text) // 4
+        except Exception as e:
+            print(f"Gemini v2 error: {e}")
+
+    if not reply_text and ANTHROPIC_API_KEY:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=cfg.max_tokens_respuesta or 500,
+                system=system,
+                messages=messages,
+            )
+            reply_text = response.content[0].text
+            provider_used = "claude"
+            if hasattr(response, 'usage'):
+                tokens_in = response.usage.input_tokens or 0
+                tokens_out = response.usage.output_tokens or 0
+        except Exception as e:
+            print(f"Claude v2 error: {e}")
+
+    if not reply_text:
+        reply_text = "Hola! Soy Mateo de MIP Quality & Logistics. Ahora mismo estoy con problemas tecnicos, pero puedes escribirnos a contacto@mipquality.com."
+        provider_used = "fallback"
+
+    # Extract lead data & booking action
+    lead = _extract_lead_data(reply_text)
+    booking = _extract_booking_request(reply_text)
+    # Clean reply from our action markers (don't expose to user)
+    clean_reply = reply_text
+    import re as _re
+    clean_reply = _re.sub(r'\s*LEAD_DATA:[^\n]+', '', clean_reply).strip()
+    clean_reply = _re.sub(r'\s*ACTION:BOOK_MEETING\|[^\n]+', '', clean_reply).strip()
+
+    # Update conversation
+    conv.tokens_input = (conv.tokens_input or 0) + tokens_in
+    conv.tokens_output = (conv.tokens_output or 0) + tokens_out
+    conv.mensajes_count = (conv.mensajes_count or 0) + 1
+    conv.proveedor_ia = provider_used
+    conv.ultimo_mensaje_at = datetime.now()
+
+    # Apply lead data
+    if lead:
+        if lead.get('email'):
+            conv.visitor_email = lead['email']
+        if lead.get('nombre'):
+            conv.visitor_nombre = lead['nombre']
+        if lead.get('telefono'):
+            conv.visitor_telefono = lead['telefono']
+        if lead.get('empresa'):
+            conv.visitor_empresa = lead['empresa']
+        if lead.get('interes'):
+            conv.interes_detectado = lead['interes'][:200]
+        # Auto-create prospect
+        if lead.get('email'):
+            prospect = _create_prospect_from_lead(lead, session_id, db)
+            if prospect:
+                conv.prospect_id = prospect.id
+                conv.convertido_a_prospect = True
+
+    # Save assistant message
+    db.add(MateoMessage(
+        conversation_id=conv.id, role="assistant",
+        content=clean_reply, tokens_usados=tokens_out,
+    ))
+    db.commit()
+
+    # Auto-book if requested and config allows
+    booking_result = None
+    if booking and cfg.auto_agendar_reuniones and booking.get('email') and booking.get('fecha'):
+        try:
+            fecha = datetime.fromisoformat(booking['fecha'].replace('Z', ''))
+            b = MateoCalendarBooking(
+                conversation_id=conv.id,
+                visitor_email=booking['email'],
+                visitor_nombre=booking.get('nombre', ''),
+                fecha_reunion=fecha,
+                duracion_min=30,
+                motivo=booking.get('motivo', 'Reunion solicitada desde chatbot'),
+                estado="confirmada",
+                meet_link="https://meet.google.com/new",
+            )
+            db.add(b)
+            db.commit()
+            db.refresh(b)
+            booking_result = {
+                "booking_id": b.id,
+                "fecha": fecha.isoformat(),
+                "meet_link": b.meet_link,
+            }
+        except Exception as e:
+            print(f"booking error: {e}")
+
+    return {
+        "reply": clean_reply,
+        "provider": provider_used,
+        "session_id": session_id,
+        "conversation_id": conv.id,
+        "tokens_used": {"input": tokens_in, "output": tokens_out},
+        "lead_captured": bool(lead.get('email')) if lead else False,
+        "booking": booking_result,
     }
 
 
