@@ -2450,18 +2450,20 @@ def _gemini_embed(text: str):
     if not GEMINI_API_KEY or not text:
         return None
     import requests as _req
-    # Try v1 first, fallback to v1beta
-    endpoints = [
-        f"https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key={GEMINI_API_KEY}",
+    # Try multiple API versions + models
+    candidates = [
+        ("v1beta", "gemini-embedding-001"),
+        ("v1beta", "text-embedding-004"),
+        ("v1", "text-embedding-004"),
+        ("v1beta", "embedding-001"),
     ]
     payload = {
         "content": {"parts": [{"text": text[:20000]}]},
         "taskType": "RETRIEVAL_DOCUMENT",
     }
     last_err = None
-    for url in endpoints:
+    for version, model in candidates:
+        url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:embedContent?key={GEMINI_API_KEY}"
         try:
             r = _req.post(url, json=payload, timeout=15)
             if r.status_code == 200:
@@ -2469,14 +2471,41 @@ def _gemini_embed(text: str):
                 emb = data.get("embedding", {}).get("values") or data.get("embeddings", [{}])[0].get("values")
                 if emb and len(emb) > 0:
                     return emb
-                last_err = f"empty embedding in response: {str(data)[:200]}"
+                last_err = f"{version}/{model}: empty response"
             else:
-                last_err = f"HTTP {r.status_code}: {r.text[:200]}"
+                last_err = f"{version}/{model}: HTTP {r.status_code}"
         except Exception as e:
-            last_err = str(e)[:200]
+            last_err = f"{version}/{model}: {str(e)[:100]}"
             continue
-    print(f"[embed] all endpoints failed. last_err: {last_err}")
+    print(f"[embed] all candidates failed. last: {last_err}")
     return None
+
+
+@app.get("/api/debug/gemini-models")
+def debug_list_gemini_models():
+    """Diagnostic: lista modelos de Gemini disponibles con esta API key."""
+    if not GEMINI_API_KEY:
+        return {"error": "GEMINI_API_KEY not set"}
+    import requests as _req
+    out = {}
+    for version in ["v1", "v1beta"]:
+        try:
+            r = _req.get(
+                f"https://generativelanguage.googleapis.com/{version}/models?key={GEMINI_API_KEY}",
+                timeout=10
+            )
+            if r.status_code == 200:
+                data = r.json()
+                models = data.get("models", [])
+                out[version] = [
+                    {"name": m.get("name"), "methods": m.get("supportedGenerationMethods", [])}
+                    for m in models if "embed" in (m.get("name","") + " ".join(m.get("supportedGenerationMethods",[]))).lower()
+                ]
+            else:
+                out[version] = {"error": f"HTTP {r.status_code}", "body": r.text[:200]}
+        except Exception as e:
+            out[version] = {"error": str(e)[:200]}
+    return out
 
 
 def _cosine_sim(a, b):
