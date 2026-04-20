@@ -3017,10 +3017,19 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
     history = data.get("history", [])
     session_id = data.get("session_id") or str(_uuid.uuid4())
     extra_context = data.get("context", "")
-    visitor = data.get("visitor", {})
+    visitor = dict(data.get("visitor", {}) or {})
 
     if not message:
         raise HTTPException(400, "Mensaje vacio")
+
+    # Auto-extract visitor data desde el mensaje del usuario (regex simple)
+    try:
+        extracted = _extract_visitor_from_message(message, history)
+        for k, v in extracted.items():
+            if v and not visitor.get(k):
+                visitor[k] = v
+    except Exception as e:
+        print(f"[visitor extract] {e}")
 
     # Pipeline tracking
     pipeline = _get_or_create_pipeline(session_id, a.id, visitor, db)
@@ -3217,6 +3226,47 @@ PIPELINE_STAGES = [
 ]
 
 
+def _extract_visitor_from_message(message: str, history: list = None) -> dict:
+    """Extrae nombre, email, telefono, empresa de un mensaje del usuario via regex."""
+    import re
+    out = {}
+    # Email
+    m = re.search(r'[\w\.\-\+]+@[\w\.\-]+\.[a-zA-Z]{2,}', message or "")
+    if m:
+        out["email"] = m.group(0).lower()
+    # Telefono Chile: +56 9 XXXXXXXX o similar
+    m = re.search(r'(\+?\d[\d\s\-]{7,15}\d)', message or "")
+    if m:
+        num = re.sub(r'\s|-', '', m.group(0))
+        if 8 <= len(num.lstrip('+')) <= 15:
+            out["telefono"] = num
+    # Nombre: "soy X", "me llamo X", "habla X"
+    name_patterns = [
+        r'soy\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})',
+        r'me llamo\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})',
+        r'habla\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})',
+        r'mi nombre es\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})',
+    ]
+    for pat in name_patterns:
+        m = re.search(pat, message or "", re.IGNORECASE)
+        if m:
+            out["nombre"] = m.group(1).strip().title()
+            break
+    # Empresa: solo si ya tenemos email o nombre (menos falsos positivos)
+    if out.get("email") or out.get("nombre"):
+        for pat in [
+            r'(?:de|en)\s+([A-Z][A-Za-z0-9&\.\-]+(?:\s+[A-Z][A-Za-z0-9&\.\-]+){0,3})',
+            r'mi empresa\s+(?:es|se llama)?\s*([A-Z][A-Za-z0-9&\.\-\s]{2,30})',
+        ]:
+            m = re.search(pat, message or "")
+            if m:
+                candidate = m.group(1).strip().rstrip('.').rstrip(',')
+                if len(candidate) > 2 and candidate.lower() not in ("mi", "la", "el", "chile", "santiago", "china", "china.", "del"):
+                    out["empresa"] = candidate
+                    break
+    return out
+
+
 def _detect_intent(message: str, history: list = None) -> dict:
     """Detecta intencion del usuario usando keywords + score.
     Retorna {intent, score, sentiment, next_stage_hint}.
@@ -3277,23 +3327,99 @@ def _detect_intent(message: str, history: list = None) -> dict:
 
 
 def _get_or_create_pipeline(session_id: str, agent_id: int, visitor: dict, db) -> ConversationPipeline:
-    """Obtiene o crea un pipeline para una sesion."""
+    """Obtiene o crea un pipeline + Prospect asociado para la sesion.
+    TODOS los chats crean prospect automaticamente (anonimo si hace falta).
+    """
     p = db.query(ConversationPipeline).filter(ConversationPipeline.session_id == session_id).first()
+    v = visitor or {}
     if p:
+        # Si el pipeline existe pero aun no tiene prospect asociado, crearlo
+        if not p.prospect_id:
+            p.prospect_id = _ensure_prospect_from_pipeline(p, session_id, v, agent_id, db)
+            db.commit()
+        # Si hay datos de visitor nuevos (ej: email despues), actualizar Prospect
+        if p.prospect_id:
+            _update_prospect_from_pipeline(p, v, db)
         return p
+    # Crear pipeline nuevo
     p = ConversationPipeline(
         session_id=session_id,
         current_stage="lead_inicial",
         current_agent_id=agent_id,
-        visitor_nombre=(visitor or {}).get("nombre", ""),
-        visitor_email=(visitor or {}).get("email", ""),
-        visitor_telefono=(visitor or {}).get("telefono", ""),
-        visitor_empresa=(visitor or {}).get("empresa", ""),
+        visitor_nombre=v.get("nombre", ""),
+        visitor_email=v.get("email", ""),
+        visitor_telefono=v.get("telefono", ""),
+        visitor_empresa=v.get("empresa", ""),
     )
     db.add(p)
     db.commit()
     db.refresh(p)
+    # Auto-create Prospect asociado
+    p.prospect_id = _ensure_prospect_from_pipeline(p, session_id, v, agent_id, db)
+    db.commit()
     return p
+
+
+def _ensure_prospect_from_pipeline(pipeline, session_id, visitor, agent_id, db):
+    """Crea un Prospect para la conversacion. Si ya hay uno con el mismo email, lo reusa."""
+    email = (visitor or {}).get("email", "").strip().lower()
+    if email:
+        existing = db.query(Prospect).filter(Prospect.email == email).first()
+        if existing:
+            return existing.id
+    # Crear Prospect nuevo. Si no hay nombre aun, usa placeholder con session short
+    nombre = (visitor or {}).get("nombre", "").strip()
+    session_short = session_id[:8] if session_id else "anon"
+    p = Prospect(
+        nombre=nombre or f"Visitante chat · {session_short}",
+        email=email or None,
+        telefono=(visitor or {}).get("telefono", ""),
+        empresa=(visitor or {}).get("empresa", ""),
+        fuente="chatbot_mateo",
+        estado="nuevo",
+        notas=f"Conversacion chat · session_id={session_id}\nAgente inicial: {agent_id}",
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p.id
+
+
+def _update_prospect_from_pipeline(pipeline, visitor, db):
+    """Si ahora conocemos mas datos del visitor (ej email llego en turn 3), actualiza Prospect."""
+    if not pipeline.prospect_id:
+        return
+    prospect = db.query(Prospect).get(pipeline.prospect_id)
+    if not prospect:
+        return
+    v = visitor or {}
+    changed = False
+    # Si el Prospect era anonimo (sin email) y ahora hay email
+    if v.get("email") and (not prospect.email or "@" not in (prospect.email or "")):
+        email = v["email"].strip().lower()
+        # Verificar si otro prospect ya tiene ese email (merge)
+        existing = db.query(Prospect).filter(Prospect.email == email, Prospect.id != prospect.id).first()
+        if existing:
+            # Merge: usar el existing, eliminar el placeholder actual
+            pipeline.prospect_id = existing.id
+            if prospect.nombre and prospect.nombre.startswith("Visitante chat") and v.get("nombre"):
+                existing.nombre = v["nombre"]
+            db.delete(prospect)
+            db.commit()
+            return
+        prospect.email = email
+        changed = True
+    if v.get("nombre") and (not prospect.nombre or prospect.nombre.startswith("Visitante chat")):
+        prospect.nombre = v["nombre"]
+        changed = True
+    if v.get("telefono") and not prospect.telefono:
+        prospect.telefono = v["telefono"]
+        changed = True
+    if v.get("empresa") and not prospect.empresa:
+        prospect.empresa = v["empresa"]
+        changed = True
+    if changed:
+        db.commit()
 
 
 def _find_agent_for_stage(stage: str, db) -> Optional[AgentConfig]:
@@ -4448,6 +4574,102 @@ def listar_prospects(estado: Optional[str] = None, db: Session = Depends(get_db)
     if estado:
         q = q.filter(Prospect.estado == estado)
     return q.order_by(Prospect.created_at.desc()).all()
+
+
+@app.get("/api/prospects/{id}/detalle")
+def get_prospect_detalle(id: int, db: Session = Depends(get_db)):
+    """Detalle completo del prospect: datos + conversacion chat + pipeline + traces."""
+    p = db.query(Prospect).get(id)
+    if not p:
+        raise HTTPException(404, "Prospect no encontrado")
+
+    # Buscar conversation_pipelines asociados
+    pipelines = db.query(ConversationPipeline).filter(ConversationPipeline.prospect_id == id).all()
+    # Tambien buscar conversaciones de chat del mismo email (legacy / compat)
+    chat_convs = []
+    if p.email:
+        for conv in db.query(MateoConversation).filter(MateoConversation.visitor_email == p.email).all():
+            chat_convs.append(conv)
+    # Tambien buscar por session_id si el pipeline lo tiene
+    for pipe in pipelines:
+        extra = db.query(MateoConversation).filter(MateoConversation.session_id == pipe.session_id).first()
+        if extra and extra not in chat_convs:
+            chat_convs.append(extra)
+
+    # Expandir mensajes de cada conversacion
+    conversaciones = []
+    for conv in chat_convs:
+        msgs = db.query(MateoMessage).filter(MateoMessage.conversation_id == conv.id).order_by(MateoMessage.created_at).all()
+        conversaciones.append({
+            "id": conv.id,
+            "session_id": conv.session_id,
+            "inicio_at": conv.inicio_at.isoformat() if conv.inicio_at else None,
+            "ultimo_mensaje_at": conv.ultimo_mensaje_at.isoformat() if conv.ultimo_mensaje_at else None,
+            "mensajes_count": conv.mensajes_count or 0,
+            "tokens_input": conv.tokens_input or 0,
+            "tokens_output": conv.tokens_output or 0,
+            "proveedor_ia": conv.proveedor_ia,
+            "interes_detectado": conv.interes_detectado or "",
+            "sentimiento": conv.sentimiento or "neutral",
+            "messages": [{
+                "role": m.role, "content": m.content,
+                "tokens": m.tokens_usados or 0,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            } for m in msgs],
+        })
+
+    # Actividades asociadas (timeline CRM)
+    try:
+        actividades = db.query(Actividad).filter(
+            (Actividad.descripcion.ilike(f"%prospect {id}%")) |
+            (Actividad.descripcion.ilike(f"%{p.email}%") if p.email else False)
+        ).order_by(Actividad.created_at.desc()).limit(20).all()
+    except Exception:
+        actividades = []
+
+    # Traces del agente (si hubo conversacion)
+    traces = []
+    for conv in chat_convs:
+        for t in db.query(AgentTrace).filter(AgentTrace.session_id == conv.session_id).order_by(AgentTrace.created_at.desc()).limit(20).all():
+            try:
+                tc = json.loads(t.tool_calls or "[]")
+            except Exception:
+                tc = []
+            traces.append({
+                "id": t.id, "agent_id": t.agent_id,
+                "prompt_tokens": t.prompt_tokens, "output_tokens": t.output_tokens,
+                "latency_ms": t.latency_ms, "cost_usd": t.cost_usd,
+                "provider": t.provider,
+                "tool_calls": tc, "tool_calls_count": len(tc),
+                "input_summary": t.input_summary, "output_summary": t.output_summary,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            })
+
+    return {
+        "prospect": {
+            "id": p.id, "nombre": p.nombre, "email": p.email,
+            "telefono": p.telefono, "empresa": p.empresa,
+            "sector": p.sector, "fuente": p.fuente,
+            "estado": p.estado, "score_ia": p.score_ia,
+            "notas": p.notas, "created_at": p.created_at.isoformat() if p.created_at else None,
+        },
+        "pipelines": [{
+            "id": pp.id, "session_id": pp.session_id,
+            "stage": pp.current_stage,
+            "agent_id": pp.current_agent_id,
+            "intent": pp.intent_detected, "sentiment": pp.sentiment,
+            "requires_human": bool(pp.requires_human),
+            "total_messages": pp.total_messages or 0,
+            "last_message_at": pp.last_message_at.isoformat() if pp.last_message_at else None,
+        } for pp in pipelines],
+        "conversaciones": conversaciones,
+        "traces": traces,
+        "actividades": [{
+            "id": a.id, "tipo": a.tipo, "titulo": a.titulo,
+            "descripcion": a.descripcion,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        } for a in (actividades or [])],
+    }
 
 
 @app.post("/api/prospects", response_model=ProspectOut)

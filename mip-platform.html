@@ -1698,42 +1698,20 @@ html,body{overflow-x:hidden;max-width:100vw}
           <p style="font-size:12px;color:var(--text-muted)">Construye agentes IA con bloques modulares de prompt · Tools, RAG y pipelines</p>
         </div>
         <div class="admin-btn-group">
-          <button class="btn btn-outline btn-sm" onclick="loadAgentTools()" title="Ver tools disponibles"><i class="fas fa-cubes"></i> Tools</button>
+          <button class="btn btn-outline btn-sm" onclick="loadAgentTools()" title="Ver tools disponibles"><i class="fas fa-cubes"></i> Tools disponibles</button>
           <button class="btn btn-outline btn-sm" onclick="loadKBFolders()" title="Gestionar Knowledge Base"><i class="fas fa-book"></i> Knowledge Base</button>
-          <button class="btn btn-outline btn-sm" onclick="loadHandoffs()" title="Conversaciones derivadas a humano"><i class="fas fa-hand-paper"></i> Handoffs <span id="handoffs-badge" class="cnt" style="display:none;background:var(--danger);color:#fff">0</span></button>
           <button class="btn btn-dark btn-sm" onclick="openAgentModal()"><i class="fas fa-plus"></i> Nuevo agente</button>
         </div>
       </div>
 
-      <!-- Tabs: Agentes / Kanban / Handoffs -->
-      <div style="display:flex;gap:6px;margin-top:16px;margin-bottom:6px;border-bottom:1px solid var(--border)">
-        <button class="btn btn-outline btn-sm ab-tab ab-tab-active" data-tab="agents" onclick="switchAgentTab('agents')" style="border-radius:4px 4px 0 0;border-bottom:2px solid var(--info)"><i class="fas fa-robot"></i> Agentes</button>
-        <button class="btn btn-outline btn-sm ab-tab" data-tab="kanban" onclick="switchAgentTab('kanban')" style="border-radius:4px 4px 0 0"><i class="fas fa-columns"></i> Kanban pipeline</button>
-        <button class="btn btn-outline btn-sm ab-tab" data-tab="handoffs" onclick="switchAgentTab('handoffs')" style="border-radius:4px 4px 0 0"><i class="fas fa-hand-paper"></i> Handoffs humanos</button>
+      <!-- Banner de navegacion -->
+      <div style="padding:10px 14px;background:var(--info-bg,#eff6ff);border-left:3px solid var(--info);border-radius:var(--radius);margin:14px 0 8px;font-size:11px;color:var(--text-secondary)">
+        <i class="fas fa-info-circle" style="color:var(--info)"></i> Esta seccion es solo para <b>gestionar tus agentes IA</b>. Los leads capturados por los agentes caen automaticamente en <a href="#" onclick="aView('a-prospects');return false" style="color:var(--info);font-weight:600">Prospects</a> donde ves el Kanban y los chats completos.
       </div>
 
-      <!-- Tab: Agentes (grid) -->
-      <div id="ab-tab-agents" class="ab-tab-content">
-        <div id="agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px">
-          <div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;grid-column:1/-1">Cargando agentes...</div>
-        </div>
-      </div>
-
-      <!-- Tab: Kanban -->
-      <div id="ab-tab-kanban" class="ab-tab-content" style="display:none">
-        <div style="margin-top:12px">
-          <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Arrastra una conversacion entre columnas para cambiar su stage. El agente correspondiente al stage tomara la conversacion automaticamente en el proximo mensaje.</p>
-          <div id="pipeline-kanban" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:16px;min-height:400px">
-            <div style="padding:20px;color:var(--text-muted);font-size:12px">Cargando kanban...</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab: Handoffs -->
-      <div id="ab-tab-handoffs" class="ab-tab-content" style="display:none">
-        <div style="margin-top:12px">
-          <div id="handoffs-list"><div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">Cargando handoffs...</div></div>
-        </div>
+      <!-- Lista de agentes (grid) -->
+      <div id="agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px">
+        <div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;grid-column:1/-1">Cargando agentes...</div>
       </div>
 
       <!-- Editor de agente (aparece al seleccionar uno) -->
@@ -2308,9 +2286,12 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- ═══ ADMIN: PROSPECTS ═══ -->
     <div class="page-body" id="a-prospects" style="display:none">
       <div class="admin-header-flex">
-        <h2 style="font-size:18px;font-weight:600">Prospects / Leads</h2>
+        <div>
+          <h2 style="font-size:18px;font-weight:600">Prospects / Leads</h2>
+          <p style="font-size:12px;color:var(--text-muted)">Todos los leads capturados por los agentes IA aparecen aqui. Click en cualquier card para ver el historial de chat completo.</p>
+        </div>
         <div class="admin-btn-group">
-          <button class="btn btn-dark btn-sm" onclick="openProspectModal()"><i class="fas fa-plus"></i> Nuevo prospect</button>
+          <button class="btn btn-dark btn-sm" onclick="openProspectModal()"><i class="fas fa-plus"></i> Nuevo prospect manual</button>
         </div>
       </div>
       <div class="stat-grid">
@@ -2319,11 +2300,37 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="stat-card"><div class="s-label">Contactados</div><div class="s-val" id="prosp-contactados">0</div></div>
         <div class="stat-card"><div class="s-label">Convertidos</div><div class="s-val" id="prosp-convertidos">0</div></div>
       </div>
-      <div class="kanban-board" id="prosp-kanban" style="min-height:360px">
-        <div class="kanban-col" data-status="nuevo"><div class="kanban-col-head"><h4>Nuevo</h4><span class="cnt" data-estado="nuevo">0</span></div><div class="kanban-col-body" id="pk-nuevo"></div></div>
-        <div class="kanban-col" data-status="contactado"><div class="kanban-col-head"><h4>Contactado</h4><span class="cnt" data-estado="contactado">0</span></div><div class="kanban-col-body" id="pk-contactado"></div></div>
-        <div class="kanban-col" data-status="calificado"><div class="kanban-col-head"><h4>Calificado</h4><span class="cnt" data-estado="calificado">0</span></div><div class="kanban-col-body" id="pk-calificado"></div></div>
-        <div class="kanban-col" data-status="convertido"><div class="kanban-col-head"><h4>Convertido</h4><span class="cnt" data-estado="convertido">0</span></div><div class="kanban-col-body" id="pk-convertido"></div></div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:6px;margin-top:16px;margin-bottom:8px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm pr-tab" data-tab="kanban-convs" onclick="switchProspectTab('kanban-convs')" style="border-radius:4px 4px 0 0;border-bottom:2px solid var(--info)"><i class="fas fa-columns"></i> Kanban conversaciones</button>
+        <button class="btn btn-outline btn-sm pr-tab" data-tab="kanban-crm" onclick="switchProspectTab('kanban-crm')" style="border-radius:4px 4px 0 0"><i class="fas fa-users"></i> Kanban CRM</button>
+        <button class="btn btn-outline btn-sm pr-tab" data-tab="handoffs" onclick="switchProspectTab('handoffs')" style="border-radius:4px 4px 0 0"><i class="fas fa-hand-paper"></i> Handoffs humanos <span id="handoffs-badge" class="cnt" style="display:none;background:var(--danger);color:#fff">0</span></button>
+      </div>
+
+      <!-- Tab: Kanban de conversaciones (pipeline por stage de la conversacion con el agente) -->
+      <div id="pr-tab-kanban-convs" class="pr-tab-content">
+        <p style="font-size:11px;color:var(--text-muted);margin:8px 0">Muestra conversaciones activas en el chat del sitio. Cada card = sesion de chat. Arrastra entre columnas para cambiar el stage y reasignar agente automaticamente.</p>
+        <div id="pipeline-kanban" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:16px;min-height:400px">
+          <div style="padding:20px;color:var(--text-muted);font-size:12px">Cargando kanban...</div>
+        </div>
+      </div>
+
+      <!-- Tab: Kanban CRM clasico (prospects por estado) -->
+      <div id="pr-tab-kanban-crm" class="pr-tab-content" style="display:none">
+        <p style="font-size:11px;color:var(--text-muted);margin:8px 0">Prospects en el pipeline CRM (estados tradicionales: nuevo, contactado, calificado, convertido).</p>
+        <div class="kanban-board" id="prosp-kanban" style="min-height:360px">
+          <div class="kanban-col" data-status="nuevo"><div class="kanban-col-head"><h4>Nuevo</h4><span class="cnt" data-estado="nuevo">0</span></div><div class="kanban-col-body" id="pk-nuevo"></div></div>
+          <div class="kanban-col" data-status="contactado"><div class="kanban-col-head"><h4>Contactado</h4><span class="cnt" data-estado="contactado">0</span></div><div class="kanban-col-body" id="pk-contactado"></div></div>
+          <div class="kanban-col" data-status="calificado"><div class="kanban-col-head"><h4>Calificado</h4><span class="cnt" data-estado="calificado">0</span></div><div class="kanban-col-body" id="pk-calificado"></div></div>
+          <div class="kanban-col" data-status="convertido"><div class="kanban-col-head"><h4>Convertido</h4><span class="cnt" data-estado="convertido">0</span></div><div class="kanban-col-body" id="pk-convertido"></div></div>
+        </div>
+      </div>
+
+      <!-- Tab: Handoffs humanos -->
+      <div id="pr-tab-handoffs" class="pr-tab-content" style="display:none">
+        <p style="font-size:11px;color:var(--text-muted);margin:8px 0">Conversaciones que los agentes derivaron a un humano. Pueden venir con notificacion WhatsApp.</p>
+        <div id="handoffs-list"><div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">Cargando handoffs...</div></div>
       </div>
     </div>
 
@@ -4536,9 +4543,11 @@ async function loadProspects() {
         col.innerHTML = filtered.length ? filtered.map(p => {
           const scoreColor = p.score_ia >= 70 ? 'var(--success)' : p.score_ia >= 40 ? 'var(--warning)' : 'var(--danger)';
           const nextSt = nextProspState(st);
-          const btnMove = st !== 'convertido' ? `<button onclick="moveProspect(${p.id},'${nextSt}')" title="Siguiente"><i class="fas fa-arrow-right"></i></button>` : '';
-          const btnConvert = st !== 'convertido' ? `<button onclick="convertirProspect(${p.id})" title="Convertir a cliente"><i class="fas fa-user-check"></i></button>` : '';
-          return `<div class="kanban-card"><div class="kc-product">${p.nombre}</div><div class="kc-client">${p.empresa || 'Sin empresa'}</div><div class="kc-meta"><span style="font-size:10px">${p.fuente || 'otro'}</span><span style="color:${scoreColor};font-weight:600">${p.score_ia || 50}</span></div><div class="kc-actions"><button onclick="editProspect(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>${btnMove}${btnConvert}</div></div>`;
+          const btnMove = st !== 'convertido' ? `<button onclick="event.stopPropagation(); moveProspect(${p.id},'${nextSt}')" title="Siguiente"><i class="fas fa-arrow-right"></i></button>` : '';
+          const btnConvert = st !== 'convertido' ? `<button onclick="event.stopPropagation(); convertirProspect(${p.id})" title="Convertir a cliente"><i class="fas fa-user-check"></i></button>` : '';
+          const isChat = (p.fuente === 'chatbot_mateo' || p.fuente === 'agent_tool');
+          const chatBadge = isChat ? '<span style="font-size:9px;background:var(--info);color:#fff;padding:1px 5px;border-radius:6px;margin-left:4px">CHAT</span>' : '';
+          return `<div class="kanban-card" style="cursor:pointer" onclick="viewProspectDetail(${p.id})" title="Click para ver detalle completo"><div class="kc-product">${p.nombre}${chatBadge}</div><div class="kc-client">${p.empresa || 'Sin empresa'}</div><div class="kc-meta"><span style="font-size:10px">${p.fuente || 'otro'}</span><span style="color:${scoreColor};font-weight:600">${p.score_ia || 50}</span></div><div class="kc-actions"><button onclick="event.stopPropagation(); viewProspectDetail(${p.id})" title="Ver detalle + chat"><i class="fas fa-eye"></i></button><button onclick="event.stopPropagation(); editProspect(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>${btnMove}${btnConvert}</div></div>`;
         }).join('') : '<div style="text-align:center;padding:20px;color:var(--text-faint);font-size:12px">Sin prospects</div>';
       }
     });
@@ -4920,11 +4929,25 @@ async function sendChat() {
         nombre: currentUser?.nombre || '',
       },
     };
-    const r = await fetch(API + '/api/chat/v2', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    // Use agent chat v2 with 60s timeout (Gemini + tools can take ~10-20s)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    let r;
+    try {
+      // Use agent runtime endpoint (mateo-sdr) for full pipeline + prospect auto-capture
+      r = await fetch(API + '/api/agents/1/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('HTTP ' + r.status + ' ' + txt.substring(0, 200));
+    }
     const data = await r.json();
 
     // Remove typing indicator
@@ -4935,16 +4958,23 @@ async function sendChat() {
     const reply = data.reply || 'Lo siento, hubo un error. Intenta de nuevo.';
     body.innerHTML += `<div class="chat-msg bot">${reply.replace(/\n/g, '<br>')}</div>`;
     chatHistory.push({ role: 'assistant', content: reply });
-    if (data.lead_captured) {
-      body.innerHTML += `<div class="chat-msg bot" style="background:var(--success-bg);color:var(--success);font-size:11px"><i class="fas fa-check-circle"></i> Tus datos quedaron guardados. Un asesor se pondra en contacto.</div>`;
-    }
-    if (data.booking) {
-      body.innerHTML += `<div class="chat-msg bot" style="background:var(--info-bg);color:var(--info);font-size:11px"><i class="fas fa-calendar-check"></i> Reunion agendada. Revisa tu email.</div>`;
+    // Visual indicator if agent used tools (lead captured, etc)
+    if (data.tool_calls && data.tool_calls.length) {
+      const leadTool = data.tool_calls.find(t => t.name === 'create_prospect' && t.result?.created);
+      if (leadTool) {
+        body.innerHTML += `<div class="chat-msg bot" style="background:var(--success-bg,#d1fae5);color:var(--success);font-size:11px"><i class="fas fa-check-circle"></i> Tus datos quedaron guardados. Un asesor te contactara pronto.</div>`;
+      }
+      const bookTool = data.tool_calls.find(t => t.name === 'calendar_create_event');
+      if (bookTool) {
+        body.innerHTML += `<div class="chat-msg bot" style="background:var(--info-bg,#dbeafe);color:var(--info);font-size:11px"><i class="fas fa-calendar-check"></i> Reunion agendada. Revisa tu email.</div>`;
+      }
     }
   } catch (err) {
     const typing = document.getElementById('chatTyping');
     if (typing) typing.remove();
-    body.innerHTML += '<div class="chat-msg bot">Disculpa, hubo un problema de conexión. ¿Puedes intentar de nuevo?</div>';
+    const errMsg = err.name === 'AbortError' ? 'La consulta demoro mas de 60 segundos. Intenta con un mensaje mas corto.' : (err.message && err.message.startsWith('HTTP') ? 'Error del servidor. Intenta de nuevo en unos segundos.' : 'Disculpa, hubo un problema de conexion. ¿Puedes intentar de nuevo?');
+    console.error('[Mateo chat]', err);
+    body.innerHTML += `<div class="chat-msg bot">${errMsg}</div>`;
   }
 
   btn.disabled = false;
@@ -5081,8 +5111,24 @@ async function viewMateoConv(id) {
     if (id === 'a-agents') {
       setTimeout(loadAgents, 50);
     }
+    if (id === 'a-prospects') {
+      setTimeout(() => { loadProspects(); loadPipelineKanban(); loadHandoffs(); }, 50);
+    }
   };
 })();
+
+// Tabs dentro de Prospects
+function switchProspectTab(tab) {
+  document.querySelectorAll('.pr-tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.pr-tab').forEach(el => { el.style.borderBottom = ''; });
+  const target = document.getElementById('pr-tab-' + tab);
+  if (target) target.style.display = 'block';
+  const btn = document.querySelector('.pr-tab[data-tab="' + tab + '"]');
+  if (btn) btn.style.borderBottom = '2px solid var(--info)';
+  if (tab === 'kanban-convs') loadPipelineKanban();
+  if (tab === 'handoffs') loadHandoffs();
+  if (tab === 'kanban-crm') loadProspects();
+}
 
 // ═══════════════════════════════════════════════════
 // AGENT BUILDER - UI handlers
@@ -5703,7 +5749,9 @@ async function loadPipelineKanban() {
                 <span style="color:${sentColor};font-size:10px">● ${c.sentiment || 'neutral'}</span>
               </div>
               <div style="margin-top:4px;font-size:9px;color:var(--text-muted)">${c.total_messages} msgs · ${c.session_id.substring(0,8)}</div>
-              <button class="btn btn-outline btn-sm" style="margin-top:6px;width:100%;font-size:10px" onclick="viewPipelineDetail(${c.id})"><i class="fas fa-eye"></i> Ver</button>
+              <div style="display:flex;gap:4px;margin-top:6px">
+                ${c.prospect_id ? `<button class="btn btn-dark btn-sm" style="flex:1;font-size:10px" onclick="viewProspectDetail(${c.prospect_id})"><i class="fas fa-user-circle"></i> Prospect + chat</button>` : `<button class="btn btn-outline btn-sm" style="flex:1;font-size:10px" onclick="viewPipelineDetail(${c.id})"><i class="fas fa-eye"></i> Ver conv</button>`}
+              </div>
             </div>`;
           }).join('') : '<div style="color:var(--text-muted);padding:20px;text-align:center;font-size:11px">Sin conversaciones</div>'}
         </div>
@@ -5740,6 +5788,105 @@ function setupKanbanDragDrop() {
       } catch (err) { toast('error', 'Error', err.message); }
     });
   });
+}
+
+async function viewProspectDetail(id) {
+  try {
+    const d = await api('/api/prospects/' + id + '/detalle');
+    const p = d.prospect;
+    const sentColor = { positivo:'var(--success)', negativo:'var(--danger)', neutral:'var(--text-muted)' };
+
+    const pipeInfo = (d.pipelines && d.pipelines.length) ? d.pipelines.map(pp => `
+      <div style="padding:8px 10px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;font-size:11px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span><b>Stage:</b> <span class="badge badge-info">${pp.stage}</span></span>
+          <span style="color:${sentColor[pp.sentiment] || sentColor.neutral}">● ${pp.sentiment || 'neutral'}</span>
+        </div>
+        <div style="margin-top:4px;color:var(--text-muted)">Intent: ${pp.intent || '—'} · ${pp.total_messages} mensajes · session ${(pp.session_id || '').substring(0,8)}</div>
+        ${pp.requires_human ? '<div style="color:var(--danger);font-weight:600;margin-top:4px"><i class="fas fa-hand-paper"></i> Requiere humano</div>' : ''}
+      </div>
+    `).join('') : '<div style="color:var(--text-muted);font-size:11px">Sin conversacion activa en el pipeline</div>';
+
+    const chatHtml = (d.conversaciones && d.conversaciones.length) ? d.conversaciones.map(conv => {
+      const msgs = (conv.messages || []).map(m => {
+        const isUser = m.role === 'user';
+        const align = isUser ? 'margin-right:auto;background:var(--bg-surface)' : 'margin-left:auto;background:#e0e7ff';
+        const name = isUser ? '👤 Cliente' : '🤵 Agente';
+        return `<div style="max-width:75%;${align};padding:8px 12px;border-radius:12px;margin-bottom:6px;font-size:12px">
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:2px">${name} · ${m.created_at ? new Date(m.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) : ''}</div>
+          <div style="white-space:pre-wrap;line-height:1.4">${(m.content||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+        </div>`;
+      }).join('') || '<div style="color:var(--text-muted);font-size:11px;padding:12px">Sin mensajes en esta sesion</div>';
+      return `<div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">
+          <b>Sesion:</b> ${(conv.session_id || '').substring(0,12)} · <b>Inicio:</b> ${conv.inicio_at ? new Date(conv.inicio_at).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'} · <b>Mensajes:</b> ${conv.mensajes_count} · <b>Tokens:</b> ${conv.tokens_input + conv.tokens_output} · <b>AI:</b> ${conv.proveedor_ia || '?'}
+        </div>
+        <div style="display:flex;flex-direction:column;background:var(--bg-white);padding:10px;border-radius:var(--radius);border:1px solid var(--border);max-height:450px;overflow-y:auto">${msgs}</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--text-muted);font-size:12px;padding:24px;text-align:center">Sin historial de chat para este prospect</div>';
+
+    const tracesHtml = (d.traces && d.traces.length) ? `<div class="dtable-wrap"><table class="dtable"><thead><tr><th>Fecha</th><th>Provider</th><th>Tokens</th><th>Latencia</th><th>Tools</th></tr></thead><tbody>
+      ${d.traces.map(t => `<tr>
+        <td style="font-size:10px">${t.created_at ? new Date(t.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+        <td style="font-size:11px">${t.provider || '—'}</td>
+        <td style="font-size:11px">${t.prompt_tokens}+${t.output_tokens}</td>
+        <td style="font-size:11px">${t.latency_ms}ms</td>
+        <td style="font-size:11px">${t.tool_calls_count || 0}</td>
+      </tr>`).join('')}
+    </tbody></table></div>` : '<div style="color:var(--text-muted);font-size:11px;padding:10px">Sin traces registrados</div>';
+
+    const actsHtml = (d.actividades && d.actividades.length) ? d.actividades.map(a => `
+      <div style="padding:6px 10px;border-left:2px solid var(--info);margin-bottom:4px;font-size:11px">
+        <div style="font-weight:600">${a.tipo} · ${a.titulo || ''}</div>
+        <div style="color:var(--text-muted);font-size:10px">${a.created_at ? new Date(a.created_at).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+        <div>${a.descripcion || ''}</div>
+      </div>`).join('') : '<div style="color:var(--text-muted);font-size:11px;padding:8px">Sin actividades asociadas</div>';
+
+    let modal = document.getElementById('prospectDetailModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'prospectDetailModal';
+      modal.className = 'modal-bg';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:920px;max-height:92vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        <div>
+          <h3 style="margin:0;font-size:16px"><i class="fas fa-user-circle" style="margin-right:6px;color:var(--info)"></i>${p.nombre || 'Anonimo'}</h3>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${p.email || 'sin email'} · ${p.telefono || 'sin tel'} · ${p.empresa || 'sin empresa'}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="editProspect(${p.id})"><i class="fas fa-edit"></i> Editar</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('prospectDetailModal').classList.remove('open')" style="color:var(--text-muted)">&times;</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px">
+        <div class="stat-card" style="padding:10px"><div class="s-label" style="font-size:10px">Estado</div><div class="s-val" style="font-size:13px">${p.estado}</div></div>
+        <div class="stat-card" style="padding:10px"><div class="s-label" style="font-size:10px">Fuente</div><div class="s-val" style="font-size:13px">${p.fuente || '—'}</div></div>
+        <div class="stat-card" style="padding:10px"><div class="s-label" style="font-size:10px">Score IA</div><div class="s-val" style="font-size:13px">${p.score_ia || 0}</div></div>
+        <div class="stat-card" style="padding:10px"><div class="s-label" style="font-size:10px">Sector</div><div class="s-val" style="font-size:13px">${p.sector || '—'}</div></div>
+        <div class="stat-card" style="padding:10px"><div class="s-label" style="font-size:10px">Creado</div><div class="s-val" style="font-size:11px">${p.created_at ? new Date(p.created_at).toLocaleDateString('es-CL') : '—'}</div></div>
+      </div>
+      ${p.notas ? `<div style="padding:10px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:14px;font-size:12px"><b>Notas:</b> ${p.notas}</div>` : ''}
+      <div style="margin-bottom:14px">
+        <h4 style="font-size:12px;font-weight:600;margin-bottom:8px"><i class="fas fa-columns" style="margin-right:4px;color:var(--info)"></i>Pipeline</h4>
+        ${pipeInfo}
+      </div>
+      <div style="margin-bottom:14px">
+        <h4 style="font-size:12px;font-weight:600;margin-bottom:8px"><i class="fas fa-comments" style="margin-right:4px;color:var(--info)"></i>Historial de chat (${(d.conversaciones || []).length} sesiones)</h4>
+        ${chatHtml}
+      </div>
+      <div style="margin-bottom:14px">
+        <h4 style="font-size:12px;font-weight:600;margin-bottom:8px"><i class="fas fa-chart-line" style="margin-right:4px;color:var(--info)"></i>Traces del agente (${(d.traces || []).length})</h4>
+        ${tracesHtml}
+      </div>
+      <div>
+        <h4 style="font-size:12px;font-weight:600;margin-bottom:8px"><i class="fas fa-history" style="margin-right:4px;color:var(--info)"></i>Actividades</h4>
+        ${actsHtml}
+      </div>
+    </div>`;
+    modal.classList.add('open');
+  } catch (err) { toast('error', 'Error', err.message); }
 }
 
 async function viewPipelineDetail(id) {
