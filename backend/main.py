@@ -2446,18 +2446,30 @@ def list_kb_docs(id: int, db: Session = Depends(get_db)):
 
 
 def _gemini_embed(text: str):
-    """Genera embedding via Gemini text-embedding-004 (768d)."""
+    """Genera embedding via Gemini (768d)."""
     if not GEMINI_API_KEY or not text:
         return None
+    # Try multiple model names (API version differences)
+    candidates = ["text-embedding-004", "models/text-embedding-004", "embedding-001", "models/embedding-001"]
     try:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
-        result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type="retrieval_document",
-        )
-        return result.get("embedding") or result.get("embeddings")
+        last_err = None
+        for model_name in candidates:
+            try:
+                result = genai.embed_content(
+                    model=model_name,
+                    content=text,
+                    task_type="retrieval_document",
+                )
+                emb = result.get("embedding") or result.get("embeddings")
+                if emb:
+                    return emb
+            except Exception as e:
+                last_err = str(e)
+                continue
+        print(f"[embed] all models failed. last_err: {last_err}")
+        return None
     except Exception as e:
         print(f"[embed] error: {e}")
         return None
