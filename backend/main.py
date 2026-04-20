@@ -693,6 +693,129 @@ def add_productos(cot_id: int, data: dict, db: Session = Depends(get_db)):
     return {"cotizacion_id": cot_id, "productos_creados": len(created), "productos": created}
 
 
+# ═══════════════════════════════════════════════════
+# PDF PARSER - extrae productos de cotizaciones PDF
+# ═══════════════════════════════════════════════════
+
+@app.post("/api/cotizaciones/parse-pdf")
+async def parse_cotizacion_pdf(file: UploadFile = File(...)):
+    """Recibe un PDF de cotizacion y retorna JSON estructurado con productos.
+    Usa pypdf para extraer texto + Gemini para estructurar via function calling.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Solo archivos PDF")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10 MB
+        raise HTTPException(400, "PDF muy grande (max 10MB)")
+
+    # Extract text with pypdf
+    try:
+        from pypdf import PdfReader
+        import io as _io
+        reader = PdfReader(_io.BytesIO(content))
+        pages_text = []
+        for i, page in enumerate(reader.pages):
+            try:
+                txt = page.extract_text() or ""
+                pages_text.append(f"--- PAGE {i+1} ---\n{txt}")
+            except Exception as e:
+                pages_text.append(f"--- PAGE {i+1} (error extract: {e}) ---")
+        raw_text = "\n\n".join(pages_text)
+    except Exception as e:
+        raise HTTPException(500, f"Error leyendo PDF: {str(e)[:200]}")
+
+    if not raw_text or len(raw_text.strip()) < 50:
+        return {
+            "ok": False,
+            "error": "El PDF no contiene texto legible (puede ser un PDF solo con imagenes). Intenta OCR.",
+            "raw_text_length": len(raw_text or ""),
+        }
+
+    # Parse with Gemini
+    if not GEMINI_API_KEY:
+        return {
+            "ok": False,
+            "error": "GEMINI_API_KEY no configurado. Agregue la API key para habilitar el parser IA.",
+            "raw_text": raw_text[:2000],
+        }
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        prompt = """Eres un parser experto en cotizaciones de importacion desde China hacia Chile.
+
+Lee el siguiente texto extraido de un PDF de cotizacion y extrae la informacion estructurada:
+
+1. NOMBRE DEL PROYECTO: el titulo general del PDF (ej: "Bichos-Emonk", "Campaña Retail Q4", etc). Suele estar en la pagina 1 o 2.
+2. DESCRIPCION DEL PROYECTO: resumen breve de que es el proyecto.
+3. PROVEEDOR / ORIGEN: nombre de la empresa que emitio la cotizacion (ej: emonk, Alibaba trader, etc). Si aparece.
+4. PRODUCTOS: array de productos. Por cada uno extrae:
+   - nombre: titulo del producto
+   - categoria: una de [gorras, ropa, botellas, medallas, toallas, mochilas, maquinaria_industrial, vending_machine, repuestos_autos, insumos_medicos, luminaria, tecnologia, mobiliario, packaging, herramientas, juguetes, alimentos, cosmetica, deportes, oficina, otro]
+   - descripcion: texto descriptivo + lista de caracteristicas (materiales, medidas, features)
+   - cantidad: MOQ en unidades (ej "500 unidades", "1000")
+   - precio_objetivo: precio unitario con moneda (ej "5734 CLP", "$1.20 USD")
+   - materialidad: material principal (ej "100% nylon", "acero inoxidable")
+   - dimensiones: medidas (ej "43 x 13 x 29cm", "178 × 224 × 73 mm")
+
+Responde SOLO con JSON valido con esta estructura exacta:
+{
+  "proyecto_nombre": "...",
+  "proyecto_descripcion": "...",
+  "proveedor": "...",
+  "productos": [
+    {
+      "nombre": "...",
+      "categoria": "...",
+      "descripcion": "...",
+      "cantidad": "...",
+      "precio_objetivo": "...",
+      "materialidad": "...",
+      "dimensiones": "..."
+    }
+  ]
+}
+
+Si un campo no esta en el PDF, pon string vacio "".
+NO agregues preambulos, comentarios o markdown. SOLO JSON puro.
+
+TEXTO DEL PDF:
+""" + raw_text[:30000]  # Limitar para no exceder context
+
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        resp = model.generate_content(prompt, generation_config={"temperature": 0.2, "response_mime_type": "application/json"})
+        reply_text = resp.text.strip()
+
+        # Parse JSON
+        try:
+            parsed = json.loads(reply_text)
+        except json.JSONDecodeError:
+            # Intentar extraer JSON si viene con texto extra
+            import re as _re
+            m = _re.search(r'\{.*\}', reply_text, _re.DOTALL)
+            if not m:
+                return {
+                    "ok": False,
+                    "error": "El parser no devolvio JSON valido.",
+                    "raw_gemini_response": reply_text[:1000],
+                }
+            parsed = json.loads(m.group(0))
+
+        return {
+            "ok": True,
+            "parsed": parsed,
+            "productos_count": len(parsed.get("productos", [])),
+            "raw_text_preview": raw_text[:800],
+        }
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return {
+            "ok": False,
+            "error": f"Error del parser IA: {str(e)[:300]}",
+            "raw_text_preview": raw_text[:800],
+        }
+
+
 @app.get("/api/cotizaciones/{cot_id}/productos")
 def get_productos(cot_id: int, db: Session = Depends(get_db)):
     """Get all products for a cotizacion"""
@@ -3284,29 +3407,59 @@ def list_agent_traces(id: int, limit: int = 50, db: Session = Depends(get_db)):
 # El admin chatea con el copiloto y este modifica los bloques del agente.
 # ═══════════════════════════════════════════════════
 
-COPILOT_SYSTEM_PROMPT = """Eres el Copiloto de Agent Builder, un asistente experto en diseñar agentes IA conversacionales.
-Tu rol es ayudar al ADMIN a construir, ajustar y perfeccionar agentes IA de ventas/soporte.
+COPILOT_SYSTEM_PROMPT = """Eres el Copiloto de Agent Builder, asistente experto en diseñar agentes IA.
 
-CAPACIDADES:
-- Leer el estado actual de los bloques del agente (identidad, instrucciones, info clave).
-- Sugerir cambios con ejemplos concretos.
-- MODIFICAR los bloques directamente cuando el admin lo pide.
-- Crear nuevos bloques (que no hacer, pasos, objetivos, CTAs, info).
-- Cambiar tono, longitud, temperatura del agente.
-- Explicar como funciona cada categoria (identidad/instrucciones/info_clave).
+IMPORTANTE: NUNCA aplicas cambios directamente. Solo PROPONES un plan en formato JSON que el admin revisa y decide si aprobar.
+
+Tu flujo:
+1. Lee el estado actual del agente.
+2. Entiende lo que el admin quiere.
+3. Responde en TEXTO BREVE explicando lo que propones (maximo 3 lineas, conversacional).
+4. Luego, al final de tu respuesta, si hay cambios concretos, incluye un bloque:
+
+```plan
+{
+  "resumen": "Frase corta de lo que cambia",
+  "actions": [
+    {
+      "op": "create_block",
+      "categoria": "instrucciones",
+      "tipo": "que_no_hacer",
+      "nombre": "Descuentos",
+      "contenido": "Nunca dar descuentos mayores a 15% sin aprobacion del admin humano. Pedir autorizacion antes de comprometer.",
+      "orden": 90
+    },
+    {
+      "op": "update_block",
+      "block_id": 10,
+      "campos": {"contenido": "nuevo texto..."},
+      "razon": "Ajustar tono a mas formal"
+    },
+    {
+      "op": "delete_block",
+      "block_id": 5,
+      "razon": "Redundante con el bloque X"
+    },
+    {
+      "op": "update_agent_settings",
+      "campos": {"temperatura": 0.5, "max_tokens": 600},
+      "razon": "Respuestas mas consistentes"
+    }
+  ]
+}
+```
 
 REGLAS:
-- Antes de hacer cambios, RESUME brevemente lo que entendiste.
-- Propone los cambios ANTES de aplicarlos. Confirma con el admin.
-- Cuando vayas a editar, usa las tools provistas (update_block, create_block, etc).
-- Conserva el estilo chileno del agente si ya lo tiene.
-- Si el admin es vago, haz preguntas especificas (ej: "¿quieres que sea mas formal o mas cercano?").
-- Siempre termina con UN call to action claro al admin (ej: "¿Aplico estos cambios?").
+- Si el admin solo pregunta o pide explicacion, responde SIN bloque plan.
+- Si el admin pide cambios, incluye SIEMPRE el bloque plan.
+- Ops validos: create_block, update_block, delete_block, update_agent_settings.
+- Para create_block: categoria (identidad/instrucciones/info_clave), tipo, nombre, contenido, orden.
+- Para update_block: block_id + campos (puede incluir: nombre, contenido, orden, activo).
+- Incluye razon breve en cada action para que el admin entienda por que.
+- Escribe el JSON con minificacion. Solo un bloque ```plan por respuesta.
+- Si el cambio es muy grande (>10 ops), divide en partes y pregunta cual hacer primero.
 
-FORMATO:
-- Corto, directo, conversacional.
-- Markdown cuando muestres lista de cambios.
-- Sin preambulos largos."""
+TONO: conversacional, directo, corto. Espanol chileno neutro. Max 3 lineas de texto + bloque plan."""
 
 
 def _copilot_build_tools(db):
@@ -3444,10 +3597,80 @@ def _copilot_describe_agent(agent, db) -> str:
     return "\n".join(lines)
 
 
+def _extract_copilot_plan(text: str) -> Optional[dict]:
+    """Extrae el bloque ```plan ...``` del reply del copiloto. Retorna dict o None."""
+    import re as _re
+    m = _re.search(r'```plan\s*(\{.*?\})\s*```', text or "", _re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except Exception as e:
+        print(f"[plan parse] {e}")
+        return None
+
+
+def _strip_plan_block(text: str) -> str:
+    """Remueve el bloque plan del reply para mostrar solo el texto conversacional."""
+    import re as _re
+    return _re.sub(r'```plan\s*\{.*?\}\s*```', '', text or "", flags=_re.DOTALL).strip()
+
+
+def _validate_copilot_plan(plan: dict, agent, db) -> list:
+    """Valida el plan contra el estado actual del agente y enriquece cada action con
+    before/after para mostrar diff en UI. Retorna lista de actions validadas."""
+    actions_validated = []
+    existing_blocks = {b.id: b for b in db.query(AgentBlock).filter(AgentBlock.agent_id == agent.id).all()}
+    for act in (plan.get("actions") or []):
+        op = act.get("op")
+        item = {"op": op, "razon": act.get("razon", ""), "valid": True}
+        if op == "create_block":
+            item["categoria"] = act.get("categoria", "identidad")
+            item["tipo"] = act.get("tipo", "personificacion")
+            item["nombre"] = act.get("nombre", "Nuevo bloque")
+            item["contenido"] = act.get("contenido", "")
+            item["orden"] = act.get("orden", 100)
+        elif op == "update_block":
+            bid = act.get("block_id")
+            b = existing_blocks.get(bid)
+            if not b:
+                item["valid"] = False
+                item["error"] = f"Bloque {bid} no existe"
+            else:
+                campos = act.get("campos") or {}
+                item["block_id"] = bid
+                item["before"] = {
+                    "nombre": b.nombre, "contenido": b.contenido,
+                    "orden": b.orden, "activo": b.activo,
+                }
+                item["after"] = {k: campos.get(k, getattr(b, k, None)) for k in ["nombre", "contenido", "orden", "activo"]}
+                item["campos"] = campos
+        elif op == "delete_block":
+            bid = act.get("block_id")
+            b = existing_blocks.get(bid)
+            if not b:
+                item["valid"] = False
+                item["error"] = f"Bloque {bid} no existe"
+            else:
+                item["block_id"] = bid
+                item["before"] = {"nombre": b.nombre, "categoria": b.categoria, "tipo": b.tipo, "contenido": b.contenido[:200] if b.contenido else ""}
+        elif op == "update_agent_settings":
+            campos = act.get("campos") or {}
+            item["campos"] = campos
+            item["before"] = {k: getattr(agent, k, None) for k in campos.keys() if hasattr(agent, k)}
+            item["after"] = {k: campos.get(k) for k in campos.keys()}
+        else:
+            item["valid"] = False
+            item["error"] = f"Op desconocida: {op}"
+        actions_validated.append(item)
+    return actions_validated
+
+
 @app.post("/api/agents/{id}/copilot")
 def agent_copilot(id: int, data: dict, db: Session = Depends(get_db)):
-    """Chat del admin con el copiloto. El copiloto puede leer y modificar los bloques del agente via tools."""
-    import time as _time
+    """Chat del admin con el copiloto. El copiloto PROPONE cambios (no los aplica).
+    Retorna reply + plan opcional con acciones que el admin puede aprobar/rechazar.
+    """
     agent = db.query(AgentConfig).get(id)
     if not agent:
         raise HTTPException(404, "Agente no encontrado")
@@ -3460,71 +3683,138 @@ def agent_copilot(id: int, data: dict, db: Session = Depends(get_db)):
     agent_state = _copilot_describe_agent(agent, db)
     system = COPILOT_SYSTEM_PROMPT + "\n\n" + agent_state
 
-    if not GEMINI_API_KEY:
-        return {"reply": "Copiloto requiere GEMINI_API_KEY configurado.", "provider": "none", "tools_executed": []}
+    provider_used = "none"
+    reply_text = None
 
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        tools = _copilot_build_tools(db)
-        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system, tools=tools)
+    # Try Gemini first
+    if GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
+            gemini_history = []
+            for h in (history or [])[-10:]:
+                role = "model" if h.get("role") == "assistant" else "user"
+                gemini_history.append({"role": role, "parts": [h.get("content", "")]})
+            chat = model.start_chat(history=gemini_history)
+            resp = chat.send_message(message)
+            reply_text = resp.text
+            provider_used = "gemini"
+        except Exception as e:
+            print(f"[copilot gemini] {e}")
 
-        gemini_history = []
-        for h in (history or [])[-10:]:
-            role = "model" if h.get("role") == "assistant" else "user"
-            gemini_history.append({"role": role, "parts": [h.get("content", "")]})
-        chat = model.start_chat(history=gemini_history)
+    # Fallback a Claude
+    if not reply_text and ANTHROPIC_API_KEY:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            msgs = []
+            for h in (history or [])[-10:]:
+                msgs.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+            msgs.append({"role": "user", "content": message})
+            resp = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1500,
+                system=system,
+                messages=msgs,
+            )
+            reply_text = resp.content[0].text
+            provider_used = "claude"
+        except Exception as e:
+            print(f"[copilot claude] {e}")
 
-        tools_executed = []
-        tokens_in = 0
-        tokens_out = 0
-        current_msg = message
-
-        for iteration in range(5):  # max 5 iteraciones
-            resp = chat.send_message(current_msg)
-            if hasattr(resp, "usage_metadata") and resp.usage_metadata:
-                tokens_in += getattr(resp.usage_metadata, "prompt_token_count", 0) or 0
-                tokens_out += getattr(resp.usage_metadata, "candidates_token_count", 0) or 0
-
-            fn_calls = []
-            try:
-                for part in resp.candidates[0].content.parts:
-                    if hasattr(part, "function_call") and part.function_call and part.function_call.name:
-                        fn_calls.append(part.function_call)
-            except Exception:
-                pass
-
-            if not fn_calls:
-                try:
-                    reply = resp.text
-                except Exception:
-                    reply = "Listo, cambios aplicados. ¿Que mas necesitas?"
-                return {
-                    "reply": reply,
-                    "provider": "gemini",
-                    "tools_executed": tools_executed,
-                    "tokens": {"input": tokens_in, "output": tokens_out},
-                }
-
-            # Ejecutar tools y enviar resultados
-            responses = []
-            for fc in fn_calls:
-                args = dict(fc.args) if fc.args else {}
-                result = _copilot_execute_tool(fc.name, args, agent, db)
-                tools_executed.append({"name": fc.name, "args": args, "result": result})
-                responses.append({"function_response": {"name": fc.name, "response": result}})
-            current_msg = responses
-
+    if not reply_text:
         return {
-            "reply": "(Copiloto alcanzo limite de iteraciones)",
-            "provider": "gemini",
-            "tools_executed": tools_executed,
-            "tokens": {"input": tokens_in, "output": tokens_out},
+            "reply": "Copiloto no disponible. Verifica GEMINI_API_KEY o ANTHROPIC_API_KEY en las variables de entorno.",
+            "provider": "none",
+            "plan": None,
         }
-    except Exception as e:
-        print(f"[copilot] {e}")
-        import traceback; traceback.print_exc()
-        return {"reply": f"Error del copiloto: {str(e)[:200]}", "provider": "error", "tools_executed": []}
+
+    # Extraer plan si hay
+    plan = _extract_copilot_plan(reply_text)
+    clean_reply = _strip_plan_block(reply_text)
+    actions_validated = []
+    if plan:
+        actions_validated = _validate_copilot_plan(plan, agent, db)
+
+    return {
+        "reply": clean_reply or "Entendido.",
+        "provider": provider_used,
+        "plan": {
+            "resumen": plan.get("resumen") if plan else None,
+            "actions": actions_validated,
+        } if plan else None,
+    }
+
+
+@app.post("/api/agents/{id}/copilot/apply-plan")
+def agent_copilot_apply_plan(id: int, data: dict, db: Session = Depends(get_db)):
+    """Aplica un plan aprobado por el admin. Recibe las actions validadas.
+    data: { actions: [...] } - mismo formato que retorna /copilot
+    """
+    agent = db.query(AgentConfig).get(id)
+    if not agent:
+        raise HTTPException(404, "Agente no encontrado")
+    actions = data.get("actions") or []
+    if not actions:
+        raise HTTPException(400, "Sin actions para aplicar")
+
+    results = []
+    for act in actions:
+        if not act.get("valid", True):
+            results.append({"op": act.get("op"), "skipped": True, "reason": act.get("error")})
+            continue
+        op = act.get("op")
+        try:
+            if op == "create_block":
+                b = AgentBlock(
+                    agent_id=agent.id,
+                    categoria=act.get("categoria", "identidad"),
+                    tipo=act.get("tipo", "personificacion"),
+                    nombre=act.get("nombre", "Nuevo bloque"),
+                    contenido=act.get("contenido", ""),
+                    orden=act.get("orden", 100),
+                    activo=True,
+                )
+                db.add(b)
+                db.flush()
+                results.append({"op": op, "ok": True, "block_id": b.id})
+            elif op == "update_block":
+                b = db.query(AgentBlock).filter(
+                    AgentBlock.id == act.get("block_id"),
+                    AgentBlock.agent_id == agent.id,
+                ).first()
+                if not b:
+                    results.append({"op": op, "ok": False, "error": "Bloque no encontrado"})
+                    continue
+                campos = act.get("campos") or {}
+                for k in ["nombre", "contenido", "orden", "activo"]:
+                    if k in campos and campos[k] is not None:
+                        setattr(b, k, campos[k])
+                results.append({"op": op, "ok": True, "block_id": b.id})
+            elif op == "delete_block":
+                b = db.query(AgentBlock).filter(
+                    AgentBlock.id == act.get("block_id"),
+                    AgentBlock.agent_id == agent.id,
+                ).first()
+                if not b:
+                    results.append({"op": op, "ok": False, "error": "Bloque no encontrado"})
+                    continue
+                db.delete(b)
+                results.append({"op": op, "ok": True, "deleted": True})
+            elif op == "update_agent_settings":
+                campos = act.get("campos") or {}
+                for k in ["display_name", "descripcion", "avatar", "temperatura", "max_tokens", "tools_allowed", "modelo", "stages"]:
+                    if k in campos and campos[k] is not None:
+                        setattr(agent, k, campos[k])
+                results.append({"op": op, "ok": True})
+            else:
+                results.append({"op": op, "ok": False, "error": f"Op desconocida: {op}"})
+        except Exception as e:
+            results.append({"op": op, "ok": False, "error": str(e)[:200]})
+    db.commit()
+    applied = sum(1 for r in results if r.get("ok"))
+    return {"applied": applied, "total": len(actions), "results": results}
 
 
 # ═══════════════════════════════════════════════════

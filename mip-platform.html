@@ -1476,6 +1476,20 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group"><label class="form-label">Rubro</label><select class="form-input" id="np-rubro"><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Deportes</option><option>Otro</option></select></div>
           </div>
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-folder-open" style="margin-right:4px"></i> PROYECTO</div>
+
+          <!-- PDF PARSER: Si ya tienes la cotizacion como PDF -->
+          <div style="padding:12px;background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(99,102,241,0.08));border:1px dashed #8b5cf6;border-radius:var(--radius);margin-bottom:14px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <i class="fas fa-file-pdf" style="color:#8b5cf6;font-size:18px"></i>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:#8b5cf6">¿Ya tienes una cotizacion PDF?</div>
+                <div style="font-size:11px;color:var(--text-muted)">Subela y la IA rellena automaticamente proyecto + productos</div>
+              </div>
+            </div>
+            <input type="file" id="np-pdf-cotizacion" accept=".pdf" onchange="handlePdfCotizacionUpload(event)" style="padding:6px;font-size:11px;width:100%;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer">
+            <div id="np-pdf-status" style="font-size:10px;color:var(--text-muted);margin-top:6px;display:none"></div>
+          </div>
+
           <div class="form-group"><label class="form-label">Nombre del proyecto *</label><input type="text" class="form-input" id="np-proyecto-nombre" placeholder="Importación gorras personalizadas, Línea Ironman, etc." required></div>
           <div class="form-group"><label class="form-label">Descripción del proyecto</label><textarea class="form-input" id="np-proyecto-desc" placeholder="Objetivo general del proyecto, deadlines, contexto comercial..." style="min-height:70px;resize:vertical"></textarea></div>
 
@@ -6194,7 +6208,74 @@ async function connectGoogleCalendar() {
       window.open(r.auth_url, '_blank');
       toast('info', 'Conectando', 'Se abrio una pestaña para autorizar con Google. Vuelve aqui al terminar.');
     }
-  } catch (err) { toast('error', 'Error', err.message + ' (requiere GOOGLE_OAUTH_CLIENT_ID/SECRET/REDIRECT_URI en env vars)'); }
+  } catch (err) {
+    // Mostrar modal de setup completo con instrucciones
+    showGoogleCalendarSetupModal(err.message);
+  }
+}
+
+function showGoogleCalendarSetupModal(errorMsg) {
+  let modal = document.getElementById('gcalSetupModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'gcalSetupModal';
+    modal.className = 'modal-bg';
+    document.body.appendChild(modal);
+  }
+  const redirectUri = window.location.origin + '/api/integrations/google-calendar/oauth/callback';
+  modal.innerHTML = `<div class="modal-box" style="max-width:640px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="margin:0;font-size:15px"><i class="fab fa-google" style="color:#4285F4;margin-right:6px"></i>Configurar Google Calendar OAuth</h3>
+      <button onclick="document.getElementById('gcalSetupModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+    </div>
+
+    <div style="padding:10px 14px;background:#fef2f2;border-left:3px solid var(--danger);border-radius:var(--radius);margin-bottom:14px;font-size:11px;color:var(--text-secondary)">
+      <b style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Faltan credenciales en el servidor</b><br>
+      ${(errorMsg || '').substring(0, 250)}
+    </div>
+
+    <p style="font-size:12px;margin-bottom:12px">Para habilitar Google Calendar necesitas configurar 3 variables de entorno en Cloud Run:</p>
+
+    <ol style="font-size:12px;line-height:1.7;padding-left:20px">
+      <li style="margin-bottom:10px">
+        <b>Crear OAuth 2.0 Client ID en Google Cloud Console</b><br>
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--info);font-size:11px"><i class="fas fa-external-link-alt"></i> Abrir Google Cloud Console → Credentials</a>
+      </li>
+      <li style="margin-bottom:10px">
+        <b>Habilitar Google Calendar API</b><br>
+        <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" style="color:var(--info);font-size:11px"><i class="fas fa-external-link-alt"></i> Enable Google Calendar API</a>
+      </li>
+      <li style="margin-bottom:10px">
+        <b>Agregar esta URL como Authorized redirect URI</b>:
+        <div style="background:var(--bg-surface);padding:6px 10px;border-radius:var(--radius);font-family:monospace;font-size:10px;margin-top:4px;word-break:break-all;display:flex;justify-content:space-between;align-items:center">
+          <span id="gcal-redirect-uri">${redirectUri}</span>
+          <button onclick="navigator.clipboard.writeText('${redirectUri}'); toast('success','Copiado','');" class="btn btn-outline btn-sm" style="font-size:10px;margin-left:8px"><i class="fas fa-copy"></i></button>
+        </div>
+      </li>
+      <li style="margin-bottom:10px">
+        <b>Configurar las 3 env vars en Cloud Run</b>:
+        <div style="background:var(--bg-surface);padding:8px 10px;border-radius:var(--radius);font-family:monospace;font-size:10px;margin-top:4px">
+          GOOGLE_OAUTH_CLIENT_ID=<span style="color:var(--text-muted)">&lt;client id de google&gt;</span><br>
+          GOOGLE_OAUTH_CLIENT_SECRET=<span style="color:var(--text-muted)">&lt;client secret&gt;</span><br>
+          GOOGLE_OAUTH_REDIRECT_URI=<span style="color:var(--text-muted)">${redirectUri}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Comando gcloud:</div>
+        <div style="background:#1e293b;color:#e2e8f0;padding:8px 10px;border-radius:var(--radius);font-family:monospace;font-size:10px;margin-top:2px;overflow-x:auto;white-space:nowrap">
+          gcloud run services update mip-quality-platform --region=us-central1 --update-env-vars GOOGLE_OAUTH_CLIENT_ID=xxx,GOOGLE_OAUTH_CLIENT_SECRET=xxx,GOOGLE_OAUTH_REDIRECT_URI=${redirectUri}
+        </div>
+      </li>
+    </ol>
+
+    <div style="padding:10px;background:var(--info-bg,#eff6ff);border-left:3px solid var(--info);border-radius:var(--radius);font-size:11px;margin-top:10px">
+      <i class="fas fa-info-circle" style="color:var(--info)"></i> Una vez configurado, el flujo OAuth abrira Google para autorizar. Cada agente puede conectar un calendario diferente.
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:10px;border-top:1px solid var(--border)">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('gcalSetupModal').classList.remove('open')">Cerrar</button>
+      <button class="btn btn-outline btn-sm" onclick="connectGoogleCalendar()"><i class="fas fa-redo"></i> Reintentar conexion</button>
+    </div>
+  </div>`;
+  modal.classList.add('open');
 }
 
 async function configureWebhook() {
@@ -6714,6 +6795,92 @@ function stopLiveConvsPolling() {
 }
 
 // ═══════════════════════════════════════════════════
+// PDF PARSER - lectura con IA de cotizaciones
+// ═══════════════════════════════════════════════════
+async function handlePdfCotizacionUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('np-pdf-status');
+  status.style.display = 'block';
+  status.innerHTML = `<i class="fas fa-spinner fa-spin" style="color:#8b5cf6"></i> Archivo "${file.name}" cargado. ¿Leer con IA y rellenar campos automaticamente?`;
+
+  // Mostrar popup de confirmacion
+  setTimeout(() => {
+    const confirmHtml = `<div id="pdfParsePopup" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-white);border:2px solid #8b5cf6;border-radius:12px;padding:22px;max-width:440px;z-index:10000;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <i class="fas fa-wand-magic-sparkles" style="color:#8b5cf6;font-size:22px"></i>
+        <div style="font-size:15px;font-weight:600">¿Leer cotizacion con IA?</div>
+      </div>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Archivo: <b>${file.name}</b> (${(file.size/1024).toFixed(0)} KB)<br><br>La IA va a extraer automaticamente:<br>• Nombre y descripcion del proyecto<br>• Todos los productos del PDF (con nombre, categoria, MOQ, precio, medidas)<br>• Categorizar cada producto</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('pdfParsePopup').remove(); document.getElementById('np-pdf-status').style.display='none'; document.getElementById('np-pdf-cotizacion').value='';">Cancelar</button>
+        <button class="btn btn-dark btn-sm" onclick="startPdfParse()" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)"><i class="fas fa-wand-magic-sparkles"></i> Si, leer con IA</button>
+      </div>
+    </div>
+    <div id="pdfParsePopupOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999" onclick="document.getElementById('pdfParsePopup')?.remove(); this.remove();"></div>`;
+    document.body.insertAdjacentHTML('beforeend', confirmHtml);
+  }, 200);
+}
+
+async function startPdfParse() {
+  document.getElementById('pdfParsePopup')?.remove();
+  document.getElementById('pdfParsePopupOverlay')?.remove();
+  const file = document.getElementById('np-pdf-cotizacion').files[0];
+  if (!file) return;
+  const status = document.getElementById('np-pdf-status');
+  status.innerHTML = `<i class="fas fa-spinner fa-spin" style="color:#8b5cf6"></i> Leyendo PDF y analizando con IA (puede tardar 15-30s)...`;
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(API + '/api/cotizaciones/parse-pdf', {
+      method: 'POST',
+      body: fd,
+    });
+    const data = await r.json();
+    if (!data.ok) {
+      status.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> ${data.error || 'Error parseando'}</span>`;
+      return;
+    }
+
+    const parsed = data.parsed || {};
+    // Rellenar campos del proyecto
+    if (parsed.proyecto_nombre) document.getElementById('np-proyecto-nombre').value = parsed.proyecto_nombre;
+    if (parsed.proyecto_descripcion) document.getElementById('np-proyecto-desc').value = parsed.proyecto_descripcion;
+
+    // Reemplazar productos: limpiar el array actual, crear uno por cada detectado
+    const productsList = document.getElementById('np-products-list');
+    productsList.innerHTML = '';
+    _productRowCounter = 0;
+    const productos = parsed.productos || [];
+    if (!productos.length) {
+      addProductRow();
+    } else {
+      productos.forEach((p, idx) => {
+        addProductRow();
+        const rows = document.querySelectorAll('#np-products-list .np-product-row');
+        const row = rows[rows.length - 1];
+        if (!row) return;
+        if (p.categoria) row.querySelector('.np-p-categoria').value = p.categoria;
+        if (p.nombre) row.querySelector('.np-p-nombre').value = p.nombre;
+        const descParts = [];
+        if (p.descripcion) descParts.push(p.descripcion);
+        if (p.materialidad) descParts.push(`Material: ${p.materialidad}`);
+        if (p.dimensiones) descParts.push(`Medidas: ${p.dimensiones}`);
+        if (descParts.length) row.querySelector('.np-p-desc').value = descParts.join('\n\n');
+        if (p.cantidad) row.querySelector('.np-p-cantidad').value = p.cantidad;
+        if (p.precio_objetivo) row.querySelector('.np-p-precio').value = p.precio_objetivo;
+      });
+    }
+
+    status.innerHTML = `<span style="color:var(--success)"><i class="fas fa-check-circle"></i> ${productos.length} producto(s) extraido(s) con IA. Revisa y ajusta antes de crear el proyecto.</span>`;
+    toast('success', 'IA rellenó el formulario', `${productos.length} producto(s) detectados`);
+  } catch (err) {
+    status.innerHTML = `<span style="color:var(--danger)"><i class="fas fa-exclamation-triangle"></i> Error: ${err.message}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════
 // COPILOTO IA - chat para editar agente via conversacion
 // ═══════════════════════════════════════════════════
 
@@ -6767,6 +6934,135 @@ function closeCopilot() {
   _copilotHistory = [];
 }
 
+let _pendingCopilotPlan = null;
+
+function _renderCopilotPlan(chat, plan) {
+  // Render un plan propuesto con diff visual + botones aceptar/rechazar
+  if (!plan || !plan.actions || !plan.actions.length) return;
+  const actionsHtml = plan.actions.map((a, idx) => {
+    const opLabels = {
+      create_block: { label: 'Crear bloque', color: '#10b981', icon: 'fa-plus-circle' },
+      update_block: { label: 'Editar bloque', color: '#f59e0b', icon: 'fa-pen' },
+      delete_block: { label: 'Eliminar bloque', color: '#ef4444', icon: 'fa-trash' },
+      update_agent_settings: { label: 'Actualizar settings', color: '#6366f1', icon: 'fa-cog' },
+    };
+    const meta = opLabels[a.op] || { label: a.op, color: '#6b7280', icon: 'fa-question' };
+    const invalidBadge = !a.valid ? `<span style="font-size:10px;color:var(--danger);font-weight:600">⚠️ ${a.error || 'Invalido'}</span>` : '';
+
+    let body = '';
+    if (a.op === 'create_block') {
+      body = `
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Categoria: <b>${a.categoria}</b> · Tipo: <b>${a.tipo}</b> · Orden: ${a.orden}</div>
+        <div style="font-size:12px;font-weight:600;margin:3px 0">${a.nombre || ''}</div>
+        <div style="font-size:11px;white-space:pre-wrap;background:var(--bg-white);padding:6px 8px;border-radius:6px;max-height:120px;overflow-y:auto">${(a.contenido || '').replace(/</g,'&lt;')}</div>
+      `;
+    } else if (a.op === 'update_block') {
+      const before = a.before || {};
+      const after = a.after || {};
+      const diffs = [];
+      if (a.campos) {
+        Object.keys(a.campos).forEach(k => {
+          const beforeVal = String(before[k] || '').replace(/</g,'&lt;');
+          const afterVal = String(after[k] || '').replace(/</g,'&lt;');
+          if (beforeVal !== afterVal) {
+            diffs.push(`
+              <div style="margin-bottom:4px">
+                <div style="font-size:10px;font-weight:600;color:var(--text-muted)">${k}:</div>
+                <div style="font-size:11px;background:#fee2e2;text-decoration:line-through;padding:3px 6px;border-radius:4px;margin-bottom:2px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${beforeVal.substring(0, 300)}</div>
+                <div style="font-size:11px;background:#d1fae5;padding:3px 6px;border-radius:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${afterVal.substring(0, 300)}</div>
+              </div>
+            `);
+          }
+        });
+      }
+      body = `
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Bloque <b>#${a.block_id}</b> · ${before.nombre || ''}</div>
+        ${diffs.join('')}
+      `;
+    } else if (a.op === 'delete_block') {
+      const before = a.before || {};
+      body = `
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px">Bloque <b>#${a.block_id}</b></div>
+        <div style="font-size:12px;font-weight:600;text-decoration:line-through;color:var(--danger);margin-bottom:3px">${before.nombre || ''}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-style:italic">${(before.contenido || '').substring(0, 150)}</div>
+      `;
+    } else if (a.op === 'update_agent_settings') {
+      const before = a.before || {};
+      const after = a.after || {};
+      const diffs = Object.keys(a.campos || {}).map(k => {
+        return `<div style="font-size:11px;margin-bottom:2px"><b>${k}:</b> <span style="color:var(--danger);text-decoration:line-through">${String(before[k] || '')}</span> → <span style="color:var(--success)">${String(after[k])}</span></div>`;
+      }).join('');
+      body = `<div>${diffs}</div>`;
+    }
+
+    return `
+      <div style="padding:10px 12px;background:var(--bg-white);border-radius:8px;margin-bottom:8px;border-left:3px solid ${meta.color};${!a.valid ? 'opacity:0.6' : ''}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <i class="fas ${meta.icon}" style="color:${meta.color}"></i>
+          <span style="font-size:12px;font-weight:600;color:${meta.color}">${meta.label}</span>
+          <span style="font-size:10px;color:var(--text-muted);margin-left:auto">#${idx + 1}</span>
+          ${invalidBadge}
+        </div>
+        ${body}
+        ${a.razon ? `<div style="font-size:10px;color:var(--text-muted);margin-top:6px;font-style:italic">💭 ${a.razon}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const validCount = plan.actions.filter(a => a.valid !== false).length;
+  const planId = 'plan-' + Date.now();
+  _pendingCopilotPlan = plan.actions;
+
+  chat.innerHTML += `
+    <div id="${planId}" style="max-width:95%;margin-right:auto;background:linear-gradient(135deg,rgba(139,92,246,0.05),rgba(99,102,241,0.05));border:2px solid #8b5cf6;border-radius:12px;padding:14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#8b5cf6"><i class="fas fa-clipboard-list"></i> Plan de cambios propuestos</div>
+          ${plan.resumen ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${plan.resumen}</div>` : ''}
+        </div>
+        <div style="font-size:10px;color:var(--text-muted)">${validCount} cambio(s) valido(s)</div>
+      </div>
+      <div style="max-height:400px;overflow-y:auto;margin-bottom:12px">${actionsHtml}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:10px;border-top:1px solid var(--border)">
+        <button class="btn btn-outline btn-sm" onclick="rejectCopilotPlan('${planId}')" style="color:var(--danger)"><i class="fas fa-times"></i> Rechazar</button>
+        <button class="btn btn-dark btn-sm" onclick="approveCopilotPlan('${planId}')" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="fas fa-check"></i> Aceptar ${validCount} cambio(s)</button>
+      </div>
+    </div>`;
+}
+
+async function approveCopilotPlan(planId) {
+  const actions = _pendingCopilotPlan || [];
+  if (!actions.length) return;
+  const validActions = actions.filter(a => a.valid !== false);
+  if (!validActions.length) { toast('error', 'Sin acciones', 'No hay acciones validas para aplicar'); return; }
+  try {
+    const r = await api('/api/agents/' + _currentAgentId + '/copilot/apply-plan', {
+      method: 'POST',
+      body: JSON.stringify({ actions: validActions }),
+    });
+    const wrap = document.getElementById(planId);
+    if (wrap) {
+      wrap.innerHTML = `<div style="padding:12px;text-align:center;color:var(--success);font-size:12px;font-weight:600"><i class="fas fa-check-circle"></i> Plan aplicado: ${r.applied}/${r.total} cambios</div>`;
+      wrap.style.borderColor = '#10b981';
+      wrap.style.background = 'linear-gradient(135deg,rgba(16,185,129,0.08),rgba(5,150,105,0.08))';
+    }
+    toast('success', 'Plan aplicado', `${r.applied} cambio(s) hechos`);
+    _pendingCopilotPlan = null;
+    loadAgent(_currentAgentId);
+  } catch (err) { toast('error', 'Error aplicando plan', err.message); }
+}
+
+function rejectCopilotPlan(planId) {
+  const wrap = document.getElementById(planId);
+  if (wrap) {
+    wrap.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px"><i class="fas fa-times-circle"></i> Plan rechazado</div>';
+    wrap.style.borderColor = '#d1d5db';
+    wrap.style.background = 'var(--bg-surface)';
+  }
+  _pendingCopilotPlan = null;
+  toast('info', 'Plan rechazado', 'Puedes pedir cambios distintos al copiloto');
+}
+
 async function sendCopilotMessage() {
   if (!_currentAgentId) return;
   const input = document.getElementById('copilot-input');
@@ -6774,50 +7070,29 @@ async function sendCopilotMessage() {
   if (!msg) return;
   const chat = document.getElementById('copilot-chat');
 
-  // Add user message
   chat.innerHTML += `<div style="max-width:80%;margin-left:auto;background:#e0e7ff;padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:12px"><div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:3px">Tu</div>${msg.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
   _copilotHistory.push({ role: 'user', content: msg });
   input.value = '';
   input.disabled = true;
 
-  // Typing indicator
-  chat.innerHTML += `<div id="copilot-typing" style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:8px 12px;border-radius:12px;margin-bottom:8px;font-size:11px;color:var(--text-muted);border-left:3px solid #8b5cf6"><i class="fas fa-spinner fa-spin"></i> El copiloto esta pensando...</div>`;
+  chat.innerHTML += `<div id="copilot-typing" style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:8px 12px;border-radius:12px;margin-bottom:8px;font-size:11px;color:var(--text-muted);border-left:3px solid #8b5cf6"><i class="fas fa-spinner fa-spin"></i> El copiloto esta analizando...</div>`;
   chat.scrollTop = chat.scrollHeight;
 
   try {
     const r = await api('/api/agents/' + _currentAgentId + '/copilot', {
       method: 'POST',
-      body: JSON.stringify({
-        message: msg,
-        history: _copilotHistory.slice(-10),
-      }),
+      body: JSON.stringify({ message: msg, history: _copilotHistory.slice(-10) }),
     });
     document.getElementById('copilot-typing')?.remove();
 
-    // Render tool calls primero si hubo
-    if (r.tools_executed && r.tools_executed.length) {
-      r.tools_executed.forEach(t => {
-        const ok = t.result && !t.result.error;
-        const icon = ok ? '✅' : '❌';
-        const color = ok ? 'var(--success)' : 'var(--danger)';
-        let desc = t.name;
-        if (t.name === 'update_block') desc = `Actualizado bloque #${t.args.block_id}`;
-        else if (t.name === 'create_block') desc = `Creado bloque "${t.args.nombre}" (${t.args.categoria}/${t.args.tipo})`;
-        else if (t.name === 'delete_block') desc = `Eliminado bloque #${t.args.block_id}`;
-        else if (t.name === 'update_agent_settings') desc = `Actualizados settings del agente`;
-        chat.innerHTML += `<div style="max-width:90%;margin-right:auto;background:#fef3c7;padding:6px 10px;border-radius:8px;margin-bottom:4px;font-size:11px;border-left:3px solid #f59e0b"><span style="color:${color}">${icon}</span> <b>Accion:</b> ${desc}</div>`;
-      });
-    }
-
-    // Reply
-    const reply = r.reply || 'Listo.';
-    chat.innerHTML += `<div style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:12px;border-left:3px solid #8b5cf6"><div style="font-size:10px;font-weight:600;color:#8b5cf6;margin-bottom:3px">🪄 Copiloto ${r.tools_executed && r.tools_executed.length ? '(aplico '+r.tools_executed.length+' cambios)' : ''}</div>${reply.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+    // Reply conversacional
+    const reply = r.reply || 'Entendido.';
+    chat.innerHTML += `<div style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:12px;border-left:3px solid #8b5cf6"><div style="font-size:10px;font-weight:600;color:#8b5cf6;margin-bottom:3px">🪄 Copiloto</div>${reply.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
     _copilotHistory.push({ role: 'assistant', content: reply });
 
-    // Si hubo tools, recargar el agente para que se vea actualizado
-    if (r.tools_executed && r.tools_executed.length) {
-      loadAgent(_currentAgentId);
-      toast('success', 'Agente actualizado', `${r.tools_executed.length} cambio(s) aplicado(s)`);
+    // Si hay plan, renderizar diff con aprobacion
+    if (r.plan && r.plan.actions && r.plan.actions.length) {
+      _renderCopilotPlan(chat, r.plan);
     }
   } catch (err) {
     document.getElementById('copilot-typing')?.remove();
