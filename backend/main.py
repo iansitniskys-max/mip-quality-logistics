@@ -98,6 +98,21 @@ def on_startup():
                     print(f"Added column movimientos_contables.{col}")
                 except Exception:
                     conn.rollback()
+            # Migrate conversation_pipelines table (live takeover)
+            for col, col_type in [
+                ("control_mode", "VARCHAR(20) DEFAULT 'ai'"),
+                ("taken_over_by", "VARCHAR(200)"),
+                ("taken_over_at", "TIMESTAMP"),
+                ("last_client_activity_at", "TIMESTAMP"),
+                ("widget_is_open", "BOOLEAN DEFAULT TRUE"),
+                ("pending_admin_messages", "TEXT DEFAULT '[]'"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE conversation_pipelines ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column conversation_pipelines.{col}")
+                except Exception:
+                    conn.rollback()
         # Seed Agent Builder defaults (tools + Mateo como primer agente)
         try:
             from sqlalchemy.orm import Session as _Sess
@@ -3034,11 +3049,52 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
 
     # Pipeline tracking
     pipeline = _get_or_create_pipeline(session_id, a.id, visitor, db)
+    # Marcar actividad del cliente
+    pipeline.last_client_activity_at = datetime.now()
+    pipeline.widget_is_open = True
+    # Si admin tomo control, NO responder con IA - solo guardar mensaje del cliente
+    if pipeline.control_mode == "human":
+        try:
+            conv = db.query(MateoConversation).filter(MateoConversation.session_id == session_id).first()
+            if not conv:
+                conv = MateoConversation(
+                    session_id=session_id,
+                    visitor_email=pipeline.visitor_email or "",
+                    visitor_nombre=pipeline.visitor_nombre or "",
+                )
+                db.add(conv)
+                db.commit()
+                db.refresh(conv)
+            db.add(MateoMessage(conversation_id=conv.id, role="user", content=message, tokens_usados=0))
+            conv.mensajes_count = (conv.mensajes_count or 0) + 1
+            conv.ultimo_mensaje_at = datetime.now()
+            pipeline.total_messages = (pipeline.total_messages or 0) + 1
+            pipeline.last_message_at = datetime.now()
+            db.commit()
+        except Exception as e:
+            print(f"[human mode msg save] {e}")
+        return {
+            "reply": None,
+            "provider": "human",
+            "session_id": session_id,
+            "agent_used": {"id": None, "name": pipeline.taken_over_by or "Admin", "avatar": "👤"},
+            "pipeline": {
+                "id": pipeline.id, "stage": pipeline.current_stage,
+                "control_mode": "human",
+                "taken_over_by": pipeline.taken_over_by,
+            },
+            "tool_calls": [],
+            "tokens": {"input": 0, "output": 0},
+            "cost_usd": 0,
+            "latency_ms": 0,
+            "waiting_for_human": True,
+            "info_message": "Un asesor humano esta revisando tu mensaje. Te responderan pronto.",
+        }
     # Si el pipeline tiene un agente distinto al actual (handoff previo), respetarlo
     if pipeline.current_agent_id and pipeline.current_agent_id != a.id:
         target_agent = db.query(AgentConfig).get(pipeline.current_agent_id)
         if target_agent and target_agent.activo:
-            a = target_agent  # switch al agente correcto segun el stage
+            a = target_agent
 
     # Intent detection + posible handoff
     intent_data = _detect_intent(message, history)
@@ -3221,6 +3277,254 @@ def list_agent_traces(id: int, limit: int = 50, db: Session = Depends(get_db)):
             "created_at": t.created_at.isoformat() if t.created_at else None,
         })
     return out
+
+
+# ═══════════════════════════════════════════════════
+# COPILOTO IA - editor conversacional de agentes
+# El admin chatea con el copiloto y este modifica los bloques del agente.
+# ═══════════════════════════════════════════════════
+
+COPILOT_SYSTEM_PROMPT = """Eres el Copiloto de Agent Builder, un asistente experto en diseñar agentes IA conversacionales.
+Tu rol es ayudar al ADMIN a construir, ajustar y perfeccionar agentes IA de ventas/soporte.
+
+CAPACIDADES:
+- Leer el estado actual de los bloques del agente (identidad, instrucciones, info clave).
+- Sugerir cambios con ejemplos concretos.
+- MODIFICAR los bloques directamente cuando el admin lo pide.
+- Crear nuevos bloques (que no hacer, pasos, objetivos, CTAs, info).
+- Cambiar tono, longitud, temperatura del agente.
+- Explicar como funciona cada categoria (identidad/instrucciones/info_clave).
+
+REGLAS:
+- Antes de hacer cambios, RESUME brevemente lo que entendiste.
+- Propone los cambios ANTES de aplicarlos. Confirma con el admin.
+- Cuando vayas a editar, usa las tools provistas (update_block, create_block, etc).
+- Conserva el estilo chileno del agente si ya lo tiene.
+- Si el admin es vago, haz preguntas especificas (ej: "¿quieres que sea mas formal o mas cercano?").
+- Siempre termina con UN call to action claro al admin (ej: "¿Aplico estos cambios?").
+
+FORMATO:
+- Corto, directo, conversacional.
+- Markdown cuando muestres lista de cambios.
+- Sin preambulos largos."""
+
+
+def _copilot_build_tools(db):
+    """Construye las tools que el copiloto puede invocar para modificar el agente."""
+    from google.generativeai.types import Tool as GTool, FunctionDeclaration
+    tools = [
+        FunctionDeclaration(
+            name="update_block",
+            description="Actualiza un bloque existente del agente. Usar para cambiar nombre, contenido, orden o activo de un bloque ya creado.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "block_id": {"type": "INTEGER", "description": "ID del bloque a actualizar"},
+                    "nombre": {"type": "STRING", "description": "Nuevo nombre (opcional)"},
+                    "contenido": {"type": "STRING", "description": "Nuevo contenido del bloque (opcional)"},
+                    "orden": {"type": "INTEGER", "description": "Nuevo orden numerico (opcional)"},
+                    "activo": {"type": "BOOLEAN", "description": "Activar/desactivar (opcional)"},
+                },
+                "required": ["block_id"],
+            },
+        ),
+        FunctionDeclaration(
+            name="create_block",
+            description="Crea un nuevo bloque para el agente. Categorias: identidad | instrucciones | info_clave. Tipos validos: personificacion, objetivo, formato, pasos, casos, que_no_hacer, ctas, info_empresa, info_precios, info_productos, info_pagos, info_devoluciones, info_despachos, info_garantias, info_otro.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "categoria": {"type": "STRING", "enum": ["identidad", "instrucciones", "info_clave"]},
+                    "tipo": {"type": "STRING"},
+                    "nombre": {"type": "STRING"},
+                    "contenido": {"type": "STRING"},
+                    "orden": {"type": "INTEGER"},
+                },
+                "required": ["categoria", "tipo", "nombre", "contenido"],
+            },
+        ),
+        FunctionDeclaration(
+            name="delete_block",
+            description="Elimina un bloque del agente.",
+            parameters={
+                "type": "OBJECT",
+                "properties": {"block_id": {"type": "INTEGER"}},
+                "required": ["block_id"],
+            },
+        ),
+        FunctionDeclaration(
+            name="update_agent_settings",
+            description="Actualiza settings del agente (display_name, descripcion, avatar, temperatura, max_tokens, tools_allowed, modelo).",
+            parameters={
+                "type": "OBJECT",
+                "properties": {
+                    "display_name": {"type": "STRING"},
+                    "descripcion": {"type": "STRING"},
+                    "avatar": {"type": "STRING"},
+                    "temperatura": {"type": "NUMBER"},
+                    "max_tokens": {"type": "INTEGER"},
+                    "tools_allowed": {"type": "STRING", "description": "JSON array como string"},
+                    "modelo": {"type": "STRING"},
+                },
+            },
+        ),
+    ]
+    return [GTool(function_declarations=tools)]
+
+
+def _copilot_execute_tool(name: str, args: dict, agent, db) -> dict:
+    """Ejecuta las tools del copiloto."""
+    try:
+        if name == "update_block":
+            b = db.query(AgentBlock).filter(
+                AgentBlock.id == args.get("block_id"),
+                AgentBlock.agent_id == agent.id,
+            ).first()
+            if not b:
+                return {"error": f"Bloque {args.get('block_id')} no encontrado"}
+            for k in ["nombre", "contenido", "orden", "activo"]:
+                if k in args and args[k] is not None:
+                    setattr(b, k, args[k])
+            db.commit()
+            return {"ok": True, "block_id": b.id, "updated": [k for k in ["nombre","contenido","orden","activo"] if k in args]}
+        elif name == "create_block":
+            b = AgentBlock(
+                agent_id=agent.id,
+                categoria=args.get("categoria", "identidad"),
+                tipo=args.get("tipo", "personificacion"),
+                nombre=args.get("nombre", "Nuevo bloque"),
+                contenido=args.get("contenido", ""),
+                orden=args.get("orden", 100),
+                activo=True,
+            )
+            db.add(b)
+            db.commit()
+            db.refresh(b)
+            return {"ok": True, "block_id": b.id, "created": True}
+        elif name == "delete_block":
+            b = db.query(AgentBlock).filter(
+                AgentBlock.id == args.get("block_id"),
+                AgentBlock.agent_id == agent.id,
+            ).first()
+            if not b:
+                return {"error": "Bloque no encontrado"}
+            db.delete(b)
+            db.commit()
+            return {"ok": True, "deleted": True}
+        elif name == "update_agent_settings":
+            for k in ["display_name", "descripcion", "avatar", "temperatura", "max_tokens", "tools_allowed", "modelo"]:
+                if k in args and args[k] is not None:
+                    setattr(agent, k, args[k])
+            db.commit()
+            return {"ok": True, "updated": [k for k in args.keys() if args[k] is not None]}
+        return {"error": f"Tool desconocida: {name}"}
+    except Exception as e:
+        return {"error": str(e)[:200]}
+
+
+def _copilot_describe_agent(agent, db) -> str:
+    """Genera descripcion compacta del estado actual del agente para el copiloto."""
+    blocks = db.query(AgentBlock).filter(AgentBlock.agent_id == agent.id).order_by(AgentBlock.categoria, AgentBlock.orden).all()
+    lines = [
+        f"# ESTADO ACTUAL DEL AGENTE",
+        f"ID: {agent.id}",
+        f"Nombre: {agent.display_name} ({agent.agent_type})",
+        f"Avatar: {agent.avatar}",
+        f"Descripcion: {agent.descripcion or '(vacia)'}",
+        f"Modelo: {agent.modelo} · Temperatura: {agent.temperatura} · Max tokens: {agent.max_tokens}",
+        f"Tools permitidos: {agent.tools_allowed}",
+        f"Stages: {agent.stages}",
+        f"Total conversaciones: {agent.total_conversations or 0}",
+        "",
+        f"## BLOQUES ({len(blocks)}):",
+    ]
+    for b in blocks:
+        preview = (b.contenido or "").replace("\n", " ")[:120]
+        lines.append(f"- [id={b.id}] [{b.categoria}] [{b.tipo}] orden={b.orden} activo={b.activo} '{b.nombre}': {preview}")
+    return "\n".join(lines)
+
+
+@app.post("/api/agents/{id}/copilot")
+def agent_copilot(id: int, data: dict, db: Session = Depends(get_db)):
+    """Chat del admin con el copiloto. El copiloto puede leer y modificar los bloques del agente via tools."""
+    import time as _time
+    agent = db.query(AgentConfig).get(id)
+    if not agent:
+        raise HTTPException(404, "Agente no encontrado")
+    message = (data.get("message") or "").strip()
+    history = data.get("history", [])
+    if not message:
+        raise HTTPException(400, "Mensaje vacio")
+
+    # Construir system prompt con contexto actual del agente
+    agent_state = _copilot_describe_agent(agent, db)
+    system = COPILOT_SYSTEM_PROMPT + "\n\n" + agent_state
+
+    if not GEMINI_API_KEY:
+        return {"reply": "Copiloto requiere GEMINI_API_KEY configurado.", "provider": "none", "tools_executed": []}
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        tools = _copilot_build_tools(db)
+        model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system, tools=tools)
+
+        gemini_history = []
+        for h in (history or [])[-10:]:
+            role = "model" if h.get("role") == "assistant" else "user"
+            gemini_history.append({"role": role, "parts": [h.get("content", "")]})
+        chat = model.start_chat(history=gemini_history)
+
+        tools_executed = []
+        tokens_in = 0
+        tokens_out = 0
+        current_msg = message
+
+        for iteration in range(5):  # max 5 iteraciones
+            resp = chat.send_message(current_msg)
+            if hasattr(resp, "usage_metadata") and resp.usage_metadata:
+                tokens_in += getattr(resp.usage_metadata, "prompt_token_count", 0) or 0
+                tokens_out += getattr(resp.usage_metadata, "candidates_token_count", 0) or 0
+
+            fn_calls = []
+            try:
+                for part in resp.candidates[0].content.parts:
+                    if hasattr(part, "function_call") and part.function_call and part.function_call.name:
+                        fn_calls.append(part.function_call)
+            except Exception:
+                pass
+
+            if not fn_calls:
+                try:
+                    reply = resp.text
+                except Exception:
+                    reply = "Listo, cambios aplicados. ¿Que mas necesitas?"
+                return {
+                    "reply": reply,
+                    "provider": "gemini",
+                    "tools_executed": tools_executed,
+                    "tokens": {"input": tokens_in, "output": tokens_out},
+                }
+
+            # Ejecutar tools y enviar resultados
+            responses = []
+            for fc in fn_calls:
+                args = dict(fc.args) if fc.args else {}
+                result = _copilot_execute_tool(fc.name, args, agent, db)
+                tools_executed.append({"name": fc.name, "args": args, "result": result})
+                responses.append({"function_response": {"name": fc.name, "response": result}})
+            current_msg = responses
+
+        return {
+            "reply": "(Copiloto alcanzo limite de iteraciones)",
+            "provider": "gemini",
+            "tools_executed": tools_executed,
+            "tokens": {"input": tokens_in, "output": tokens_out},
+        }
+    except Exception as e:
+        print(f"[copilot] {e}")
+        import traceback; traceback.print_exc()
+        return {"reply": f"Error del copiloto: {str(e)[:200]}", "provider": "error", "tools_executed": []}
 
 
 # ═══════════════════════════════════════════════════
@@ -3658,6 +3962,446 @@ def get_pipeline_detail(id: int, db: Session = Depends(get_db)):
         } for h in history],
         "messages": messages,
     }
+
+
+# ═══════════════════════════════════════════════════
+# LIVE TAKEOVER - admin toma control de la conversacion
+# ═══════════════════════════════════════════════════
+
+def _pipeline_live_status(p: ConversationPipeline) -> str:
+    """Calcula el status live de un pipeline basado en actividad reciente."""
+    from datetime import timedelta as _td
+    now = datetime.now()
+    if p.control_mode == "human":
+        return "human_control"
+    if not p.last_client_activity_at:
+        return "idle"
+    delta = now - p.last_client_activity_at
+    if delta < _td(minutes=2):
+        return "live"   # cliente escribio en los ultimos 2 min
+    if delta < _td(minutes=15):
+        return "active" # activo pero no en vivo
+    if delta < _td(hours=24):
+        return "idle"
+    return "closed"
+
+
+@app.get("/api/pipeline/conversations/{id}/live-status")
+def pipeline_live_status(id: int, db: Session = Depends(get_db)):
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+    return {
+        "id": p.id,
+        "status": _pipeline_live_status(p),
+        "control_mode": p.control_mode or "ai",
+        "taken_over_by": p.taken_over_by or None,
+        "taken_over_at": p.taken_over_at.isoformat() if p.taken_over_at else None,
+        "last_client_activity_at": p.last_client_activity_at.isoformat() if p.last_client_activity_at else None,
+        "last_message_at": p.last_message_at.isoformat() if p.last_message_at else None,
+        "total_messages": p.total_messages or 0,
+    }
+
+
+@app.post("/api/pipeline/conversations/{id}/take-over")
+def take_over_conversation(id: int, data: dict, db: Session = Depends(get_db)):
+    """Admin toma control de la conversacion. El agente IA deja de responder."""
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+    admin_email = data.get("admin_email", "admin@mipquality.com")
+    admin_nombre = data.get("admin_nombre", "Admin MIP")
+    p.control_mode = "human"
+    p.taken_over_by = admin_email
+    p.taken_over_at = datetime.now()
+    p.handled_by_admin = admin_email
+    # Log del evento como actividad
+    try:
+        db.add(Actividad(
+            tipo="takeover_humano",
+            titulo=f"Admin tomo control de la conversacion",
+            descripcion=f"{admin_nombre} ({admin_email}) tomo control del chat. El agente IA deja de responder.",
+            autor=admin_email,
+        ))
+    except Exception:
+        pass
+    # Notificar al agente actual via log
+    db.add(PipelineStageLog(
+        pipeline_id=p.id,
+        from_stage=p.current_stage, to_stage=p.current_stage,
+        from_agent_id=p.current_agent_id, to_agent_id=None,
+        trigger_type="human_takeover",
+        trigger_data=json.dumps({"admin": admin_email}),
+    ))
+    db.commit()
+    # Mensaje de sistema en el chat para el cliente
+    try:
+        # Buscar/crear MateoConversation de esta sesion para poder agregar el mensaje
+        conv = db.query(MateoConversation).filter(MateoConversation.session_id == p.session_id).first()
+        if not conv:
+            conv = MateoConversation(
+                session_id=p.session_id,
+                visitor_email=p.visitor_email or "",
+                visitor_nombre=p.visitor_nombre or "",
+            )
+            db.add(conv)
+            db.commit()
+            db.refresh(conv)
+        db.add(MateoMessage(
+            conversation_id=conv.id,
+            role="assistant",
+            content=f"[Un asesor humano ({admin_nombre}) se unio a la conversacion y te atendera personalmente]",
+            tokens_usados=0,
+        ))
+        db.commit()
+    except Exception as e:
+        print(f"[takeover system msg] {e}")
+    return {
+        "id": p.id, "control_mode": p.control_mode,
+        "taken_over_by": admin_email,
+        "taken_over_at": p.taken_over_at.isoformat(),
+    }
+
+
+@app.post("/api/pipeline/conversations/{id}/release-control")
+def release_control(id: int, db: Session = Depends(get_db)):
+    """Admin devuelve el control al agente IA."""
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+    prev_admin = p.taken_over_by
+    p.control_mode = "ai"
+    p.taken_over_by = None
+    # taken_over_at queda como registro historico
+    db.add(PipelineStageLog(
+        pipeline_id=p.id,
+        from_stage=p.current_stage, to_stage=p.current_stage,
+        from_agent_id=None, to_agent_id=p.current_agent_id,
+        trigger_type="human_release",
+        trigger_data=json.dumps({"prev_admin": prev_admin}),
+    ))
+    db.commit()
+    # Mensaje sistema
+    try:
+        conv = db.query(MateoConversation).filter(MateoConversation.session_id == p.session_id).first()
+        if conv:
+            db.add(MateoMessage(
+                conversation_id=conv.id,
+                role="assistant",
+                content="[El asesor humano devolvio el control al asistente IA]",
+                tokens_usados=0,
+            ))
+            db.commit()
+    except Exception:
+        pass
+    return {"id": p.id, "control_mode": p.control_mode}
+
+
+@app.post("/api/pipeline/conversations/{id}/send-admin-message")
+def admin_send_message(id: int, data: dict, db: Session = Depends(get_db)):
+    """Admin envia un mensaje al cliente en modo takeover."""
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+    message = data.get("message", "").strip()
+    admin_nombre = data.get("admin_nombre", p.taken_over_by or "Admin MIP")
+    if not message:
+        raise HTTPException(400, "Mensaje vacio")
+    # Persistir en MateoConversation como mensaje del "asistente" (role assistant)
+    # pero prefijado con [ADMIN] para diferenciarlo del agente IA
+    try:
+        conv = db.query(MateoConversation).filter(MateoConversation.session_id == p.session_id).first()
+        if not conv:
+            conv = MateoConversation(
+                session_id=p.session_id,
+                visitor_email=p.visitor_email or "",
+                visitor_nombre=p.visitor_nombre or "",
+            )
+            db.add(conv)
+            db.commit()
+            db.refresh(conv)
+        msg = MateoMessage(
+            conversation_id=conv.id,
+            role="assistant",
+            content=message,
+            tokens_usados=0,
+        )
+        db.add(msg)
+        conv.mensajes_count = (conv.mensajes_count or 0) + 1
+        conv.ultimo_mensaje_at = datetime.now()
+        # Agregar a pending_admin_messages para que el widget del cliente lo recoja
+        try:
+            pending = json.loads(p.pending_admin_messages or "[]")
+        except Exception:
+            pending = []
+        pending.append({
+            "content": message,
+            "admin_nombre": admin_nombre,
+            "sent_at": datetime.now().isoformat(),
+        })
+        p.pending_admin_messages = json.dumps(pending)
+        p.total_messages = (p.total_messages or 0) + 1
+        p.last_message_at = datetime.now()
+        db.commit()
+    except Exception as e:
+        raise HTTPException(500, f"Error guardando mensaje: {e}")
+    return {"ok": True, "message_id": msg.id}
+
+
+@app.get("/api/chat/session/{session_id}/pending")
+def get_pending_admin_messages(session_id: str, clear: bool = True, db: Session = Depends(get_db)):
+    """Widget del cliente hace polling aqui para recibir mensajes del admin."""
+    p = db.query(ConversationPipeline).filter(ConversationPipeline.session_id == session_id).first()
+    if not p:
+        return {"messages": [], "control_mode": "ai"}
+    try:
+        pending = json.loads(p.pending_admin_messages or "[]")
+    except Exception:
+        pending = []
+    if clear and pending:
+        p.pending_admin_messages = "[]"
+        db.commit()
+    return {
+        "messages": pending,
+        "control_mode": p.control_mode or "ai",
+        "taken_over_by": p.taken_over_by,
+    }
+
+
+@app.get("/api/pipeline/conversations/{id}/summary")
+def get_conversation_summary(id: int, force: bool = False, db: Session = Depends(get_db)):
+    """Genera un resumen de la conversacion con:
+    - Estado general + stage
+    - Resumen ejecutivo (via LLM)
+    - Compromisos / acciones pendientes (detectados en los mensajes)
+    - Proximos pasos sugeridos
+    """
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+
+    # Obtener mensajes
+    conv = db.query(MateoConversation).filter(MateoConversation.session_id == p.session_id).first()
+    messages = []
+    if conv:
+        msgs = db.query(MateoMessage).filter(MateoMessage.conversation_id == conv.id).order_by(MateoMessage.created_at).all()
+        messages = [(m.role, m.content, m.created_at) for m in msgs]
+
+    if not messages:
+        return {
+            "id": p.id,
+            "session_id": p.session_id,
+            "status": _pipeline_live_status(p),
+            "visitor": {
+                "nombre": p.visitor_nombre, "email": p.visitor_email,
+                "telefono": p.visitor_telefono, "empresa": p.visitor_empresa,
+            },
+            "stage": p.current_stage,
+            "summary": "Sin mensajes en la conversacion.",
+            "compromisos": [],
+            "proximos_pasos": [],
+            "mensajes_count": 0,
+        }
+
+    # Detectar compromisos via regex (heuristicas simples)
+    commitments = _detect_commitments(messages)
+
+    # Generar resumen via LLM si hay suficientes mensajes y Gemini/Claude disponible
+    summary_text = ""
+    try:
+        summary_text = _generate_conversation_summary(messages, p)
+    except Exception as e:
+        print(f"[summary gen] {e}")
+        summary_text = _fallback_summary(messages)
+
+    # Proximos pasos sugeridos
+    next_steps = _suggest_next_steps(messages, p, commitments)
+
+    return {
+        "id": p.id,
+        "session_id": p.session_id,
+        "status": _pipeline_live_status(p),
+        "control_mode": p.control_mode or "ai",
+        "taken_over_by": p.taken_over_by,
+        "visitor": {
+            "nombre": p.visitor_nombre, "email": p.visitor_email,
+            "telefono": p.visitor_telefono, "empresa": p.visitor_empresa,
+        },
+        "stage": p.current_stage,
+        "intent": p.intent_detected, "intent_score": p.intent_score,
+        "sentiment": p.sentiment,
+        "mensajes_count": len(messages),
+        "prospect_id": p.prospect_id,
+        "summary": summary_text,
+        "compromisos": commitments,
+        "proximos_pasos": next_steps,
+        "first_message_at": messages[0][2].isoformat() if messages[0][2] else None,
+        "last_message_at": messages[-1][2].isoformat() if messages[-1][2] else None,
+    }
+
+
+def _detect_commitments(messages: list) -> list:
+    """Detecta compromisos del agente hacia el cliente en los mensajes del assistant."""
+    import re
+    commitments = []
+    commitment_patterns = [
+        (r'te (mando|envio|paso|hago llegar) (.+?) (hoy|mañana|esta semana|en \d+ (horas?|dias?))', 'envio'),
+        (r'(hoy|mañana|esta semana) (te )?(mando|envio|te envio|te paso)(.+)', 'envio'),
+        (r'en (\d+) (horas?|dias?|minutos?)(.+)', 'plazo'),
+        (r'(agendar|agendemos|programar|reservar)(.+)(reunion|llamada|meet|call)', 'reunion'),
+        (r'te (llamo|contacto|respondo|confirmo)(.+?)(hoy|mañana|luego)', 'contacto'),
+        (r'te (tendré|tendre|tendras|vas a tener)(.+)(cotizacion|propuesta|pdf)(.+)(hoy|mañana)', 'cotizacion'),
+        (r'armar(te)? (una |la )?(cotizacion|propuesta|oferta)(.+)', 'cotizacion'),
+        (r'te consigo (el|la)?\s*(precio|cotizacion|info|muestra)(.+)', 'info'),
+    ]
+    for role, content, created_at in messages:
+        if role != "assistant":
+            continue
+        c_lower = (content or "").lower()
+        for pattern, kind in commitment_patterns:
+            matches = re.findall(pattern, c_lower)
+            if matches:
+                # Extract context around the match
+                m = re.search(pattern, c_lower)
+                if m:
+                    ctx_start = max(0, m.start() - 30)
+                    ctx_end = min(len(c_lower), m.end() + 50)
+                    context = content[ctx_start:ctx_end].strip()
+                    commitments.append({
+                        "tipo": kind,
+                        "texto": context,
+                        "fecha_mensaje": created_at.isoformat() if created_at else None,
+                    })
+                    break  # one commitment per message
+    return commitments
+
+
+def _fallback_summary(messages: list) -> str:
+    """Resumen simple sin LLM: primer mensaje del cliente + ultimo del agente."""
+    first_user = next((m for m in messages if m[0] == "user"), None)
+    last_assistant = next((m for m in reversed(messages) if m[0] == "assistant"), None)
+    parts = []
+    if first_user:
+        parts.append(f"Cliente consulto: {(first_user[1] or '')[:200]}")
+    if last_assistant:
+        parts.append(f"Ultima respuesta agente: {(last_assistant[1] or '')[:200]}")
+    return " · ".join(parts) or "Sin datos suficientes para resumen"
+
+
+def _generate_conversation_summary(messages: list, pipeline) -> str:
+    """Genera resumen ejecutivo via Gemini/Claude."""
+    if not messages:
+        return ""
+    # Construir transcript
+    transcript_lines = []
+    for role, content, _ in messages[-20:]:  # ultimos 20 mensajes
+        speaker = "Cliente" if role == "user" else "Agente"
+        transcript_lines.append(f"{speaker}: {(content or '')[:500]}")
+    transcript = "\n".join(transcript_lines)
+
+    prompt = f"""Eres un analista de ventas. Resume la siguiente conversacion entre un cliente y un agente de MIP Quality & Logistics (broker de importacion China-Chile).
+
+CONVERSACION:
+{transcript}
+
+DATOS DEL CLIENTE:
+- Nombre: {pipeline.visitor_nombre or 'desconocido'}
+- Email: {pipeline.visitor_email or 'no proporcionado'}
+- Empresa: {pipeline.visitor_empresa or 'no proporcionada'}
+- Stage actual: {pipeline.current_stage}
+
+Genera un RESUMEN EJECUTIVO de maximo 4 lineas que incluya:
+1. Que busca el cliente (producto, volumen, timing)
+2. Como respondio el agente
+3. En que se quedo la conversacion
+4. Nivel de interes / proximidad al cierre
+
+Responde SOLO con el resumen, sin preambulos."""
+
+    if GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            resp = model.generate_content(prompt)
+            return resp.text.strip()
+        except Exception as e:
+            print(f"[summary gemini] {e}")
+    if ANTHROPIC_API_KEY:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            resp = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=300,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.content[0].text.strip()
+        except Exception as e:
+            print(f"[summary claude] {e}")
+    return _fallback_summary(messages)
+
+
+def _suggest_next_steps(messages: list, pipeline, commitments: list) -> list:
+    """Genera pasos sugeridos basados en compromisos + stage."""
+    steps = []
+    # Si hay compromisos, listarlos como acciones pendientes
+    for c in commitments[-5:]:  # ultimos 5
+        steps.append({
+            "accion": f"Cumplir compromiso ({c['tipo']})",
+            "detalle": c['texto'][:120],
+            "prioridad": "alta",
+        })
+    # Sugerencias basadas en stage
+    stage_suggestions = {
+        "lead_inicial": {"accion": "Calificar al lead", "detalle": "Verificar si tiene volumen real y email valido", "prioridad": "media"},
+        "calificando": {"accion": "Enviar cotizacion estimada", "detalle": "Preparar rangos de precio para los productos mencionados", "prioridad": "alta"},
+        "cotizando": {"accion": "Seguimiento proactivo", "detalle": "Llamar o escribir para confirmar interes y resolver dudas", "prioridad": "alta"},
+        "cerrando": {"accion": "Formalizar propuesta", "detalle": "Generar PDF de cotizacion formal y condiciones de pago", "prioridad": "critica"},
+        "cliente_activo": {"accion": "Onboarding post-venta", "detalle": "Enviar acceso a la plataforma y primer contacto del KAM", "prioridad": "media"},
+        "soporte_post_venta": {"accion": "Atender consulta", "detalle": "Revisar pedido y responder al cliente", "prioridad": "alta"},
+        "cliente_perdido": {"accion": "Nurturing suave", "detalle": "Enviar contenido de valor (case studies) en 2 semanas", "prioridad": "baja"},
+    }
+    sugg = stage_suggestions.get(pipeline.current_stage)
+    if sugg:
+        steps.append(sugg)
+    # Si no hay email y el lead es bueno
+    if not pipeline.visitor_email and (pipeline.intent_score or 0) >= 0.5:
+        steps.append({"accion": "Obtener email del cliente", "detalle": "Pedir contacto para enviar material", "prioridad": "alta"})
+    # Si requiere humano
+    if pipeline.requires_human:
+        steps.append({"accion": "Derivar a humano", "detalle": "El agente solicito handoff. Tomar control de la conversacion.", "prioridad": "critica"})
+    return steps
+
+
+@app.get("/api/pipeline/live-conversations")
+def list_live_conversations(db: Session = Depends(get_db)):
+    """Lista conversaciones activas en vivo (cliente escribio en los ultimos 15 min).
+    Usado para el widget de 'chats abiertos' en el admin."""
+    from datetime import timedelta as _td
+    cutoff = datetime.now() - _td(minutes=15)
+    convs = db.query(ConversationPipeline).filter(
+        (ConversationPipeline.last_client_activity_at >= cutoff) |
+        (ConversationPipeline.control_mode == "human")
+    ).order_by(ConversationPipeline.last_message_at.desc()).all()
+    out = []
+    for c in convs:
+        out.append({
+            "id": c.id,
+            "session_id": c.session_id,
+            "status": _pipeline_live_status(c),
+            "control_mode": c.control_mode or "ai",
+            "taken_over_by": c.taken_over_by,
+            "visitor_nombre": c.visitor_nombre or "",
+            "visitor_email": c.visitor_email or "",
+            "prospect_id": c.prospect_id,
+            "stage": c.current_stage,
+            "agent_id": c.current_agent_id,
+            "last_client_activity_at": c.last_client_activity_at.isoformat() if c.last_client_activity_at else None,
+            "last_message_at": c.last_message_at.isoformat() if c.last_message_at else None,
+            "total_messages": c.total_messages or 0,
+        })
+    return out
 
 
 # Human Handoffs endpoints

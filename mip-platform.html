@@ -1407,6 +1407,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" data-feature="emails" onclick="aView('a-emails')"><i class="fas fa-envelope-open-text"></i> Automatizaciones</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Sistema</div>
+        <a class="sb-link" onclick="aView('a-live-chats')"><i class="fas fa-headset"></i> Chats activos <span class="cnt" id="live-chats-badge" style="display:none;background:var(--success);color:#fff">0</span></a>
         <a class="sb-link" onclick="aView('a-agents')"><i class="fas fa-robot"></i> Agent Builder</a>
         <a class="sb-link" onclick="aView('a-config')"><i class="fas fa-cog"></i> Configuración</a>
         <a class="sb-link" onclick="aView('a-integrations')"><i class="fas fa-plug"></i> Integraciones</a>
@@ -1689,6 +1690,24 @@ html,body{overflow-x:hidden;max-width:100vw}
       </div>
     </div>
 
+    <!-- ═══ CHATS ACTIVOS ═══ -->
+    <div class="page-body" id="a-live-chats" style="display:none">
+      <div class="admin-header-flex">
+        <div>
+          <h2 style="font-size:18px;font-weight:600"><i class="fas fa-headset" style="margin-right:6px"></i>Chats activos en tiempo real</h2>
+          <p style="font-size:12px;color:var(--text-muted)">Conversaciones en curso con tus agentes IA. Click para ver resumen, compromisos y tomar control.</p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="loadLiveConversations()"><i class="fas fa-sync"></i> Actualizar</button>
+      </div>
+      <div style="padding:10px 14px;background:var(--info-bg,#eff6ff);border-left:3px solid var(--info);border-radius:var(--radius);margin:14px 0;font-size:11px;color:var(--text-secondary)">
+        <div style="font-weight:600;color:var(--info);margin-bottom:4px">Estados:</div>
+        <span style="padding:2px 8px;background:#10b981;color:#fff;border-radius:10px;font-size:10px;margin-right:6px">LIVE AHORA</span> cliente escribio en los ultimos 2 min ·
+        <span style="padding:2px 8px;background:#f59e0b;color:#fff;border-radius:10px;font-size:10px;margin:0 6px">Activo</span> menos de 15 min ·
+        <span style="padding:2px 8px;background:#8b5cf6;color:#fff;border-radius:10px;font-size:10px;margin:0 6px">CONTROL HUMANO</span> tu tomaste control
+      </div>
+      <div id="live-convs-list"><div style="padding:24px;color:var(--text-muted);font-size:12px;text-align:center">Cargando...</div></div>
+    </div>
+
     <!-- ADMIN: Configuración -->
     <!-- ═══ AGENT BUILDER ═══ -->
     <div class="page-body" id="a-agents" style="display:none">
@@ -1727,6 +1746,7 @@ html,body{overflow-x:hidden;max-width:100vw}
               <p style="font-size:12px;color:var(--text-muted)" id="aed-desc">—</p>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn btn-dark btn-sm" onclick="openCopilotPanel()" title="Copiloto IA: chatea para editar la personalidad, bloques y tono del agente" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)"><i class="fas fa-wand-magic-sparkles"></i> Copiloto IA</button>
               <button type="button" class="btn btn-outline btn-sm" onclick="previewAgentPrompt()" title="Ver el system prompt completo que recibira el LLM, formado por la union de todos los bloques activos"><i class="fas fa-eye"></i> Preview prompt</button>
               <button type="button" class="btn btn-outline btn-sm" onclick="testAgentChat()" title="Abrir un chat de prueba con este agente, sin afectar conversaciones reales"><i class="fas fa-comment-dots"></i> Probar chat</button>
               <button type="button" class="btn btn-outline btn-sm" onclick="loadAgentTraces()" title="Historial de llamadas al LLM con tokens, latencia, costo y tool calls"><i class="fas fa-chart-line"></i> Traces</button>
@@ -3142,7 +3162,7 @@ async function downloadBulkCSV() {
 
 // ─── Admin ───
 function aView(id) {
-  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-agents','a-config','a-integrations','a-editor','a-history','a-tickets'];
+  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-live-chats','a-agents','a-config','a-integrations','a-editor','a-history','a-tickets'];
   ALL_VIEWS.forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
   const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
   const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-agents':'Agent Builder','a-config':'Configuración','a-integrations':'Integraciones','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte' };
@@ -5004,6 +5024,8 @@ async function sendChat() {
   // Persist session id across messages
   if (!window._mateoSessionId) {
     window._mateoSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,9);
+    // Start polling for admin messages (takeover)
+    _startChatPolling();
   }
   try {
     const payload = {
@@ -5041,19 +5063,24 @@ async function sendChat() {
     const typing = document.getElementById('chatTyping');
     if (typing) typing.remove();
 
-    // Add bot response
-    const reply = data.reply || 'Lo siento, hubo un error. Intenta de nuevo.';
-    body.innerHTML += `<div class="chat-msg bot">${reply.replace(/\n/g, '<br>')}</div>`;
-    chatHistory.push({ role: 'assistant', content: reply });
-    // Visual indicator if agent used tools (lead captured, etc)
-    if (data.tool_calls && data.tool_calls.length) {
-      const leadTool = data.tool_calls.find(t => t.name === 'create_prospect' && t.result?.created);
-      if (leadTool) {
-        body.innerHTML += `<div class="chat-msg bot" style="background:var(--success-bg,#d1fae5);color:var(--success);font-size:11px"><i class="fas fa-check-circle"></i> Tus datos quedaron guardados. Un asesor te contactara pronto.</div>`;
-      }
-      const bookTool = data.tool_calls.find(t => t.name === 'calendar_create_event');
-      if (bookTool) {
-        body.innerHTML += `<div class="chat-msg bot" style="background:var(--info-bg,#dbeafe);color:var(--info);font-size:11px"><i class="fas fa-calendar-check"></i> Reunion agendada. Revisa tu email.</div>`;
+    // Si admin tomo control, mostrar mensaje y no agregar reply vacia
+    if (data.waiting_for_human) {
+      body.innerHTML += `<div class="chat-msg bot" style="background:#fef3c7;color:#92400e;font-size:11px;border-left:3px solid #f59e0b"><i class="fas fa-user-headset"></i> ${data.info_message || 'Un asesor esta revisando tu mensaje'}</div>`;
+    } else {
+      // Add bot response
+      const reply = data.reply || 'Lo siento, hubo un error. Intenta de nuevo.';
+      body.innerHTML += `<div class="chat-msg bot">${reply.replace(/\n/g, '<br>')}</div>`;
+      chatHistory.push({ role: 'assistant', content: reply });
+      // Visual indicator if agent used tools (lead captured, etc)
+      if (data.tool_calls && data.tool_calls.length) {
+        const leadTool = data.tool_calls.find(t => t.name === 'create_prospect' && t.result?.created);
+        if (leadTool) {
+          body.innerHTML += `<div class="chat-msg bot" style="background:var(--success-bg,#d1fae5);color:var(--success);font-size:11px"><i class="fas fa-check-circle"></i> Tus datos quedaron guardados. Un asesor te contactara pronto.</div>`;
+        }
+        const bookTool = data.tool_calls.find(t => t.name === 'calendar_create_event');
+        if (bookTool) {
+          body.innerHTML += `<div class="chat-msg bot" style="background:var(--info-bg,#dbeafe);color:var(--info);font-size:11px"><i class="fas fa-calendar-check"></i> Reunion agendada. Revisa tu email.</div>`;
+        }
       }
     }
   } catch (err) {
@@ -5201,8 +5228,28 @@ async function viewMateoConv(id) {
     if (id === 'a-prospects') {
       setTimeout(() => { loadProspects(); loadPipelineKanban(); loadHandoffs(); }, 50);
     }
+    if (id === 'a-live-chats') {
+      setTimeout(() => { if (typeof startLiveConvsPolling === 'function') startLiveConvsPolling(); }, 50);
+    } else {
+      if (typeof stopLiveConvsPolling === 'function') stopLiveConvsPolling();
+    }
   };
 })();
+
+// Poll badge cada 30s (global)
+setInterval(async () => {
+  try {
+    const r = await fetch(API + '/api/pipeline/live-conversations', { cache: 'no-store' });
+    if (!r.ok) return;
+    const convs = await r.json();
+    const live = convs.filter(c => c.status === 'live' || c.status === 'human_control').length;
+    const badge = document.getElementById('live-chats-badge');
+    if (badge) {
+      badge.textContent = live;
+      badge.style.display = live > 0 ? 'inline-block' : 'none';
+    }
+  } catch {}
+}, 30000);
 
 // Tabs dentro de Prospects
 function switchProspectTab(tab) {
@@ -6442,6 +6489,344 @@ async function deleteAutoRule(id) {
     toast('success', 'Eliminada', '');
     if (_currentAgentId) loadAutoRules(_currentAgentId);
   } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// CHAT WIDGET POLLING (recibir mensajes del admin cuando hace takeover)
+// ═══════════════════════════════════════════════════
+let _chatPollInterval = null;
+function _startChatPolling() {
+  if (_chatPollInterval) clearInterval(_chatPollInterval);
+  _chatPollInterval = setInterval(async () => {
+    if (!window._mateoSessionId) return;
+    try {
+      const r = await fetch(API + '/api/chat/session/' + window._mateoSessionId + '/pending', { cache: 'no-store' });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.messages && d.messages.length) {
+        const body = document.getElementById('chatBody');
+        if (body) {
+          d.messages.forEach(m => {
+            const nombre = m.admin_nombre || 'Asesor';
+            body.innerHTML += `<div class="chat-msg bot" style="border-left:3px solid var(--info)"><div style="font-size:10px;font-weight:600;color:var(--info);margin-bottom:3px">👤 ${nombre}</div>${(m.content||'').replace(/\n/g, '<br>')}</div>`;
+            chatHistory.push({ role: 'assistant', content: m.content });
+          });
+          body.scrollTop = body.scrollHeight;
+        }
+      }
+    } catch {}
+  }, 4000); // poll cada 4s
+}
+
+// ═══════════════════════════════════════════════════
+// ADMIN TAKEOVER - panel para que admin tome control del chat
+// ═══════════════════════════════════════════════════
+
+let _takeoverPipeId = null;
+let _takeoverPollInterval = null;
+
+async function openTakeoverPanel(pipelineId) {
+  _takeoverPipeId = pipelineId;
+  let modal = document.getElementById('takeoverModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'takeoverModal';
+    modal.className = 'modal-bg';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="modal-box" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px">
+      <div id="takeover-header" style="flex:1">
+        <div style="font-size:14px;font-weight:600"><i class="fas fa-user-headset" style="margin-right:6px;color:var(--info)"></i>Control de conversacion <span id="takeover-status" style="font-size:10px;margin-left:8px;padding:2px 8px;border-radius:8px;background:var(--success);color:#fff">LIVE</span></div>
+        <div id="takeover-visitor" style="font-size:11px;color:var(--text-muted);margin-top:2px">—</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button id="takeover-btn-control" class="btn btn-dark btn-sm" onclick="toggleTakeover()"><i class="fas fa-hand-paper"></i> Tomar control</button>
+        <button class="btn btn-outline btn-sm" onclick="closeTakeover()" style="color:var(--text-muted)">&times;</button>
+      </div>
+    </div>
+    <div id="takeover-summary" style="margin-bottom:10px"></div>
+    <div id="takeover-chat" style="flex:1;overflow-y:auto;background:var(--bg-surface);padding:12px;border-radius:var(--radius);min-height:300px;max-height:50vh;display:flex;flex-direction:column"></div>
+    <div id="takeover-input-wrap" style="display:none;margin-top:10px;gap:6px">
+      <input type="text" class="form-input" id="takeover-input" placeholder="Escribe tu mensaje al cliente..." style="flex:1" onkeypress="if(event.key==='Enter'){sendAdminMessage();}">
+      <button class="btn btn-dark btn-sm" onclick="sendAdminMessage()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>`;
+  modal.classList.add('open');
+  await refreshTakeoverPanel();
+  // Poll cada 3s para actualizar chat live
+  if (_takeoverPollInterval) clearInterval(_takeoverPollInterval);
+  _takeoverPollInterval = setInterval(refreshTakeoverPanel, 3000);
+}
+
+function closeTakeover() {
+  document.getElementById('takeoverModal')?.classList.remove('open');
+  if (_takeoverPollInterval) { clearInterval(_takeoverPollInterval); _takeoverPollInterval = null; }
+  _takeoverPipeId = null;
+}
+
+async function refreshTakeoverPanel() {
+  if (!_takeoverPipeId) return;
+  try {
+    const [detail, summary] = await Promise.all([
+      api('/api/pipeline/conversations/' + _takeoverPipeId),
+      api('/api/pipeline/conversations/' + _takeoverPipeId + '/summary'),
+    ]);
+    // Header
+    const statusEl = document.getElementById('takeover-status');
+    const s = summary.status || 'idle';
+    const statusMap = { live: { label: 'LIVE', bg: '#10b981' }, active: { label: 'ACTIVO', bg: '#f59e0b' }, idle: { label: 'INACTIVO', bg: '#6b7280' }, closed: { label: 'CERRADO', bg: '#374151' }, human_control: { label: 'CONTROL HUMANO', bg: '#8b5cf6' } };
+    const sc = statusMap[s] || statusMap.idle;
+    statusEl.textContent = sc.label;
+    statusEl.style.background = sc.bg;
+    document.getElementById('takeover-visitor').textContent = `${summary.visitor.nombre || 'Anonimo'} · ${summary.visitor.email || 'sin email'} · stage ${summary.stage} · ${summary.mensajes_count} msgs`;
+
+    // Boton control
+    const btn = document.getElementById('takeover-btn-control');
+    if (summary.control_mode === 'human') {
+      btn.innerHTML = '<i class="fas fa-robot"></i> Devolver al IA';
+      btn.classList.remove('btn-dark'); btn.classList.add('btn-outline');
+      document.getElementById('takeover-input-wrap').style.display = 'flex';
+    } else {
+      btn.innerHTML = '<i class="fas fa-hand-paper"></i> Tomar control';
+      btn.classList.add('btn-dark'); btn.classList.remove('btn-outline');
+      document.getElementById('takeover-input-wrap').style.display = 'none';
+    }
+
+    // Resumen + compromisos + proximos pasos
+    const summaryWrap = document.getElementById('takeover-summary');
+    const commits = (summary.compromisos || []).slice(0, 5).map(c => `<li style="margin-bottom:3px"><span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:10px;margin-right:4px">${c.tipo}</span>${c.texto}</li>`).join('');
+    const steps = (summary.proximos_pasos || []).map(st => {
+      const prio = { critica: 'var(--danger)', alta: 'var(--warning)', media: 'var(--info)', baja: 'var(--text-muted)' }[st.prioridad] || 'var(--text-muted)';
+      return `<li style="margin-bottom:3px"><span style="font-weight:600;color:${prio}">[${(st.prioridad||'').toUpperCase()}]</span> <b>${st.accion}:</b> ${st.detalle}</li>`;
+    }).join('');
+    summaryWrap.innerHTML = `<div style="padding:10px 12px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius);font-size:11px">
+      <div style="font-weight:600;font-size:12px;margin-bottom:6px"><i class="fas fa-clipboard-list" style="margin-right:4px;color:var(--info)"></i>Resumen ejecutivo</div>
+      <div style="color:var(--text-secondary);margin-bottom:8px;white-space:pre-wrap">${(summary.summary || 'Sin resumen').replace(/</g,'&lt;')}</div>
+      ${commits ? `<div style="font-weight:600;font-size:11px;margin-top:8px;margin-bottom:3px">📌 Compromisos del agente:</div><ul style="margin:0;padding-left:20px;color:var(--text-secondary)">${commits}</ul>` : ''}
+      ${steps ? `<div style="font-weight:600;font-size:11px;margin-top:8px;margin-bottom:3px">🎯 Proximos pasos:</div><ul style="margin:0;padding-left:20px;color:var(--text-secondary)">${steps}</ul>` : ''}
+    </div>`;
+
+    // Chat messages
+    const chatWrap = document.getElementById('takeover-chat');
+    const msgs = detail.messages || [];
+    if (!msgs.length) {
+      chatWrap.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:12px">Sin mensajes aun</div>';
+    } else {
+      const wasAtBottom = chatWrap.scrollHeight - chatWrap.scrollTop - chatWrap.clientHeight < 50;
+      chatWrap.innerHTML = msgs.map(m => {
+        const isUser = m.role === 'user';
+        const align = isUser ? 'margin-right:auto;background:var(--bg-white)' : 'margin-left:auto;background:#dbeafe';
+        const name = isUser ? '👤 ' + (summary.visitor.nombre || 'Cliente') : '🤵 Agente';
+        return `<div style="max-width:75%;${align};padding:8px 12px;border-radius:12px;margin-bottom:6px;font-size:12px;border:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:2px">${name} · ${m.created_at ? new Date(m.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}) : ''}</div>
+          <div style="white-space:pre-wrap;line-height:1.4">${(m.content||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+        </div>`;
+      }).join('');
+      if (wasAtBottom) chatWrap.scrollTop = chatWrap.scrollHeight;
+    }
+  } catch (err) { console.error('refreshTakeover:', err); }
+}
+
+async function toggleTakeover() {
+  if (!_takeoverPipeId) return;
+  try {
+    const summary = await api('/api/pipeline/conversations/' + _takeoverPipeId + '/summary');
+    const adminEmail = currentUser?.email || 'admin@mipquality.com';
+    const adminName = currentUser?.nombre || 'Admin MIP';
+    if (summary.control_mode === 'human') {
+      await api('/api/pipeline/conversations/' + _takeoverPipeId + '/release-control', { method: 'POST' });
+      toast('success', 'Control devuelto al IA', 'El agente continuara atendiendo.');
+    } else {
+      await api('/api/pipeline/conversations/' + _takeoverPipeId + '/take-over', { method: 'POST', body: JSON.stringify({ admin_email: adminEmail, admin_nombre: adminName }) });
+      toast('success', 'Control tomado', 'Ahora responde tu directamente.');
+    }
+    refreshTakeoverPanel();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function sendAdminMessage() {
+  if (!_takeoverPipeId) return;
+  const input = document.getElementById('takeover-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  try {
+    await api('/api/pipeline/conversations/' + _takeoverPipeId + '/send-admin-message', {
+      method: 'POST',
+      body: JSON.stringify({ message: msg, admin_nombre: currentUser?.nombre || 'Admin MIP' })
+    });
+    input.value = '';
+    refreshTakeoverPanel();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// CHATS ACTIVOS / REPORTES (nueva seccion)
+// ═══════════════════════════════════════════════════
+
+async function loadLiveConversations() {
+  try {
+    const convs = await api('/api/pipeline/live-conversations');
+    const wrap = document.getElementById('live-convs-list');
+    if (!wrap) return;
+    if (!convs.length) {
+      wrap.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:12px;text-align:center;background:var(--bg-surface);border-radius:var(--radius)">No hay chats activos en este momento.</div>';
+      return;
+    }
+    const statusMap = { live: { label: 'LIVE AHORA', bg: '#10b981', blink: true }, active: { label: 'Activo', bg: '#f59e0b' }, idle: { label: 'Inactivo', bg: '#6b7280' }, human_control: { label: 'CONTROL HUMANO', bg: '#8b5cf6' } };
+    wrap.innerHTML = convs.map(c => {
+      const sc = statusMap[c.status] || statusMap.idle;
+      const lastMsg = c.last_client_activity_at ? _timeAgo(c.last_client_activity_at) : 'nunca';
+      return `<div class="card" style="padding:14px;margin-bottom:8px;cursor:pointer" onclick="openTakeoverPanel(${c.id})">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:600;font-size:13px">${c.visitor_nombre || 'Anonimo'} <span style="font-weight:400;color:var(--text-muted);font-size:11px">${c.visitor_email || ''}</span></div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Stage: <b>${c.stage}</b> · ${c.total_messages} msgs · ultima: ${lastMsg}</div>
+          </div>
+          <div style="text-align:right">
+            <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;color:#fff;background:${sc.bg};${sc.blink ? 'animation:pulse 1.5s infinite' : ''}">${sc.label}</span>
+            <div style="margin-top:6px"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openTakeoverPanel(${c.id})" style="font-size:10px"><i class="fas fa-eye"></i> Ver + tomar control</button></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) { console.error('loadLiveConversations:', err); }
+}
+
+function _timeAgo(iso) {
+  const d = new Date(iso);
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return 'ahora';
+  if (s < 3600) return Math.floor(s/60) + ' min';
+  if (s < 86400) return Math.floor(s/3600) + ' h';
+  return Math.floor(s/86400) + ' d';
+}
+
+// Poll cada 20s cuando esta la vista abierta
+let _liveConvsPollInterval = null;
+function startLiveConvsPolling() {
+  if (_liveConvsPollInterval) return;
+  loadLiveConversations();
+  _liveConvsPollInterval = setInterval(loadLiveConversations, 20000);
+}
+function stopLiveConvsPolling() {
+  if (_liveConvsPollInterval) { clearInterval(_liveConvsPollInterval); _liveConvsPollInterval = null; }
+}
+
+// ═══════════════════════════════════════════════════
+// COPILOTO IA - chat para editar agente via conversacion
+// ═══════════════════════════════════════════════════
+
+let _copilotHistory = [];
+
+function openCopilotPanel() {
+  if (!_currentAgentId) { toast('error','Error','Selecciona un agente primero'); return; }
+  _copilotHistory = [];
+  let modal = document.getElementById('copilotModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'copilotModal';
+    modal.className = 'modal-bg';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="modal-box" style="max-width:760px;max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:10px">
+      <div>
+        <div style="font-size:14px;font-weight:600"><i class="fas fa-wand-magic-sparkles" style="margin-right:6px;background:linear-gradient(135deg,#8b5cf6,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent"></i>Copiloto IA — Editor conversacional del agente</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Chatea con el copiloto para modificar personalidad, tono, bloques e instrucciones del agente.</div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="closeCopilot()" style="color:var(--text-muted)">&times;</button>
+    </div>
+
+    <div style="padding:10px 14px;background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(99,102,241,0.08));border-left:3px solid #8b5cf6;border-radius:var(--radius);margin-bottom:10px;font-size:11px;color:var(--text-secondary)">
+      <div style="font-weight:600;color:#8b5cf6;margin-bottom:4px">💡 Ejemplos de lo que puedes pedir:</div>
+      <div style="margin-bottom:3px">• "Haz el tono mas formal y menos chileno"</div>
+      <div style="margin-bottom:3px">• "Agrega un bloque de que NO hacer: nunca dar descuentos sobre 15%"</div>
+      <div style="margin-bottom:3px">• "Mateo debe preguntar rubro ANTES de volumen"</div>
+      <div>• "Crea un flujo de pasos especifico para clientes primerizos"</div>
+    </div>
+
+    <div id="copilot-chat" style="flex:1;overflow-y:auto;background:var(--bg-surface);padding:12px;border-radius:var(--radius);min-height:340px;max-height:55vh;display:flex;flex-direction:column">
+      <div style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:12px;border-left:3px solid #8b5cf6">
+        <div style="font-size:10px;font-weight:600;color:#8b5cf6;margin-bottom:3px">🪄 Copiloto</div>
+        Hola! Soy el Copiloto de Agent Builder. Cuentame que queres ajustar del agente y yo hago los cambios. Puedo modificar bloques, cambiar tono, crear nuevos pasos, agregar reglas de "que NO hacer", etc.
+      </div>
+    </div>
+
+    <div id="copilot-input-wrap" style="display:flex;gap:6px;margin-top:10px">
+      <textarea class="form-input" id="copilot-input" placeholder="Ej: 'Hacelo mas agresivo en ventas' o 'Agrega que nunca ofrezca descuentos sin aprobacion'..." style="flex:1;min-height:50px;resize:vertical" onkeypress="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendCopilotMessage();}"></textarea>
+      <button class="btn btn-dark btn-sm" onclick="sendCopilotMessage()" style="align-self:stretch;background:linear-gradient(135deg,#8b5cf6,#6366f1)"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>`;
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('copilot-input')?.focus(), 100);
+}
+
+function closeCopilot() {
+  document.getElementById('copilotModal')?.classList.remove('open');
+  _copilotHistory = [];
+}
+
+async function sendCopilotMessage() {
+  if (!_currentAgentId) return;
+  const input = document.getElementById('copilot-input');
+  const msg = (input.value || '').trim();
+  if (!msg) return;
+  const chat = document.getElementById('copilot-chat');
+
+  // Add user message
+  chat.innerHTML += `<div style="max-width:80%;margin-left:auto;background:#e0e7ff;padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:12px"><div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:3px">Tu</div>${msg.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+  _copilotHistory.push({ role: 'user', content: msg });
+  input.value = '';
+  input.disabled = true;
+
+  // Typing indicator
+  chat.innerHTML += `<div id="copilot-typing" style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:8px 12px;border-radius:12px;margin-bottom:8px;font-size:11px;color:var(--text-muted);border-left:3px solid #8b5cf6"><i class="fas fa-spinner fa-spin"></i> El copiloto esta pensando...</div>`;
+  chat.scrollTop = chat.scrollHeight;
+
+  try {
+    const r = await api('/api/agents/' + _currentAgentId + '/copilot', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: msg,
+        history: _copilotHistory.slice(-10),
+      }),
+    });
+    document.getElementById('copilot-typing')?.remove();
+
+    // Render tool calls primero si hubo
+    if (r.tools_executed && r.tools_executed.length) {
+      r.tools_executed.forEach(t => {
+        const ok = t.result && !t.result.error;
+        const icon = ok ? '✅' : '❌';
+        const color = ok ? 'var(--success)' : 'var(--danger)';
+        let desc = t.name;
+        if (t.name === 'update_block') desc = `Actualizado bloque #${t.args.block_id}`;
+        else if (t.name === 'create_block') desc = `Creado bloque "${t.args.nombre}" (${t.args.categoria}/${t.args.tipo})`;
+        else if (t.name === 'delete_block') desc = `Eliminado bloque #${t.args.block_id}`;
+        else if (t.name === 'update_agent_settings') desc = `Actualizados settings del agente`;
+        chat.innerHTML += `<div style="max-width:90%;margin-right:auto;background:#fef3c7;padding:6px 10px;border-radius:8px;margin-bottom:4px;font-size:11px;border-left:3px solid #f59e0b"><span style="color:${color}">${icon}</span> <b>Accion:</b> ${desc}</div>`;
+      });
+    }
+
+    // Reply
+    const reply = r.reply || 'Listo.';
+    chat.innerHTML += `<div style="max-width:80%;margin-right:auto;background:var(--bg-white);padding:10px 12px;border-radius:12px;margin-bottom:8px;font-size:12px;border-left:3px solid #8b5cf6"><div style="font-size:10px;font-weight:600;color:#8b5cf6;margin-bottom:3px">🪄 Copiloto ${r.tools_executed && r.tools_executed.length ? '(aplico '+r.tools_executed.length+' cambios)' : ''}</div>${reply.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+    _copilotHistory.push({ role: 'assistant', content: reply });
+
+    // Si hubo tools, recargar el agente para que se vea actualizado
+    if (r.tools_executed && r.tools_executed.length) {
+      loadAgent(_currentAgentId);
+      toast('success', 'Agente actualizado', `${r.tools_executed.length} cambio(s) aplicado(s)`);
+    }
+  } catch (err) {
+    document.getElementById('copilot-typing')?.remove();
+    chat.innerHTML += `<div style="max-width:80%;margin-right:auto;background:#fee2e2;color:var(--danger);padding:8px 12px;border-radius:12px;margin-bottom:8px;font-size:11px">Error: ${err.message}</div>`;
+  } finally {
+    input.disabled = false;
+    input.focus();
+    chat.scrollTop = chat.scrollHeight;
+  }
 }
 </script>
 </body>

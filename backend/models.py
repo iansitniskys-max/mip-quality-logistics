@@ -636,6 +636,13 @@ class ConversationPipeline(Base):
     notes = Column(Text)
     total_messages = Column(Integer, default=0)
     last_message_at = Column(DateTime, server_default=func.now())
+    # Live conversation control
+    control_mode = Column(String(20), default="ai")  # ai | human | mixed
+    taken_over_by = Column(String(200))  # email del admin que tomo control
+    taken_over_at = Column(DateTime)
+    last_client_activity_at = Column(DateTime)  # ultima vez que el CLIENTE escribio
+    widget_is_open = Column(Boolean, default=True)  # cliente tiene el widget abierto
+    pending_admin_messages = Column(Text, default="[]")  # cola de mensajes del admin esperando ser entregados al cliente
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
