@@ -2450,16 +2450,14 @@ def _gemini_embed(text: str):
     if not GEMINI_API_KEY or not text:
         return None
     import requests as _req
-    # Try multiple API versions + models
+    # gemini-embedding-001 es el modelo oficial (1536d default, soporta 768/1536/3072)
     candidates = [
         ("v1beta", "gemini-embedding-001"),
-        ("v1beta", "text-embedding-004"),
-        ("v1", "text-embedding-004"),
-        ("v1beta", "embedding-001"),
     ]
     payload = {
         "content": {"parts": [{"text": text[:20000]}]},
         "taskType": "RETRIEVAL_DOCUMENT",
+        "outputDimensionality": 768,  # reduce para economizar storage, calidad similar
     }
     last_err = None
     for version, model in candidates:
