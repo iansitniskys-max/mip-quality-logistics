@@ -19,6 +19,7 @@ from models import (
     Socio, GastoSplit,
     MateoConfig, MateoConversation, MateoMessage, MateoCalendarBooking,
     AgentConfig, AgentBlock, Tool, KnowledgeFolder, KnowledgeDoc, KnowledgeChunk, AgentTrace,
+    ConversationPipeline, PipelineStageLog, AgentIntegration, HumanHandoff,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -32,6 +33,7 @@ from schemas import (
     MateoConfigOut, MateoConversationOut,
     AgentConfigOut, AgentConfigCreate, AgentBlockOut, AgentBlockCreate,
     ToolOut, KBFolderOut, KBDocOut,
+    ConversationPipelineOut, HumanHandoffOut, AgentIntegrationOut,
 )
 import csv
 import io
@@ -1990,6 +1992,54 @@ DEFAULT_TOOLS = [
         "handler": "webhook_send",
         "peligroso": True,
     },
+    {
+        "name": "check_calendar_availability",
+        "description": "Consulta la disponibilidad en Google Calendar del equipo para agendar reuniones. Retorna los slots ocupados en un rango de fechas. USAR cuando el cliente quiere saber cuando podemos reunirnos.",
+        "categoria": "calendar",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "time_min": {"type": "string", "description": "ISO timestamp inicio de ventana"},
+                "time_max": {"type": "string", "description": "ISO timestamp fin de ventana"},
+            },
+        }),
+        "handler": "check_calendar_availability",
+        "peligroso": False,
+    },
+    {
+        "name": "add_to_pipeline",
+        "description": "Agrega al cliente actual al pipeline de ventas CRM moviendolo al stage apropiado. Usar cuando el cliente muestra intencion real de compra o avance en su interes.",
+        "categoria": "crm",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "session_id": {"type": "string"},
+                "stage": {"type": "string", "enum": ["lead_inicial","calificando","cotizando","cerrando","cliente_activo","soporte_post_venta","cliente_perdido"]},
+                "nombre": {"type": "string"},
+                "email": {"type": "string"},
+                "telefono": {"type": "string"},
+                "empresa": {"type": "string"},
+                "notes": {"type": "string"},
+            },
+            "required": ["stage"],
+        }),
+        "handler": "add_to_pipeline",
+        "peligroso": False,
+    },
+    {
+        "name": "check_order_status",
+        "description": "Consulta el estado de un pedido/cotizacion del cliente. Usar cuando el cliente pregunta por donde va su pedido o cuando llega.",
+        "categoria": "crm",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "email": {"type": "string", "description": "Email del cliente"},
+                "pedido_id": {"type": "integer", "description": "Numero de pedido si lo conoce"},
+            },
+        }),
+        "handler": "check_order_status",
+        "peligroso": False,
+    },
 ]
 
 
@@ -2125,7 +2175,154 @@ def _seed_agent_builder(db):
                 orden=70, activo=True, es_reusable=True, block_key="precios_mip",
             ))
     db.commit()
+
+    # Update Mateo stages to match pipeline
+    agent.stages = json.dumps(["lead_inicial", "calificando"])
+    agent.tools_allowed = json.dumps(["search_kb", "create_prospect", "calendar_create_event", "check_calendar_availability", "add_to_pipeline", "escalate_to_human"])
+    db.commit()
     print(f"[agent-builder] Seeded Mateo agent with {len(db.query(AgentBlock).filter(AgentBlock.agent_id==agent.id).all())} blocks")
+
+    # Seed 3 agentes adicionales para multi-stage pipeline
+    _seed_additional_agents(db)
+
+
+def _seed_additional_agents(db):
+    """Crea Carla (Cerradora), Paula (Soporte Post-venta), Diego (Retencion/Perdidos)."""
+    existing_types = {a.agent_type for a in db.query(AgentConfig).all()}
+
+    # 1. Carla - Cerradora (stages: cotizando, cerrando)
+    if "carla-cierre" not in existing_types:
+        carla = AgentConfig(
+            agent_type="carla-cierre",
+            display_name="Carla - Ejecutiva de Cierre",
+            descripcion="Cierra ventas con clientes calificados. Maneja objeciones de precio, negocia condiciones, genera cotizaciones formales.",
+            avatar="👩‍💼",
+            modelo="gemini-2.5-flash",
+            activo=True,
+            tools_allowed=json.dumps(["search_kb", "create_prospect", "calendar_create_event", "check_calendar_availability", "add_to_pipeline", "escalate_to_human"]),
+            max_tool_calls=8,
+            kb_folder_ids="[]",
+            stages=json.dumps(["cotizando", "cerrando"]),
+            temperatura=0.6,
+            max_tokens=600,
+        )
+        db.add(carla)
+        db.commit()
+        db.refresh(carla)
+        _add_agent_blocks(carla, db, [
+            ("personificacion", "identidad", "Personalidad", 0, """Eres Carla, ejecutiva de cierre senior de MIP Quality & Logistics. Tienes 10 años de experiencia cerrando ventas B2B de importacion. Eres directa, profesional, orientada a numeros y a cerrar.
+
+Usas 'tu' en espanol chileno, tono cercano pero con autoridad comercial. Nunca regateas, defiendes el valor."""),
+            ("formato", "identidad", "Formato respuesta", 20, """RESPUESTAS:
+- Cortas y al punto, maximo 3 parrafos.
+- Siempre con un numero concreto: precio, plazo, descuento, fecha.
+- Cada respuesta termina con UN CTA especifico de cierre."""),
+            ("instrucciones", "instrucciones", "Tecnicas de cierre", 30, """ESTRATEGIA DE CIERRE:
+1. ANCLAJE: siempre da un rango de precio concreto antes que el cliente lo pida.
+2. OBJECIONES: "si el precio es el tema, podemos ajustar en X. Pero el valor esta en Y."
+3. URGENCIA REAL: "los precios FOB se ajustan con la tasa del RMB, si cerramos esta semana fijamos tarifa."
+4. ALTERNATIVAS: nunca preguntes 'quieres?' sino '¿prefieres pagar 50/50 o 30/70?'
+5. SUMA DE PEQUEÑOS SI: haz que el cliente diga si a cosas pequeñas antes del cierre grande.
+6. PROPUESTA CONCRETA: siempre ofrece enviar cotizacion formal en PDF."""),
+            ("casos", "instrucciones", "Casos objeciones", 40, """OBJECIONES Y COMO LAS MANEJAS:
+- "Es caro" -> "Te entiendo, pero compara: estas pagando la confiabilidad de un equipo en China. Mira el costo por unidad al año."
+- "Necesito pensarlo" -> "Claro. ¿Que dato te falta para decidir? Te lo armo en 24 horas."
+- "Otra empresa me ofrecio mas barato" -> "Interesante. ¿Te incluye inspecciones pre-embarque? ¿Tienen oficina en China? La diferencia son esos detalles que cuidan tu inversion."
+- "No tengo todo el presupuesto" -> "Tenemos financiamiento: podemos adelantar tu 50% y cobrarte a 30/60 dias post-entrega. ¿Eso te ayuda?"
+"""),
+            ("info_precios", "info_clave", "Rangos cerrados MIP", 50, """RANGOS DE PRECIOS QUE PUEDES MANEJAR:
+- Margen MIP estandar: 15-25% sobre CIF
+- Descuento max por volumen >5000 un: 5%
+- Descuento max por volumen >10000 un: 10%
+- Condiciones de pago flexibles: 50/50, 30/70, 100% anticipo con 2% descuento, LC a 30 dias.
+- Flete maritimo: 8-12% del FOB
+- Flete aereo: 20-25% del FOB"""),
+        ])
+
+    # 2. Paula - Soporte Post-venta (stages: cliente_activo, soporte_post_venta)
+    if "paula-soporte" not in existing_types:
+        paula = AgentConfig(
+            agent_type="paula-soporte",
+            display_name="Paula - Atencion Post-venta",
+            descripcion="Atiende clientes activos: consultas de estado de pedido, tracking, resolucion de problemas, garantias.",
+            avatar="👩‍🎓",
+            modelo="gemini-2.5-flash",
+            activo=True,
+            tools_allowed=json.dumps(["check_order_status", "search_kb", "escalate_to_human", "add_to_pipeline"]),
+            max_tool_calls=6,
+            kb_folder_ids="[]",
+            stages=json.dumps(["cliente_activo", "soporte_post_venta"]),
+            temperatura=0.5,
+            max_tokens=500,
+        )
+        db.add(paula)
+        db.commit()
+        db.refresh(paula)
+        _add_agent_blocks(paula, db, [
+            ("personificacion", "identidad", "Personalidad", 0, """Eres Paula, del equipo de Atencion al Cliente de MIP Quality & Logistics. Empatica, paciente y orientada a resolver. Haces que el cliente se sienta escuchado y acompañado durante todo el proceso de su importacion.
+
+Usas 'tu', tono calido y profesional."""),
+            ("formato", "identidad", "Formato", 20, """- Mensajes empaticos, maximo 3 parrafos.
+- Siempre confirma lo que el cliente te dice antes de avanzar.
+- Usa bullets cuando des info estructurada."""),
+            ("instrucciones", "instrucciones", "Flujo soporte", 30, """FLUJO DE SOPORTE:
+1. SALUDO + confirmar identidad: pide email y N° de pedido para verificar.
+2. CONSULTA: usa `check_order_status` para ver el estado actual.
+3. RESPUESTA: comunica etapa actual + fecha estimada de siguiente paso.
+4. SI HAY PROBLEMA: documenta, escala con `escalate_to_human` si es mayor.
+5. CIERRE: pregunta si hay algo mas + confirma que te puede escribir cuando quiera."""),
+            ("casos", "instrucciones", "Casos tipicos", 40, """- "¿Donde esta mi pedido?" -> check_order_status + dar etapa y fechas.
+- "Esta atrasado" -> disculpa + consulta + da nueva ETA + escala si el delay es >1 semana.
+- "Hay un defecto" -> lamenta + pide fotos/video + escala a QC con urgencia alta.
+- "¿Cuando llega?" -> da etapa actual + dias estimados por etapa restante."""),
+        ])
+
+    # 3. Diego - Retencion y clientes perdidos (stages: cliente_perdido)
+    if "diego-retencion" not in existing_types:
+        diego = AgentConfig(
+            agent_type="diego-retencion",
+            display_name="Diego - Retencion & Recuperacion",
+            descripcion="Reactiva clientes perdidos o que muestran señales de churn. Ofrece incentivos, escucha objeciones, reconecta.",
+            avatar="🤝",
+            modelo="gemini-2.5-flash",
+            activo=True,
+            tools_allowed=json.dumps(["search_kb", "create_prospect", "calendar_create_event", "escalate_to_human", "add_to_pipeline"]),
+            max_tool_calls=6,
+            kb_folder_ids="[]",
+            stages=json.dumps(["cliente_perdido"]),
+            temperatura=0.8,
+            max_tokens=500,
+        )
+        db.add(diego)
+        db.commit()
+        db.refresh(diego)
+        _add_agent_blocks(diego, db, [
+            ("personificacion", "identidad", "Personalidad", 0, """Eres Diego, especialista en recuperacion de clientes de MIP Quality & Logistics. Humilde, curioso, empatico. Tu mision NO es vender a la fuerza, es entender que paso y dejar la puerta abierta con valor.
+
+Usas 'tu', tono conversacional, genuinamente interesado."""),
+            ("formato", "identidad", "Formato", 20, """- Corto y conciso. Respeta el tiempo del cliente.
+- Haz UNA pregunta por mensaje, escucha.
+- No insistas. Ofreces valor y dejas al cliente decidir."""),
+            ("instrucciones", "instrucciones", "Estrategia de retencion", 30, """ESTRATEGIA:
+1. ESCUCHA SIN DEFENDER: valida la razon del cliente primero ("entiendo totalmente que...").
+2. PREGUNTA ABIERTA: ¿que nos falto? ¿que hubiera hecho diferencia?
+3. APRENDIZAJE: agradece el feedback honestamente.
+4. VALOR SIN PRESION: "te dejo este dato por si algun dia vuelve a ser util" (ej: guia de costos, contacto).
+5. CIERRE ABIERTO: "si alguna vez quieres volver a conversar, mi linea esta abierta."
+No uses CTAs agresivos. Este cliente ya dijo no."""),
+        ])
+    db.commit()
+
+
+def _add_agent_blocks(agent, db, blocks_data):
+    """Helper para agregar lista de bloques a un agente."""
+    for tipo, categoria, nombre, orden, contenido in blocks_data:
+        db.add(AgentBlock(
+            agent_id=agent.id, tipo=tipo, categoria=categoria,
+            nombre=nombre, contenido=contenido,
+            orden=orden, activo=True,
+        ))
+    db.commit()
 
 
 def _compose_agent_prompt(agent: "AgentConfig", db, extra_context: str = "") -> str:
@@ -2153,7 +2350,11 @@ def _compose_agent_prompt(agent: "AgentConfig", db, extra_context: str = "") -> 
                 "info_clave": "# INFORMACION CLAVE",
             }
             parts.append("\n\n" + header_map.get(b.categoria, "# " + b.categoria.upper()))
-        parts.append(f"\n\n## {b.nombre}\n{b.contenido}")
+        # Special rendering for "que_no_hacer" - prohibition block
+        if b.tipo == "que_no_hacer":
+            parts.append(f"\n\n## ⚠️ {b.nombre} - PROHIBICIONES ESTRICTAS\nNUNCA hagas lo siguiente bajo ninguna circunstancia:\n{b.contenido}")
+        else:
+            parts.append(f"\n\n## {b.nombre}\n{b.contenido}")
         # Render sub_steps if any
         try:
             subs = json.loads(b.sub_steps or "[]")
@@ -2799,7 +3000,12 @@ def _agent_chat_gemini_with_tools(agent, system, messages, message, db, max_iter
 # ─── Endpoints: Agent chat runtime ───
 @app.post("/api/agents/{id}/chat")
 def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
-    """Chat runtime usando el agente con su prompt compuesto."""
+    """Chat runtime usando el agente con su prompt compuesto.
+    Ahora con:
+      - Pipeline tracking: crea/actualiza ConversationPipeline
+      - Intent detection + auto-handoff entre agentes
+      - Human handoff con notificacion WhatsApp
+    """
     import uuid as _uuid
     import time as _time
     a = db.query(AgentConfig).get(id)
@@ -2809,9 +3015,35 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
     history = data.get("history", [])
     session_id = data.get("session_id") or str(_uuid.uuid4())
     extra_context = data.get("context", "")
+    visitor = data.get("visitor", {})
 
     if not message:
         raise HTTPException(400, "Mensaje vacio")
+
+    # Pipeline tracking
+    pipeline = _get_or_create_pipeline(session_id, a.id, visitor, db)
+    # Si el pipeline tiene un agente distinto al actual (handoff previo), respetarlo
+    if pipeline.current_agent_id and pipeline.current_agent_id != a.id:
+        target_agent = db.query(AgentConfig).get(pipeline.current_agent_id)
+        if target_agent and target_agent.activo:
+            a = target_agent  # switch al agente correcto segun el stage
+
+    # Intent detection + posible handoff
+    intent_data = _detect_intent(message, history)
+    stage_changed = _maybe_handoff_pipeline(pipeline, intent_data, message, db)
+    if stage_changed and pipeline.current_agent_id != a.id:
+        # Hubo cambio de agente, usar el nuevo
+        target_agent = db.query(AgentConfig).get(pipeline.current_agent_id)
+        if target_agent and target_agent.activo:
+            a = target_agent
+    pipeline.total_messages = (pipeline.total_messages or 0) + 1
+    pipeline.last_message_at = datetime.now()
+    db.commit()
+
+    # Agrega info del pipeline al contexto
+    extra_context += f"\n\n[PIPELINE STATE]\nStage: {pipeline.current_stage}\nIntent: {intent_data.get('intent')} (score={intent_data.get('score')})\nSentiment: {intent_data.get('sentiment')}"
+    if pipeline.requires_human:
+        extra_context += "\n⚠️ ESTE CLIENTE REQUIERE HANDOFF HUMANO. Informale que estas escalando su consulta y pasale un numero de contacto."
 
     # RAG: buscar en KB si hay folders configurados
     try:
@@ -2937,6 +3169,13 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
         "cost_usd": round(cost, 6),
         "latency_ms": latency_ms,
         "tool_calls": tool_calls_executed,
+        "agent_used": {"id": a.id, "name": a.display_name, "avatar": a.avatar},
+        "pipeline": {
+            "id": pipeline.id, "stage": pipeline.current_stage,
+            "intent": pipeline.intent_detected, "intent_score": pipeline.intent_score,
+            "sentiment": pipeline.sentiment,
+            "requires_human": pipeline.requires_human,
+        },
     }
 
 
@@ -2959,6 +3198,748 @@ def list_agent_traces(id: int, limit: int = 50, db: Session = Depends(get_db)):
             "created_at": t.created_at.isoformat() if t.created_at else None,
         })
     return out
+
+
+# ═══════════════════════════════════════════════════
+# PIPELINE DE CONVERSACIONES - STAGES + HANDOFF MULTI-AGENTE
+# ═══════════════════════════════════════════════════
+
+PIPELINE_STAGES = [
+    ("lead_inicial", "Lead Inicial", "#6366f1"),
+    ("calificando", "Calificando", "#f59e0b"),
+    ("cotizando", "Cotizando", "#8b5cf6"),
+    ("cerrando", "Cerrando", "#10b981"),
+    ("cliente_activo", "Cliente Activo", "#059669"),
+    ("soporte_post_venta", "Soporte Post-venta", "#3b82f6"),
+    ("cliente_perdido", "Cliente Perdido", "#6b7280"),
+]
+
+
+def _detect_intent(message: str, history: list = None) -> dict:
+    """Detecta intencion del usuario usando keywords + score.
+    Retorna {intent, score, sentiment, next_stage_hint}.
+    """
+    msg_lower = (message or "").lower()
+    # Keywords por intent
+    buy_signals = ["comprar", "cotizar", "cotizacion", "presupuesto", "necesito", "quiero", "precio", "cuanto cuesta", "cuanto vale", "cuando puedo", "condiciones de pago", "anticipo", "pago", "factura", "contrato", "firmar"]
+    support_signals = ["estado de mi pedido", "mi pedido", "donde esta", "tracking", "seguimiento", "cuando llega", "demora", "retraso", "problema", "defecto", "devolucion", "garantia"]
+    lost_signals = ["no me interesa", "no gracias", "muy caro", "encontre otra", "otra opcion", "mejor precio", "cancelar", "no quiero"]
+    complex_signals = ["hablar con", "humano", "persona real", "no me entiendes", "me puedes pasar", "ejecutivo", "gerente"]
+    qualified_signals = ["empresa", "rut", "factura", "mi empresa", "somos", "trabajo en", "soy de"]
+
+    score_buy = sum(1 for kw in buy_signals if kw in msg_lower)
+    score_support = sum(1 for kw in support_signals if kw in msg_lower)
+    score_lost = sum(1 for kw in lost_signals if kw in msg_lower)
+    score_complex = sum(1 for kw in complex_signals if kw in msg_lower)
+    score_qualified = sum(1 for kw in qualified_signals if kw in msg_lower)
+
+    # Sentiment por negativas simples
+    negative_words = ["no", "nunca", "malo", "horrible", "pesimo", "mal", "disgustado", "enojado"]
+    positive_words = ["si", "perfecto", "genial", "excelente", "bacan", "gracias", "ok"]
+    neg_count = sum(1 for w in negative_words if w in msg_lower.split())
+    pos_count = sum(1 for w in positive_words if w in msg_lower.split())
+    sentiment = "negativo" if neg_count > pos_count else ("positivo" if pos_count > neg_count else "neutral")
+
+    # Ranking
+    scores = {
+        "intencion_compra": score_buy,
+        "soporte": score_support,
+        "cliente_perdido": score_lost,
+        "derivar_humano": score_complex,
+        "calificado": score_qualified,
+    }
+    top_intent = max(scores.items(), key=lambda x: x[1])
+    intent_name = top_intent[0] if top_intent[1] > 0 else "info_general"
+    score_normalized = min(1.0, top_intent[1] / 3.0) if top_intent[1] > 0 else 0.3
+
+    # Sugerir siguiente stage
+    stage_hint = None
+    if intent_name == "intencion_compra" and score_normalized >= 0.6:
+        stage_hint = "cerrando"
+    elif intent_name == "intencion_compra":
+        stage_hint = "cotizando"
+    elif intent_name == "calificado":
+        stage_hint = "calificando"
+    elif intent_name == "soporte":
+        stage_hint = "soporte_post_venta"
+    elif intent_name == "cliente_perdido":
+        stage_hint = "cliente_perdido"
+
+    return {
+        "intent": intent_name,
+        "score": round(score_normalized, 2),
+        "sentiment": sentiment,
+        "next_stage_hint": stage_hint,
+        "requires_human": score_complex >= 2 or (intent_name == "derivar_humano" and score_complex >= 1),
+    }
+
+
+def _get_or_create_pipeline(session_id: str, agent_id: int, visitor: dict, db) -> ConversationPipeline:
+    """Obtiene o crea un pipeline para una sesion."""
+    p = db.query(ConversationPipeline).filter(ConversationPipeline.session_id == session_id).first()
+    if p:
+        return p
+    p = ConversationPipeline(
+        session_id=session_id,
+        current_stage="lead_inicial",
+        current_agent_id=agent_id,
+        visitor_nombre=(visitor or {}).get("nombre", ""),
+        visitor_email=(visitor or {}).get("email", ""),
+        visitor_telefono=(visitor or {}).get("telefono", ""),
+        visitor_empresa=(visitor or {}).get("empresa", ""),
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+def _find_agent_for_stage(stage: str, db) -> Optional[AgentConfig]:
+    """Busca un agente activo cuya lista de stages incluya el stage solicitado."""
+    agents = db.query(AgentConfig).filter(AgentConfig.activo == True).all()
+    for a in agents:
+        try:
+            stages = json.loads(a.stages or "[]")
+            if stage in stages:
+                return a
+        except Exception:
+            continue
+    return None
+
+
+def _maybe_handoff_pipeline(pipeline: ConversationPipeline, intent_data: dict, message: str, db):
+    """Evalua si hay que hacer handoff de agente segun el stage hint.
+    Registra el cambio en PipelineStageLog. Actualiza pipeline.current_agent_id.
+    Si requires_human=True, crea un HumanHandoff.
+    """
+    old_stage = pipeline.current_stage
+    old_agent = pipeline.current_agent_id
+    changed = False
+
+    # Update intent tracking
+    pipeline.intent_detected = intent_data.get("intent")
+    pipeline.intent_score = intent_data.get("score", 0)
+    pipeline.sentiment = intent_data.get("sentiment", "neutral")
+
+    # Handoff de stage si el hint es diferente Y confiable
+    hint = intent_data.get("next_stage_hint")
+    if hint and hint != old_stage and intent_data.get("score", 0) >= 0.5:
+        # Buscar agente para el nuevo stage
+        new_agent = _find_agent_for_stage(hint, db)
+        if new_agent:
+            pipeline.current_stage = hint
+            pipeline.current_agent_id = new_agent.id
+            changed = True
+            # Log
+            log = PipelineStageLog(
+                pipeline_id=pipeline.id,
+                from_stage=old_stage, to_stage=hint,
+                from_agent_id=old_agent, to_agent_id=new_agent.id,
+                trigger_type="intent_detected",
+                trigger_data=json.dumps({"intent": intent_data.get("intent"), "score": intent_data.get("score")}),
+            )
+            db.add(log)
+
+    # Human handoff si lo requiere
+    if intent_data.get("requires_human") and not pipeline.requires_human:
+        pipeline.requires_human = True
+        pipeline.human_handoff_reason = f"Intent: {intent_data.get('intent')} (score={intent_data.get('score')})"
+        pipeline.handoff_at = datetime.now()
+        # Crear registro
+        handoff = HumanHandoff(
+            session_id=pipeline.session_id,
+            pipeline_id=pipeline.id,
+            agent_id=pipeline.current_agent_id,
+            visitor_nombre=pipeline.visitor_nombre,
+            visitor_email=pipeline.visitor_email,
+            visitor_telefono=pipeline.visitor_telefono,
+            motivo=pipeline.human_handoff_reason + f" | mensaje: {message[:150]}",
+            urgencia="alta" if intent_data.get("sentiment") == "negativo" else "media",
+            estado="pendiente",
+            notified_via="none",
+        )
+        db.add(handoff)
+        # Trigger WhatsApp notification (async, se encola)
+        try:
+            _notify_handoff_via_whatsapp(handoff, db)
+        except Exception as e:
+            print(f"[handoff notify] error: {e}")
+
+    db.commit()
+    return changed
+
+
+def _notify_handoff_via_whatsapp(handoff: HumanHandoff, db):
+    """Envia aviso via WhatsApp a los admins. Requiere TWILIO o META_WA env vars."""
+    admin_phones_raw = os.getenv("HANDOFF_ADMIN_PHONES", "")  # comma-separated
+    admin_phones = [p.strip() for p in admin_phones_raw.split(",") if p.strip()]
+    if not admin_phones:
+        return
+    body = (
+        f"🔔 HANDOFF MIP\n"
+        f"Urgencia: {handoff.urgencia.upper()}\n"
+        f"Cliente: {handoff.visitor_nombre or '?'} ({handoff.visitor_email or '?'})\n"
+        f"Motivo: {handoff.motivo[:200]}\n"
+        f"Session: {handoff.session_id}"
+    )
+    sent = False
+    # Twilio primero
+    TWILIO_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # ej: whatsapp:+14155238886
+    if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
+        try:
+            import requests as _req
+            for to in admin_phones:
+                to_wa = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
+                r = _req.post(
+                    f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json",
+                    auth=(TWILIO_SID, TWILIO_TOKEN),
+                    data={"From": TWILIO_FROM, "To": to_wa, "Body": body},
+                    timeout=10,
+                )
+                if r.status_code in (200, 201):
+                    sent = True
+        except Exception as e:
+            print(f"[twilio WA] error: {e}")
+    # Meta Cloud API fallback
+    META_WA_TOKEN = os.getenv("META_WA_TOKEN", "")
+    META_WA_PHONE_ID = os.getenv("META_WA_PHONE_ID", "")
+    if not sent and META_WA_TOKEN and META_WA_PHONE_ID:
+        try:
+            import requests as _req
+            for to in admin_phones:
+                to_clean = to.replace("+", "").replace(" ", "")
+                r = _req.post(
+                    f"https://graph.facebook.com/v18.0/{META_WA_PHONE_ID}/messages",
+                    headers={"Authorization": f"Bearer {META_WA_TOKEN}", "Content-Type": "application/json"},
+                    json={"messaging_product": "whatsapp", "to": to_clean, "type": "text", "text": {"body": body}},
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    sent = True
+        except Exception as e:
+            print(f"[meta WA] error: {e}")
+    if sent:
+        handoff.whatsapp_sent = True
+        handoff.notified_via = "whatsapp"
+        db.commit()
+
+
+# Pipeline endpoints
+
+@app.get("/api/pipeline/stages")
+def list_pipeline_stages():
+    """Lista los stages del pipeline (estaticos)."""
+    return [{"key": k, "label": l, "color": c} for k, l, c in PIPELINE_STAGES]
+
+
+@app.get("/api/pipeline/conversations")
+def list_pipeline_conversations(stage: Optional[str] = None, db: Session = Depends(get_db)):
+    """Lista todas las conversaciones con su stage y datos del cliente. Para Kanban."""
+    q = db.query(ConversationPipeline)
+    if stage:
+        q = q.filter(ConversationPipeline.current_stage == stage)
+    rows = q.order_by(ConversationPipeline.updated_at.desc()).all()
+    return [{
+        "id": p.id,
+        "session_id": p.session_id,
+        "stage": p.current_stage,
+        "agent_id": p.current_agent_id,
+        "visitor_nombre": p.visitor_nombre or "",
+        "visitor_email": p.visitor_email or "",
+        "visitor_telefono": p.visitor_telefono or "",
+        "visitor_empresa": p.visitor_empresa or "",
+        "intent": p.intent_detected or "",
+        "intent_score": p.intent_score or 0,
+        "sentiment": p.sentiment or "neutral",
+        "requires_human": bool(p.requires_human),
+        "total_messages": p.total_messages or 0,
+        "prospect_id": p.prospect_id,
+        "cliente_id": p.cliente_id,
+        "last_message_at": p.last_message_at.isoformat() if p.last_message_at else None,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+    } for p in rows]
+
+
+@app.put("/api/pipeline/conversations/{id}/stage")
+def update_pipeline_stage(id: int, data: dict, db: Session = Depends(get_db)):
+    """Mueve manualmente una conversacion de stage (para drag&drop en UI)."""
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+    new_stage = data.get("stage")
+    valid = [s[0] for s in PIPELINE_STAGES]
+    if new_stage not in valid:
+        raise HTTPException(400, f"Stage invalido. Usar: {valid}")
+    old_stage = p.current_stage
+    old_agent = p.current_agent_id
+    p.current_stage = new_stage
+    # Auto-asignar agente del nuevo stage si existe
+    new_agent = _find_agent_for_stage(new_stage, db)
+    if new_agent:
+        p.current_agent_id = new_agent.id
+    db.add(PipelineStageLog(
+        pipeline_id=p.id, from_stage=old_stage, to_stage=new_stage,
+        from_agent_id=old_agent, to_agent_id=p.current_agent_id,
+        trigger_type="manual",
+        trigger_data=json.dumps({"admin": data.get("admin", "unknown")}),
+    ))
+    db.commit()
+    return {"id": p.id, "stage": new_stage, "agent_id": p.current_agent_id}
+
+
+@app.get("/api/pipeline/conversations/{id}")
+def get_pipeline_detail(id: int, db: Session = Depends(get_db)):
+    p = db.query(ConversationPipeline).get(id)
+    if not p:
+        raise HTTPException(404, "Pipeline no encontrado")
+    history = db.query(PipelineStageLog).filter(PipelineStageLog.pipeline_id == id).order_by(PipelineStageLog.created_at).all()
+    # Incluir mensajes si existe MateoConversation con mismo session_id
+    messages = []
+    conv = db.query(MateoConversation).filter(MateoConversation.session_id == p.session_id).first()
+    if conv:
+        msgs = db.query(MateoMessage).filter(MateoMessage.conversation_id == conv.id).order_by(MateoMessage.created_at).all()
+        messages = [{"role": m.role, "content": m.content, "created_at": m.created_at.isoformat() if m.created_at else None} for m in msgs]
+    return {
+        "id": p.id, "session_id": p.session_id,
+        "stage": p.current_stage, "agent_id": p.current_agent_id,
+        "visitor_nombre": p.visitor_nombre, "visitor_email": p.visitor_email,
+        "visitor_telefono": p.visitor_telefono, "visitor_empresa": p.visitor_empresa,
+        "intent_detected": p.intent_detected, "intent_score": p.intent_score,
+        "sentiment": p.sentiment, "requires_human": p.requires_human,
+        "prospect_id": p.prospect_id, "cliente_id": p.cliente_id,
+        "cotizacion_id": p.cotizacion_id, "pedido_id": p.pedido_id,
+        "notes": p.notes, "total_messages": p.total_messages,
+        "stage_history": [{
+            "from": h.from_stage, "to": h.to_stage,
+            "from_agent_id": h.from_agent_id, "to_agent_id": h.to_agent_id,
+            "trigger": h.trigger_type, "created_at": h.created_at.isoformat() if h.created_at else None,
+        } for h in history],
+        "messages": messages,
+    }
+
+
+# Human Handoffs endpoints
+
+@app.get("/api/handoffs")
+def list_handoffs(estado: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(HumanHandoff)
+    if estado:
+        q = q.filter(HumanHandoff.estado == estado)
+    rows = q.order_by(HumanHandoff.created_at.desc()).all()
+    return [{
+        "id": h.id, "session_id": h.session_id,
+        "visitor_nombre": h.visitor_nombre or "",
+        "visitor_email": h.visitor_email or "",
+        "visitor_telefono": h.visitor_telefono or "",
+        "motivo": h.motivo or "",
+        "urgencia": h.urgencia, "estado": h.estado,
+        "asignado_a": h.asignado_a or "",
+        "whatsapp_sent": h.whatsapp_sent or False,
+        "notified_via": h.notified_via or "",
+        "created_at": h.created_at.isoformat() if h.created_at else None,
+    } for h in rows]
+
+
+@app.get("/api/handoffs/count")
+def handoffs_count(db: Session = Depends(get_db)):
+    pending = db.query(HumanHandoff).filter(HumanHandoff.estado == "pendiente").count()
+    return {"pending": pending}
+
+
+@app.put("/api/handoffs/{id}")
+def update_handoff(id: int, data: dict, db: Session = Depends(get_db)):
+    h = db.query(HumanHandoff).get(id)
+    if not h:
+        raise HTTPException(404, "Handoff no encontrado")
+    for k in ["estado", "asignado_a", "notas_resolucion"]:
+        if k in data:
+            setattr(h, k, data[k])
+    if data.get("estado") == "resuelto":
+        h.resuelto_at = datetime.now()
+    db.commit()
+    return {"id": h.id, "estado": h.estado}
+
+
+# Agent Integrations endpoints
+
+@app.get("/api/agents/{agent_id}/integrations")
+def list_agent_integrations(agent_id: int, db: Session = Depends(get_db)):
+    rows = db.query(AgentIntegration).filter(AgentIntegration.agent_id == agent_id).all()
+    return [{
+        "id": i.id, "agent_id": i.agent_id, "tipo": i.tipo,
+        "nombre": i.nombre or "", "activo": i.activo,
+        "config": i.config or "{}",
+        "has_credentials": bool(i.credentials and i.credentials != "{}"),
+    } for i in rows]
+
+
+@app.post("/api/agents/{agent_id}/integrations")
+def create_agent_integration(agent_id: int, data: dict, db: Session = Depends(get_db)):
+    a = db.query(AgentConfig).get(agent_id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    i = AgentIntegration(
+        agent_id=agent_id,
+        tipo=data.get("tipo", "custom_webhook"),
+        nombre=data.get("nombre", ""),
+        activo=data.get("activo", True),
+        credentials=data.get("credentials", "{}"),
+        config=data.get("config", "{}"),
+    )
+    db.add(i)
+    db.commit()
+    db.refresh(i)
+    return {"id": i.id, "tipo": i.tipo}
+
+
+@app.put("/api/integrations/{id}")
+def update_integration(id: int, data: dict, db: Session = Depends(get_db)):
+    i = db.query(AgentIntegration).get(id)
+    if not i:
+        raise HTTPException(404, "Integration no encontrada")
+    for k in ["nombre", "activo", "credentials", "config"]:
+        if k in data:
+            setattr(i, k, data[k])
+    db.commit()
+    return {"id": i.id, "updated": True}
+
+
+@app.delete("/api/integrations/{id}")
+def delete_integration(id: int, db: Session = Depends(get_db)):
+    i = db.query(AgentIntegration).get(id)
+    if not i:
+        raise HTTPException(404, "Integration no encontrada")
+    db.delete(i)
+    db.commit()
+    return {"deleted": True}
+
+
+# Google Calendar OAuth2
+
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "") or GOOGLE_CLIENT_ID
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "")
+
+
+@app.get("/api/integrations/google-calendar/oauth/start")
+def gcal_oauth_start(agent_id: int):
+    """Inicia el flujo OAuth2 de Google Calendar para un agente."""
+    if not GOOGLE_OAUTH_CLIENT_ID or not GOOGLE_OAUTH_REDIRECT_URI:
+        raise HTTPException(500, "Google OAuth no configurado. Requiere GOOGLE_OAUTH_CLIENT_ID y GOOGLE_OAUTH_REDIRECT_URI")
+    from urllib.parse import urlencode
+    params = {
+        "client_id": GOOGLE_OAUTH_CLIENT_ID,
+        "redirect_uri": GOOGLE_OAUTH_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events",
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": f"agent_{agent_id}",
+    }
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+    return {"auth_url": auth_url}
+
+
+@app.get("/api/integrations/google-calendar/oauth/callback")
+def gcal_oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
+    """Callback de Google OAuth2 - intercambia code por tokens."""
+    if not GOOGLE_OAUTH_CLIENT_SECRET:
+        raise HTTPException(500, "GOOGLE_OAUTH_CLIENT_SECRET no configurado")
+    # Extract agent_id from state
+    try:
+        agent_id = int(state.replace("agent_", ""))
+    except Exception:
+        raise HTTPException(400, "state invalido")
+    import requests as _req
+    try:
+        r = _req.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": GOOGLE_OAUTH_CLIENT_ID,
+            "client_secret": GOOGLE_OAUTH_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_OAUTH_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }, timeout=15)
+        if r.status_code != 200:
+            raise HTTPException(500, f"OAuth exchange fallido: {r.text[:200]}")
+        tokens = r.json()
+    except Exception as e:
+        raise HTTPException(500, f"Error OAuth: {str(e)}")
+
+    # Guardar en AgentIntegration
+    existing = db.query(AgentIntegration).filter(
+        AgentIntegration.agent_id == agent_id,
+        AgentIntegration.tipo == "google_calendar",
+    ).first()
+    credentials = json.dumps({
+        "access_token": tokens.get("access_token"),
+        "refresh_token": tokens.get("refresh_token"),
+        "expires_in": tokens.get("expires_in"),
+        "token_type": tokens.get("token_type"),
+        "scope": tokens.get("scope"),
+    })
+    if existing:
+        existing.credentials = credentials
+        existing.activo = True
+    else:
+        db.add(AgentIntegration(
+            agent_id=agent_id, tipo="google_calendar",
+            nombre="Google Calendar", activo=True,
+            credentials=credentials,
+            config=json.dumps({"calendar_id": "primary"}),
+        ))
+    db.commit()
+    # Redirigir a la UI
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/?integration=google_calendar&status=success&agent_id=" + str(agent_id))
+
+
+def _get_gcal_access_token(agent_id: int, db) -> Optional[str]:
+    """Obtiene access_token valido para el agente. Si expiro, hace refresh."""
+    integ = db.query(AgentIntegration).filter(
+        AgentIntegration.agent_id == agent_id,
+        AgentIntegration.tipo == "google_calendar",
+        AgentIntegration.activo == True,
+    ).first()
+    if not integ or not integ.credentials:
+        return None
+    try:
+        creds = json.loads(integ.credentials)
+    except Exception:
+        return None
+    # Intentar access token directo. Si falla en 401 despues, se hace refresh.
+    return creds.get("access_token")
+
+
+def _refresh_gcal_token(agent_id: int, db) -> Optional[str]:
+    integ = db.query(AgentIntegration).filter(
+        AgentIntegration.agent_id == agent_id,
+        AgentIntegration.tipo == "google_calendar",
+    ).first()
+    if not integ:
+        return None
+    try:
+        creds = json.loads(integ.credentials or "{}")
+    except Exception:
+        return None
+    refresh_token = creds.get("refresh_token")
+    if not refresh_token:
+        return None
+    import requests as _req
+    try:
+        r = _req.post("https://oauth2.googleapis.com/token", data={
+            "client_id": GOOGLE_OAUTH_CLIENT_ID,
+            "client_secret": GOOGLE_OAUTH_CLIENT_SECRET,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        }, timeout=15)
+        if r.status_code == 200:
+            new_tokens = r.json()
+            creds["access_token"] = new_tokens.get("access_token")
+            creds["expires_in"] = new_tokens.get("expires_in")
+            integ.credentials = json.dumps(creds)
+            db.commit()
+            return creds["access_token"]
+    except Exception as e:
+        print(f"[gcal refresh] error: {e}")
+    return None
+
+
+# Tool handler: check_calendar_availability (via Google Calendar API real)
+def _handler_check_calendar(args: dict, agent, db) -> dict:
+    token = _get_gcal_access_token(agent.id, db)
+    if not token:
+        return {"error": "Google Calendar no conectado para este agente. Conectalo en la UI de Integraciones."}
+    from datetime import timedelta as _td
+    time_min = args.get("time_min") or datetime.now().isoformat() + "Z"
+    time_max = args.get("time_max") or (datetime.now() + _td(days=7)).isoformat() + "Z"
+    import requests as _req
+    try:
+        r = _req.post(
+            "https://www.googleapis.com/calendar/v3/freeBusy",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"timeMin": time_min, "timeMax": time_max, "items": [{"id": "primary"}]},
+            timeout=10,
+        )
+        if r.status_code == 401:
+            token = _refresh_gcal_token(agent.id, db)
+            if not token:
+                return {"error": "Token expirado y no se pudo refrescar. Reconecta Google Calendar."}
+            r = _req.post(
+                "https://www.googleapis.com/calendar/v3/freeBusy",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={"timeMin": time_min, "timeMax": time_max, "items": [{"id": "primary"}]},
+                timeout=10,
+            )
+        if r.status_code != 200:
+            return {"error": f"GCal API error: {r.status_code}", "body": r.text[:200]}
+        data = r.json()
+        busy = data.get("calendars", {}).get("primary", {}).get("busy", [])
+        return {"busy_slots": busy, "time_range": {"min": time_min, "max": time_max}, "count": len(busy)}
+    except Exception as e:
+        return {"error": str(e)[:200]}
+
+
+def _handler_gcal_create_event_real(args: dict, agent, db) -> dict:
+    token = _get_gcal_access_token(agent.id, db)
+    if not token:
+        # Fallback al handler stub
+        return _handler_calendar_book(args, agent, db)
+    from datetime import timedelta as _td
+    email = args.get("email", "")
+    nombre = args.get("nombre", "")
+    start_iso = args.get("fecha_iso") or args.get("start")
+    duracion = args.get("duracion_min", 30)
+    motivo = args.get("motivo", "Reunion MIP")
+    if not start_iso:
+        return {"error": "fecha_iso requerido"}
+    try:
+        start = datetime.fromisoformat(start_iso.replace("Z", ""))
+        end = start + _td(minutes=duracion)
+    except Exception:
+        return {"error": "fecha_iso invalida"}
+    import requests as _req
+    event = {
+        "summary": f"{motivo} - {nombre or email}",
+        "description": f"Agendado por {agent.display_name}\nCliente: {nombre} ({email})",
+        "start": {"dateTime": start.isoformat(), "timeZone": "America/Santiago"},
+        "end": {"dateTime": end.isoformat(), "timeZone": "America/Santiago"},
+        "attendees": [{"email": email}] if email else [],
+        "conferenceData": {
+            "createRequest": {"requestId": f"mip-{int(datetime.now().timestamp())}",
+                              "conferenceSolutionKey": {"type": "hangoutsMeet"}},
+        },
+    }
+    try:
+        r = _req.post(
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=event, timeout=15,
+        )
+        if r.status_code == 401:
+            token = _refresh_gcal_token(agent.id, db)
+            if token:
+                r = _req.post(
+                    "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json=event, timeout=15,
+                )
+        if r.status_code in (200, 201):
+            data = r.json()
+            # Persist local booking record
+            b = MateoCalendarBooking(
+                visitor_email=email, visitor_nombre=nombre,
+                fecha_reunion=start, duracion_min=duracion,
+                motivo=motivo, estado="confirmada",
+                calendar_event_id=data.get("id"),
+                meet_link=data.get("hangoutLink") or "",
+            )
+            db.add(b)
+            db.commit()
+            return {
+                "event_id": data.get("id"),
+                "html_link": data.get("htmlLink"),
+                "meet_link": data.get("hangoutLink"),
+                "created": True,
+            }
+        return {"error": f"GCal API {r.status_code}: {r.text[:200]}"}
+    except Exception as e:
+        return {"error": str(e)[:200]}
+
+
+# Tool handler: add_to_pipeline - agrega el cliente actual al pipeline de ventas
+def _handler_add_to_pipeline(args: dict, agent, db) -> dict:
+    session_id = args.get("session_id", "")
+    stage = args.get("stage", "cotizando")
+    valid = [s[0] for s in PIPELINE_STAGES]
+    if stage not in valid:
+        stage = "calificando"
+    # Buscar o crear pipeline
+    p = db.query(ConversationPipeline).filter(ConversationPipeline.session_id == session_id).first()
+    if not p:
+        p = ConversationPipeline(
+            session_id=session_id or f"manual-{int(datetime.now().timestamp())}",
+            current_stage=stage,
+            current_agent_id=agent.id,
+            visitor_nombre=args.get("nombre", ""),
+            visitor_email=args.get("email", ""),
+            visitor_telefono=args.get("telefono", ""),
+            visitor_empresa=args.get("empresa", ""),
+            notes=args.get("notes", ""),
+        )
+        db.add(p)
+        db.commit()
+        db.refresh(p)
+        return {"pipeline_id": p.id, "created": True, "stage": stage}
+    # Actualizar
+    old_stage = p.current_stage
+    p.current_stage = stage
+    if args.get("nombre") and not p.visitor_nombre:
+        p.visitor_nombre = args["nombre"]
+    if args.get("email") and not p.visitor_email:
+        p.visitor_email = args["email"]
+    db.add(PipelineStageLog(
+        pipeline_id=p.id, from_stage=old_stage, to_stage=stage,
+        trigger_type="tool_add_to_pipeline",
+        trigger_data=json.dumps({"agent_id": agent.id}),
+    ))
+    db.commit()
+    return {"pipeline_id": p.id, "created": False, "stage": stage, "previous_stage": old_stage}
+
+
+# Register new tool handlers
+TOOL_HANDLERS["check_calendar_availability"] = _handler_check_calendar
+TOOL_HANDLERS["gcal_check_availability"] = _handler_check_calendar
+TOOL_HANDLERS["calendar_create_event_real"] = _handler_gcal_create_event_real
+TOOL_HANDLERS["add_to_pipeline"] = _handler_add_to_pipeline
+TOOL_HANDLERS["move_to_stage"] = _handler_add_to_pipeline
+
+
+def _handler_check_order_status(args: dict, agent, db) -> dict:
+    """Busca el estado de un pedido/cotizacion del cliente."""
+    email = args.get("email", "").strip()
+    pedido_id = args.get("pedido_id")
+    # Priority: pedido_id directo
+    if pedido_id:
+        p = db.query(Pedido).get(pedido_id)
+        if p:
+            etapas = ['','Solicitud','Cotización','Muestra','Pago 50%','Producción','QC China','Embarque','Entrega','Pago final']
+            etapa_nombre = etapas[p.etapa_actual] if p.etapa_actual and p.etapa_actual < len(etapas) else 'N/A'
+            return {
+                "pedido_id": p.id, "etapa_actual": p.etapa_actual,
+                "etapa_nombre": etapa_nombre, "monto_total": p.monto_total,
+                "estado": p.estado, "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+        return {"error": f"Pedido {pedido_id} no encontrado"}
+    # Busqueda por email
+    if email:
+        cliente = db.query(Cliente).filter(Cliente.email == email).first()
+        if not cliente:
+            return {"error": f"Cliente con email {email} no encontrado"}
+        cots = db.query(Cotizacion).filter(Cotizacion.cliente_id == cliente.id).order_by(Cotizacion.created_at.desc()).limit(5).all()
+        if not cots:
+            return {"cotizaciones": [], "mensaje": "Cliente sin cotizaciones activas"}
+        out = []
+        etapas = ['','Solicitud','Cotización','Muestra','Pago 50%','Producción','QC China','Embarque','Entrega','Pago final']
+        for c in cots:
+            pedidos = db.query(Pedido).filter(Pedido.cotizacion_id == c.id).all()
+            item = {
+                "cotizacion_id": c.id, "producto": c.producto,
+                "estado": c.estado, "cantidad": c.cantidad,
+            }
+            if pedidos:
+                p = pedidos[0]
+                etapa_nombre = etapas[p.etapa_actual] if p.etapa_actual and p.etapa_actual < len(etapas) else 'N/A'
+                item["pedido_id"] = p.id
+                item["etapa_actual"] = p.etapa_actual
+                item["etapa_nombre"] = etapa_nombre
+            out.append(item)
+        return {"cotizaciones": out, "count": len(out)}
+    return {"error": "Requiere email o pedido_id"}
+
+
+TOOL_HANDLERS["check_order_status"] = _handler_check_order_status
 
 
 # ═══ FASE 1: EXPORT/IMPORT EXCEL DE CLIENTES ═══

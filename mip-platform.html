@@ -1474,13 +1474,17 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group"><label class="form-label">Teléfono</label><input type="text" class="form-input" id="np-telefono" placeholder="+56 9 1234 5678"></div>
             <div class="form-group"><label class="form-label">Rubro</label><select class="form-input" id="np-rubro"><option value="">Seleccionar...</option><option>Retail / Moda</option><option>Industrial</option><option>Hospitality</option><option>Tecnología</option><option>Salud</option><option>Hogar & Deco</option><option>Construcción</option><option>Alimentos</option><option>Deportes</option><option>Otro</option></select></div>
           </div>
-          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-box" style="margin-right:4px"></i> PRODUCTO / PROYECTO</div>
-          <div class="form-group"><label class="form-label">Producto / Nombre del proyecto *</label><input type="text" class="form-input" id="np-producto" placeholder="Máquina de hielo, Línea Ironman, etc." required></div>
-          <div class="form-group"><label class="form-label">Descripción / Especificaciones</label><textarea class="form-input" id="np-descripcion" placeholder="Detalles del producto, materiales, certificaciones..." style="min-height:60px"></textarea></div>
-          <div class="form-row">
-            <div class="form-group"><label class="form-label">Cantidad</label><input type="text" class="form-input" id="np-cantidad" placeholder="5,000 un"></div>
-            <div class="form-group"><label class="form-label">Precio objetivo</label><input type="text" class="form-input" id="np-precio" placeholder="$3.50 USD"></div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-folder-open" style="margin-right:4px"></i> PROYECTO</div>
+          <div class="form-group"><label class="form-label">Nombre del proyecto *</label><input type="text" class="form-input" id="np-proyecto-nombre" placeholder="Importación gorras personalizadas, Línea Ironman, etc." required></div>
+          <div class="form-group"><label class="form-label">Descripción del proyecto</label><textarea class="form-input" id="np-proyecto-desc" placeholder="Objetivo general del proyecto, deadlines, contexto comercial..." style="min-height:70px;resize:vertical"></textarea></div>
+
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-box" style="margin-right:4px"></i> PRODUCTOS <span style="font-weight:400;color:var(--text-muted);font-size:11px">(uno o varios)</span></div>
+          <div id="np-products-list"></div>
+          <div style="text-align:center;margin:8px 0 12px">
+            <button type="button" class="btn btn-outline btn-sm" onclick="addProductRow()" style="font-size:11px"><i class="fas fa-plus"></i> Agregar otro producto</button>
           </div>
+
+          <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-clock" style="margin-right:4px"></i> PLAZOS Y ESTADO</div>
           <div class="form-row">
             <div class="form-group"><label class="form-label">Plazo producción</label><select class="form-input" id="np-plazo"><option value="">Seleccionar...</option><option>30 días</option><option>45 días</option><option>60 días</option><option>90 días</option><option>100 días</option><option>120 días</option><option>Flexible</option></select></div>
             <div class="form-group"><label class="form-label">Estado</label><select class="form-input" id="np-estado"><option value="pendiente">Pendiente</option><option value="cotizado">Cotizado</option><option value="produccion">En producción</option><option value="entregado">Entregado</option></select></div>
@@ -1694,31 +1698,63 @@ html,body{overflow-x:hidden;max-width:100vw}
           <p style="font-size:12px;color:var(--text-muted)">Construye agentes IA con bloques modulares de prompt · Tools, RAG y pipelines</p>
         </div>
         <div class="admin-btn-group">
-          <button class="btn btn-outline btn-sm" onclick="loadAgentTools()"><i class="fas fa-cubes"></i> Tools</button>
-          <button class="btn btn-outline btn-sm" onclick="loadKBFolders()"><i class="fas fa-book"></i> Knowledge Base</button>
+          <button class="btn btn-outline btn-sm" onclick="loadAgentTools()" title="Ver tools disponibles"><i class="fas fa-cubes"></i> Tools</button>
+          <button class="btn btn-outline btn-sm" onclick="loadKBFolders()" title="Gestionar Knowledge Base"><i class="fas fa-book"></i> Knowledge Base</button>
+          <button class="btn btn-outline btn-sm" onclick="loadHandoffs()" title="Conversaciones derivadas a humano"><i class="fas fa-hand-paper"></i> Handoffs <span id="handoffs-badge" class="cnt" style="display:none;background:var(--danger);color:#fff">0</span></button>
           <button class="btn btn-dark btn-sm" onclick="openAgentModal()"><i class="fas fa-plus"></i> Nuevo agente</button>
         </div>
       </div>
 
-      <!-- Lista de agentes -->
-      <div id="agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:16px">
-        <div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;grid-column:1/-1">Cargando agentes...</div>
+      <!-- Tabs: Agentes / Kanban / Handoffs -->
+      <div style="display:flex;gap:6px;margin-top:16px;margin-bottom:6px;border-bottom:1px solid var(--border)">
+        <button class="btn btn-outline btn-sm ab-tab ab-tab-active" data-tab="agents" onclick="switchAgentTab('agents')" style="border-radius:4px 4px 0 0;border-bottom:2px solid var(--info)"><i class="fas fa-robot"></i> Agentes</button>
+        <button class="btn btn-outline btn-sm ab-tab" data-tab="kanban" onclick="switchAgentTab('kanban')" style="border-radius:4px 4px 0 0"><i class="fas fa-columns"></i> Kanban pipeline</button>
+        <button class="btn btn-outline btn-sm ab-tab" data-tab="handoffs" onclick="switchAgentTab('handoffs')" style="border-radius:4px 4px 0 0"><i class="fas fa-hand-paper"></i> Handoffs humanos</button>
+      </div>
+
+      <!-- Tab: Agentes (grid) -->
+      <div id="ab-tab-agents" class="ab-tab-content">
+        <div id="agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px">
+          <div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center;grid-column:1/-1">Cargando agentes...</div>
+        </div>
+      </div>
+
+      <!-- Tab: Kanban -->
+      <div id="ab-tab-kanban" class="ab-tab-content" style="display:none">
+        <div style="margin-top:12px">
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Arrastra una conversacion entre columnas para cambiar su stage. El agente correspondiente al stage tomara la conversacion automaticamente en el proximo mensaje.</p>
+          <div id="pipeline-kanban" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:16px;min-height:400px">
+            <div style="padding:20px;color:var(--text-muted);font-size:12px">Cargando kanban...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Handoffs -->
+      <div id="ab-tab-handoffs" class="ab-tab-content" style="display:none">
+        <div style="margin-top:12px">
+          <div id="handoffs-list"><div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">Cargando handoffs...</div></div>
+        </div>
       </div>
 
       <!-- Editor de agente (aparece al seleccionar uno) -->
       <div id="agent-editor" style="display:none;margin-top:20px">
         <div class="card" style="padding:24px">
+          <div style="padding:10px 14px;background:var(--info-bg,#eff6ff);border-left:3px solid var(--info);border-radius:var(--radius);margin-bottom:16px;font-size:11px;color:var(--text-secondary)">
+            <div style="font-weight:600;margin-bottom:4px;color:var(--info)"><i class="fas fa-info-circle"></i> Como funciona el editor</div>
+            Los <b>bloques de prompt</b> (identidad, instrucciones, info clave) se concatenan al ejecutarse para formar el system prompt del LLM. Las <b>tools</b> son funciones que el agente puede llamar para ejecutar acciones reales (consultar KB, crear prospects, agendar, etc). Las <b>integraciones</b> conectan el agente con servicios externos (Google Calendar, WhatsApp, webhooks).
+          </div>
           <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px;flex-wrap:wrap;gap:10px">
             <div>
               <h3 style="font-size:16px;font-weight:600;margin-bottom:4px"><span id="aed-avatar" style="font-size:20px;margin-right:8px"></span><span id="aed-name">—</span></h3>
               <p style="font-size:12px;color:var(--text-muted)" id="aed-desc">—</p>
             </div>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-outline btn-sm" onclick="previewAgentPrompt()"><i class="fas fa-eye"></i> Preview prompt</button>
-              <button class="btn btn-outline btn-sm" onclick="testAgentChat()"><i class="fas fa-comment-dots"></i> Probar chat</button>
-              <button class="btn btn-outline btn-sm" onclick="loadAgentTraces()"><i class="fas fa-chart-line"></i> Traces</button>
-              <button class="btn btn-dark btn-sm" onclick="saveAgentSettings()"><i class="fas fa-save"></i> Guardar</button>
-              <button class="btn btn-outline btn-sm" onclick="document.getElementById('agent-editor').style.display='none'" style="color:var(--text-muted)">&times;</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn btn-outline btn-sm" onclick="previewAgentPrompt()" title="Ver el system prompt completo que recibira el LLM, formado por la union de todos los bloques activos"><i class="fas fa-eye"></i> Preview prompt</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="testAgentChat()" title="Abrir un chat de prueba con este agente, sin afectar conversaciones reales"><i class="fas fa-comment-dots"></i> Probar chat</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="loadAgentTraces()" title="Historial de llamadas al LLM con tokens, latencia, costo y tool calls"><i class="fas fa-chart-line"></i> Traces</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="loadAgentIntegrations()" title="Conectar Google Calendar, WhatsApp, webhooks externos"><i class="fas fa-plug"></i> Integraciones</button>
+              <button type="button" class="btn btn-dark btn-sm" onclick="saveAgentSettings()"><i class="fas fa-save"></i> Guardar</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('agent-editor').style.display='none'" style="color:var(--text-muted)">&times;</button>
             </div>
           </div>
 
@@ -1745,7 +1781,14 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group"><label class="form-label">Temperatura</label><input type="number" class="form-input" id="aed-temp" step="0.1" min="0" max="2" value="0.7"></div>
             <div class="form-group"><label class="form-label">Max tokens</label><input type="number" class="form-input" id="aed-max-tokens" min="100" max="4000" value="800"></div>
             <div class="form-group" style="grid-column:span 3"><label class="form-label">Descripción</label><textarea class="form-input" id="aed-descripcion" style="min-height:50px"></textarea></div>
-            <div class="form-group" style="grid-column:span 2"><label class="form-label">Tools permitidos (JSON array)</label><input type="text" class="form-input" id="aed-tools" placeholder='["search_kb","create_prospect"]'></div>
+            <div class="form-group" style="grid-column:span 2">
+              <label class="form-label">Tools (funciones) permitidos <span style="font-weight:400;color:var(--text-muted)">(selecciona las que el agente puede ejecutar)</span></label>
+              <div id="aed-tools-picker" style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);max-height:220px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <div style="color:var(--text-muted);font-size:11px;grid-column:1/-1">Cargando tools disponibles...</div>
+              </div>
+              <input type="hidden" id="aed-tools">
+              <div style="font-size:10px;color:var(--text-muted);margin-top:6px"><i class="fas fa-info-circle" style="color:var(--info)"></i> Las tools permiten al agente <b>ejecutar acciones reales</b> (buscar en KB, crear prospect, agendar reuniones, consultar pedidos, escalar a humano). Sin tools el agente solo conversa sin actuar.</div>
+            </div>
             <div class="form-group"><label class="form-label">Activo</label><div style="padding:10px 0"><div class="switch" id="aed-activo" onclick="this.classList.toggle('on')"></div></div></div>
             <div class="form-group" style="grid-column:span 3"><label class="form-label">Pipeline / Etapas donde opera <span style="font-weight:400;color:var(--text-muted)">(comma-separated)</span></label><input type="text" class="form-input" id="aed-stages" placeholder="lead_inicial, calificando, cotizando, cerrando"><div style="font-size:10px;color:var(--text-muted);margin-top:4px">El agente puede ser invocado en estas etapas del embudo. Ej: un agente SDR opera en 'lead_inicial' y 'calificando', otro agente cerrador en 'cerrando'.</div></div>
             <div class="form-group" style="grid-column:span 3"><label class="form-label">KB Folders IDs <span style="font-weight:400;color:var(--text-muted)">(JSON array - usa boton Knowledge Base arriba para verlos)</span></label><input type="text" class="form-input" id="aed-kb-folders" placeholder="[1, 2, 3]"></div>
@@ -3579,8 +3622,94 @@ async function inviteClientToPlatform(email, nombre) {
 }
 
 // ─── Admin: New Project ───
-function openNewProjectModal() { document.getElementById('newProjectModal').classList.add('open'); }
+// Catalogo de categorias de productos (20 mas comunes en importacion)
+const PRODUCT_CATEGORIES = [
+  { v:'gorras', l:'Gorras / Caps' },
+  { v:'ropa', l:'Ropa / Textil (poleras, poleras, buzos)' },
+  { v:'botellas', l:'Botellas / Termos' },
+  { v:'medallas', l:'Medallas / Trofeos' },
+  { v:'toallas', l:'Toallas / Microfibra' },
+  { v:'mochilas', l:'Mochilas / Bolsos' },
+  { v:'maquinaria_industrial', l:'Maquinaria industrial' },
+  { v:'vending_machine', l:'Vending machines / Expendedoras' },
+  { v:'repuestos_autos', l:'Repuestos automotrices' },
+  { v:'insumos_medicos', l:'Insumos médicos' },
+  { v:'luminaria', l:'Luminaria / Iluminación LED' },
+  { v:'tecnologia', l:'Tecnología / Electrónica' },
+  { v:'mobiliario', l:'Mobiliario / Muebles' },
+  { v:'packaging', l:'Packaging / Envases' },
+  { v:'herramientas', l:'Herramientas' },
+  { v:'juguetes', l:'Juguetes / Productos infantiles' },
+  { v:'alimentos', l:'Alimentos / Snacks' },
+  { v:'cosmetica', l:'Cosmética / Belleza' },
+  { v:'deportes', l:'Artículos deportivos' },
+  { v:'oficina', l:'Artículos de oficina / Merchandising' },
+  { v:'otro', l:'Otro (especificar en descripción)' },
+];
+
+function openNewProjectModal() {
+  document.getElementById('newProjectModal').classList.add('open');
+  // Reset products list to 1 fila
+  const list = document.getElementById('np-products-list');
+  if (list) { list.innerHTML = ''; addProductRow(); }
+}
 function closeNewProjectModal() { document.getElementById('newProjectModal').classList.remove('open'); }
+
+let _productRowCounter = 0;
+function addProductRow() {
+  const list = document.getElementById('np-products-list');
+  if (!list) return;
+  _productRowCounter++;
+  const idx = _productRowCounter;
+  const catOptions = PRODUCT_CATEGORIES.map(c => `<option value="${c.v}">${c.l}</option>`).join('');
+  const row = document.createElement('div');
+  row.className = 'np-product-row';
+  row.dataset.idx = idx;
+  row.style.cssText = 'padding:14px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:10px;border-left:3px solid var(--info)';
+  row.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:.5px"><i class="fas fa-cube" style="margin-right:4px"></i>PRODUCTO #<span class="np-product-num">${idx}</span></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="removeProductRow(this)" style="color:var(--danger);padding:4px 8px" title="Eliminar este producto"><i class="fas fa-trash"></i></button>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Categoría *</label><select class="form-input np-p-categoria" required>
+        <option value="">Seleccionar categoría...</option>${catOptions}
+      </select></div>
+      <div class="form-group"><label class="form-label">Nombre específico del producto *</label><input type="text" class="form-input np-p-nombre" placeholder="Ej: Gorra trucker bordada 5 paneles" required></div>
+    </div>
+    <div class="form-group"><label class="form-label">Descripción / Especificaciones *</label><textarea class="form-input np-p-desc" style="min-height:56px;resize:vertical" placeholder="Materiales, colores, logo, personalización, certificaciones requeridas, medidas..." required></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cantidad *</label><input type="text" class="form-input np-p-cantidad" placeholder="5,000 un" required></div>
+      <div class="form-group"><label class="form-label">Precio objetivo (FOB USD)</label><input type="text" class="form-input np-p-precio" placeholder="$1.20 USD/un"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Archivo de referencia <span style="color:var(--text-muted);font-weight:400">(foto, spec sheet, link pinterest, etc)</span></label>
+      <input type="file" class="form-input np-p-archivo" accept=".pdf,.doc,.docx,.xlsx,.jpg,.jpeg,.png,.webp,.zip" style="padding:8px">
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Formatos: PDF, Word, Excel, imágenes, ZIP. Max 10MB.</div>
+    </div>
+  `;
+  list.appendChild(row);
+  _renumberProductRows();
+}
+
+function removeProductRow(btn) {
+  const row = btn.closest('.np-product-row');
+  const list = document.getElementById('np-products-list');
+  if (list.querySelectorAll('.np-product-row').length <= 1) {
+    toast('error', 'Al menos 1 producto', 'Debe haber al menos un producto en el proyecto');
+    return;
+  }
+  row.remove();
+  _renumberProductRows();
+}
+
+function _renumberProductRows() {
+  const rows = document.querySelectorAll('#np-products-list .np-product-row');
+  rows.forEach((r, i) => {
+    const num = r.querySelector('.np-product-num');
+    if (num) num.textContent = i + 1;
+  });
+}
 
 async function submitNewProject(e) {
   e.preventDefault();
@@ -3588,6 +3717,29 @@ async function submitNewProject(e) {
   const invitarCliente = document.getElementById('sw-invitar-cliente')?.classList.contains('on');
   const email = document.getElementById('np-email').value;
   const nombre = document.getElementById('np-nombre').value;
+  const proyectoNombre = document.getElementById('np-proyecto-nombre').value.trim();
+  const proyectoDesc = document.getElementById('np-proyecto-desc').value.trim();
+
+  // Collect products from all rows
+  const productRows = document.querySelectorAll('#np-products-list .np-product-row');
+  const productos = [];
+  for (const r of productRows) {
+    const categoria = r.querySelector('.np-p-categoria').value;
+    const nombreP = r.querySelector('.np-p-nombre').value.trim();
+    const desc = r.querySelector('.np-p-desc').value.trim();
+    const cantidad = r.querySelector('.np-p-cantidad').value.trim();
+    const precio = r.querySelector('.np-p-precio').value.trim();
+    const archivo = r.querySelector('.np-p-archivo').files[0] || null;
+    if (!categoria || !nombreP || !desc || !cantidad) {
+      toast('error', 'Error', 'Completa los campos requeridos de cada producto (categoria, nombre, descripcion, cantidad)');
+      return;
+    }
+    productos.push({ categoria, nombre: nombreP, descripcion: desc, cantidad, precio_objetivo: precio, archivo });
+  }
+  if (!productos.length) { toast('error', 'Error', 'Agrega al menos un producto'); return; }
+
+  // El primer producto se usa para la Cotizacion principal (compat con endpoint existente)
+  const firstP = productos[0];
   const data = {
     cliente_nombre: nombre,
     cliente_email: email,
@@ -3595,30 +3747,59 @@ async function submitNewProject(e) {
     cliente_telefono: document.getElementById('np-telefono').value,
     cliente_rut: document.getElementById('np-rut')?.value || '',
     cliente_rubro: document.getElementById('np-rubro')?.value || '',
-    producto: document.getElementById('np-producto').value,
-    descripcion: document.getElementById('np-descripcion').value,
-    cantidad: document.getElementById('np-cantidad').value,
-    precio_objetivo: document.getElementById('np-precio').value,
+    producto: firstP.nombre || proyectoNombre,
+    descripcion: (proyectoDesc ? proyectoDesc + '\n\n' : '') + `[${firstP.categoria.toUpperCase()}] ${firstP.descripcion}`,
+    cantidad: firstP.cantidad,
+    precio_objetivo: firstP.precio_objetivo,
     plazo: document.getElementById('np-plazo').value,
     estado: document.getElementById('np-estado').value,
     crear_pedido: crearPedido,
     monto_total: document.getElementById('np-monto')?.value || 0,
     etapa_actual: document.getElementById('np-etapa')?.value || 1,
     condiciones: document.getElementById('np-condiciones')?.value || '',
+    // Extra info nuevos campos
+    proyecto_nombre: proyectoNombre,
+    proyecto_descripcion: proyectoDesc,
+    // TODO backend: aceptar array productos completo para crear ProductoCotizacion por cada uno
   };
   try {
     const result = await api('/api/admin/create-project', { method: 'POST', body: JSON.stringify(data) });
-    // Upload documents if provided
+    const cotId = result.cotizacion_id;
+
+    // Si hay productos adicionales (desde el 2do en adelante) crearlos como ProductoCotizacion
+    if (productos.length > 1 && cotId) {
+      const extraProductos = productos.slice(1).map(p => ({
+        nombre: p.nombre, categoria: p.categoria,
+        descripcion: p.descripcion, cantidad: p.cantidad,
+        precio_objetivo: p.precio_objetivo,
+      }));
+      try {
+        await api(`/api/cotizaciones/${cotId}/productos`, { method:'POST', body: JSON.stringify({ productos: extraProductos }) });
+      } catch (e) { console.warn('productos extra fail:', e); }
+    }
+
+    // Subir archivos de referencia de cada producto
+    for (let i = 0; i < productos.length; i++) {
+      const file = productos[i].archivo;
+      if (!file) continue;
+      const fd = new FormData(); fd.append('file', file);
+      const cat = productos[i].categoria || 'referencia_producto';
+      try {
+        await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=referencia_${cat}&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+      } catch (e) { console.warn('upload ref fail:', e); }
+    }
+
+    // Subir docs de proyecto
     const cotDoc = document.getElementById('np-doc-cotizacion')?.files[0];
     if (cotDoc) {
       const fd = new FormData(); fd.append('file', cotDoc);
-      await fetch(`${API}/api/admin/upload?cotizacion_id=${result.cotizacion_id}&categoria=cotizacion_formal&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+      await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=cotizacion_formal&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
     }
     const otrosDocs = document.getElementById('np-doc-otros')?.files;
     if (otrosDocs?.length) {
       for (const f of otrosDocs) {
         const fd = new FormData(); fd.append('file', f);
-        await fetch(`${API}/api/admin/upload?cotizacion_id=${result.cotizacion_id}&categoria=otro&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+        await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=otro&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
       }
     }
     // Invite client if switch is on
@@ -3626,9 +3807,8 @@ async function submitNewProject(e) {
       inviteClientToPlatform(email, nombre);
     }
     closeNewProjectModal();
-    toast('success', 'Proyecto creado', `${result.producto} asignado a ${result.cliente_nombre}`);
+    toast('success', 'Proyecto creado', `${productos.length} producto(s) asignados a ${result.cliente_nombre}`);
     e.target.reset();
-    // Reload admin data
     loadAdminData();
   } catch (err) { toast('error', 'Error', err.message); }
 }
@@ -4911,13 +5091,15 @@ let _currentAgentId = null;
 
 const TIPOS_POR_CATEGORIA = {
   identidad: [
-    { v:'personificacion', l:'Personificación' },
-    { v:'objetivo', l:'Objetivo general' },
-    { v:'formato', l:'Formato de respuesta' },
+    { v:'personificacion', l:'Personificación (quien es)' },
+    { v:'objetivo', l:'Objetivo general (que debe lograr)' },
+    { v:'formato', l:'Formato de respuesta (longitud, tono, estilo)' },
   ],
   instrucciones: [
-    { v:'pasos', l:'Pasos a seguir' },
-    { v:'casos', l:'Casos posibles' },
+    { v:'pasos', l:'Pasos a seguir (secuencia numerada)' },
+    { v:'casos', l:'Casos posibles (if/else escenarios)' },
+    { v:'que_no_hacer', l:'Qué NO hacer (prohibiciones / guardrails)' },
+    { v:'ctas', l:'Call to actions (frases de cierre)' },
   ],
   info_clave: [
     { v:'info_empresa', l:'Info empresa/tienda' },
@@ -4930,6 +5112,37 @@ const TIPOS_POR_CATEGORIA = {
     { v:'info_otro', l:'Otra información de referencia' },
   ],
 };
+
+async function renderToolsPicker(currentJson) {
+  const wrap = document.getElementById('aed-tools-picker');
+  if (!wrap) return;
+  let selected = [];
+  try { selected = JSON.parse(currentJson || '[]'); } catch {}
+  try {
+    const tools = await api('/api/agent-tools');
+    wrap.innerHTML = tools.map(t => {
+      const isSel = selected.includes(t.name);
+      const danger = t.peligroso ? ' <i class="fas fa-exclamation-triangle" style="color:var(--danger)" title="Peligroso - requiere confirmacion"></i>' : '';
+      return `<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--bg-white);border-radius:var(--radius);cursor:pointer;font-size:11px;border:1px solid ${isSel?'var(--info)':'var(--border)'}">
+        <input type="checkbox" value="${t.name}" ${isSel?'checked':''} style="margin-top:2px;cursor:pointer">
+        <div style="flex:1">
+          <div style="font-weight:600;font-family:monospace;font-size:11px">${t.name}${danger}</div>
+          <div style="color:var(--text-muted);font-size:10px;margin-top:2px">${(t.description||'').substring(0,110)}${(t.description||'').length>110?'...':''}</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px">${t.categoria}</div>
+        </div>
+      </label>`;
+    }).join('');
+    // Hover highlight
+    wrap.querySelectorAll('label').forEach(label => {
+      const cb = label.querySelector('input[type="checkbox"]');
+      cb.addEventListener('change', () => {
+        label.style.borderColor = cb.checked ? 'var(--info)' : 'var(--border)';
+      });
+    });
+  } catch (err) {
+    wrap.innerHTML = `<div style="color:var(--danger);font-size:11px;grid-column:1/-1">Error cargando tools: ${err.message}</div>`;
+  }
+}
 
 function updateBlockTipos() {
   const cat = document.getElementById('bl-categoria').value;
@@ -4991,6 +5204,8 @@ async function loadAgent(id) {
     document.getElementById('aed-temp').value = a.temperatura;
     document.getElementById('aed-max-tokens').value = a.max_tokens;
     document.getElementById('aed-tools').value = a.tools_allowed || '[]';
+    // Render tools as checkboxes
+    await renderToolsPicker(a.tools_allowed || '[]');
     // Stages: convert JSON array to comma-separated for friendlier UX
     try {
       const stagesArr = JSON.parse(a.stages || '[]');
@@ -5015,8 +5230,9 @@ function renderBlocksList(blocks) {
     wrap.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;font-size:12px">Sin bloques. Agrega el primero.</div>';
     return;
   }
-  const catLabels = { identidad:'IDENTIDAD', instrucciones:'INSTRUCCIONES', info_clave:'INFORMACIÓN CLAVE' };
+  const catLabels = { identidad:'IDENTIDAD (quien es)', instrucciones:'INSTRUCCIONES (como actua)', info_clave:'INFORMACION CLAVE (datos de referencia)' };
   const catColors = { identidad:'var(--info)', instrucciones:'var(--warning)', info_clave:'var(--success)' };
+  const tipoColors = { que_no_hacer: 'var(--danger)' };  // override color por tipo especial
   const grouped = {};
   blocks.forEach(b => { (grouped[b.categoria] = grouped[b.categoria] || []).push(b); });
   wrap.innerHTML = Object.keys(grouped).map(cat => {
@@ -5024,11 +5240,15 @@ function renderBlocksList(blocks) {
     return `<div style="margin-bottom:18px">
       <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:${catColors[cat]};margin-bottom:6px">${catLabels[cat] || cat.toUpperCase()} <span style="font-weight:400;color:var(--text-muted);margin-left:6px"><i class="fas fa-grip-vertical"></i> arrastra para reordenar</span></div>
       <div class="blocks-sortable" data-category="${cat}">
-        ${bs.map(b => `<div data-block-id="${b.id}" style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${catColors[cat]};opacity:${b.activo?1:0.5};cursor:move">
+        ${bs.map(b => {
+          const borderColor = tipoColors[b.tipo] || catColors[cat];
+          const bgColor = b.tipo === 'que_no_hacer' ? 'var(--danger-bg, #fef2f2)' : 'var(--bg-surface)';
+          const iconPrefix = b.tipo === 'que_no_hacer' ? '<i class="fas fa-ban" style="color:var(--danger);margin-right:4px"></i>' : '';
+          return `<div data-block-id="${b.id}" style="padding:10px 12px;background:${bgColor};border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${borderColor};opacity:${b.activo?1:0.5};cursor:move">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:6px">
               <i class="fas fa-grip-vertical" style="color:var(--text-muted);font-size:11px;cursor:grab"></i>
-              <div style="font-weight:500;font-size:13px">${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span></div>
+              <div style="font-weight:500;font-size:13px">${iconPrefix}${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span></div>
             </div>
             <div style="display:flex;gap:4px;align-items:center">
               <span style="font-size:10px;color:var(--text-muted)">orden ${b.orden}</span>
@@ -5038,7 +5258,8 @@ function renderBlocksList(blocks) {
             </div>
           </div>
           <div style="font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:80px;overflow:hidden;line-height:1.4">${(b.contenido||'').substring(0,250)}${(b.contenido||'').length>250?'...':''}</div>
-        </div>`).join('')}
+        </div>`;
+        }).join('')}
       </div>
     </div>`;
   }).join('');
@@ -5105,9 +5326,10 @@ async function saveAgentSettings() {
   // Parse stages: comma-separated -> JSON array
   const stagesRaw = document.getElementById('aed-stages').value || '';
   const stagesArr = stagesRaw.split(',').map(s => s.trim()).filter(Boolean);
-  // Validate tools_allowed is valid JSON
-  const toolsRaw = document.getElementById('aed-tools').value || '[]';
-  try { JSON.parse(toolsRaw); } catch { toast('error','Error','tools_allowed debe ser JSON array valido'); return; }
+  // Tools: collect from checkboxes
+  const checkedTools = Array.from(document.querySelectorAll('#aed-tools-picker input[type="checkbox"]:checked')).map(cb => cb.value);
+  const toolsRaw = JSON.stringify(checkedTools);
+  document.getElementById('aed-tools').value = toolsRaw;
   const kbRaw = document.getElementById('aed-kb-folders').value || '[]';
   try { JSON.parse(kbRaw); } catch { toast('error','Error','kb_folder_ids debe ser JSON array valido'); return; }
   const data = {
@@ -5423,6 +5645,298 @@ async function submitKBDoc() {
   finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Guardar y generar embeddings'; }
   }
+}
+
+// ═══════════════════════════════════════════════════
+// TABS: Agents / Kanban / Handoffs
+// ═══════════════════════════════════════════════════
+function switchAgentTab(tab) {
+  document.querySelectorAll('.ab-tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.ab-tab').forEach(el => {
+    el.style.borderBottom = '';
+    el.classList.remove('ab-tab-active');
+  });
+  const target = document.getElementById('ab-tab-' + tab);
+  if (target) target.style.display = 'block';
+  const btn = document.querySelector('.ab-tab[data-tab="' + tab + '"]');
+  if (btn) { btn.style.borderBottom = '2px solid var(--info)'; btn.classList.add('ab-tab-active'); }
+  if (tab === 'kanban') loadPipelineKanban();
+  if (tab === 'handoffs') loadHandoffs();
+  if (tab === 'agents') loadAgents();
+}
+
+// ═══════════════════════════════════════════════════
+// KANBAN PIPELINE
+// ═══════════════════════════════════════════════════
+async function loadPipelineKanban() {
+  try {
+    const stages = await api('/api/pipeline/stages');
+    const convs = await api('/api/pipeline/conversations');
+    const byStage = {};
+    stages.forEach(s => byStage[s.key] = []);
+    convs.forEach(c => {
+      if (!byStage[c.stage]) byStage[c.stage] = [];
+      byStage[c.stage].push(c);
+    });
+    const wrap = document.getElementById('pipeline-kanban');
+    if (!wrap) return;
+    wrap.innerHTML = stages.map(s => {
+      const items = byStage[s.key] || [];
+      return `<div class="kanban-col" data-stage="${s.key}" style="min-width:260px;flex:1;background:var(--bg-surface);border-radius:var(--radius);padding:10px;border-top:3px solid ${s.color}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600">${s.label}</div>
+          <span style="font-size:10px;color:var(--text-muted);background:var(--bg-white);padding:2px 8px;border-radius:10px">${items.length}</span>
+        </div>
+        <div class="kanban-drop" data-stage="${s.key}" style="min-height:300px;display:flex;flex-direction:column;gap:6px">
+          ${items.length ? items.map(c => {
+            const sentColor = c.sentiment === 'positivo' ? 'var(--success)' : c.sentiment === 'negativo' ? 'var(--danger)' : 'var(--text-muted)';
+            const humanBadge = c.requires_human ? '<span class="badge badge-danger" style="font-size:9px">👤 HUMANO</span>' : '';
+            return `<div class="kanban-card" data-id="${c.id}" draggable="true" style="background:var(--bg-white);padding:10px;border-radius:var(--radius);cursor:move;font-size:11px;border-left:3px solid ${s.color}">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
+                <div style="font-weight:600;font-size:12px">${c.visitor_nombre || 'Anonimo'}</div>
+                ${humanBadge}
+              </div>
+              <div style="color:var(--text-muted);font-size:10px">${c.visitor_email || '—'}</div>
+              ${c.visitor_empresa ? `<div style="color:var(--text-muted);font-size:10px"><i class="fas fa-building"></i> ${c.visitor_empresa}</div>` : ''}
+              <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:9px;padding:2px 6px;background:var(--bg-surface);border-radius:8px">${c.intent || 'info'}</span>
+                <span style="color:${sentColor};font-size:10px">● ${c.sentiment || 'neutral'}</span>
+              </div>
+              <div style="margin-top:4px;font-size:9px;color:var(--text-muted)">${c.total_messages} msgs · ${c.session_id.substring(0,8)}</div>
+              <button class="btn btn-outline btn-sm" style="margin-top:6px;width:100%;font-size:10px" onclick="viewPipelineDetail(${c.id})"><i class="fas fa-eye"></i> Ver</button>
+            </div>`;
+          }).join('') : '<div style="color:var(--text-muted);padding:20px;text-align:center;font-size:11px">Sin conversaciones</div>'}
+        </div>
+      </div>`;
+    }).join('');
+    // Enable drag & drop
+    setupKanbanDragDrop();
+  } catch (err) {
+    console.error('kanban err:', err);
+    document.getElementById('pipeline-kanban').innerHTML = `<div style="color:var(--danger);padding:12px">Error: ${err.message}</div>`;
+  }
+}
+
+function setupKanbanDragDrop() {
+  document.querySelectorAll('.kanban-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', card.dataset.id);
+      card.style.opacity = '0.5';
+    });
+    card.addEventListener('dragend', e => { card.style.opacity = '1'; });
+  });
+  document.querySelectorAll('.kanban-drop').forEach(drop => {
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.background = 'var(--bg-white)'; });
+    drop.addEventListener('dragleave', e => { drop.style.background = ''; });
+    drop.addEventListener('drop', async e => {
+      e.preventDefault();
+      drop.style.background = '';
+      const id = e.dataTransfer.getData('text/plain');
+      const newStage = drop.dataset.stage;
+      try {
+        await api('/api/pipeline/conversations/' + id + '/stage', { method:'PUT', body: JSON.stringify({ stage: newStage, admin: currentUser?.email || 'admin' }) });
+        toast('success', 'Movido', `Conversacion -> ${newStage}`);
+        loadPipelineKanban();
+      } catch (err) { toast('error', 'Error', err.message); }
+    });
+  });
+}
+
+async function viewPipelineDetail(id) {
+  try {
+    const d = await api('/api/pipeline/conversations/' + id);
+    const msgs = (d.messages || []).map(m => {
+      const role = m.role === 'user' ? 'Cliente' : 'Agente';
+      const color = m.role === 'user' ? 'var(--text)' : 'var(--info)';
+      return `<div style="margin-bottom:6px;padding:6px 10px;background:var(--bg-surface);border-radius:var(--radius);font-size:11px"><div style="font-weight:600;color:${color};font-size:10px">${role}</div><div style="white-space:pre-wrap">${(m.content||'').replace(/</g,'&lt;')}</div></div>`;
+    }).join('') || '<div style="color:var(--text-muted);font-size:11px">Sin mensajes en MateoConversation (la conversacion ocurrio fuera)</div>';
+    const history = (d.stage_history || []).map(h => `<div style="font-size:10px;color:var(--text-muted)">${h.created_at?.substring(0,16)} · ${h.from} → ${h.to} (${h.trigger})</div>`).join('') || '<div style="color:var(--text-muted);font-size:11px">Sin cambios de stage</div>';
+
+    let modal = document.getElementById('pipelineDetailModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'pipelineDetailModal';
+      modal.className = 'modal-bg';
+      modal.innerHTML = `<div class="modal-box" style="max-width:720px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="margin:0;font-size:15px"><i class="fas fa-user-circle" style="margin-right:6px"></i><span id="pipeline-detail-name"></span></h3>
+          <button onclick="document.getElementById('pipelineDetailModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+        </div>
+        <div id="pipeline-detail-body"></div>
+      </div>`;
+      document.body.appendChild(modal);
+    }
+    document.getElementById('pipeline-detail-name').textContent = (d.visitor_nombre || 'Anonimo') + ' - Stage: ' + d.stage;
+    document.getElementById('pipeline-detail-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:11px">
+        <div><b>Email:</b> ${d.visitor_email || '—'}</div>
+        <div><b>Telefono:</b> ${d.visitor_telefono || '—'}</div>
+        <div><b>Empresa:</b> ${d.visitor_empresa || '—'}</div>
+        <div><b>Intent:</b> ${d.intent_detected || '—'} (${d.intent_score})</div>
+        <div><b>Sentiment:</b> ${d.sentiment}</div>
+        <div><b>Mensajes:</b> ${d.total_messages}</div>
+        ${d.requires_human ? '<div style="grid-column:1/-1;color:var(--danger);font-weight:600">⚠️ Requiere intervencion humana</div>' : ''}
+      </div>
+      <div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Historial de stages</div>${history}</div>
+      <div><div style="font-size:12px;font-weight:600;margin-bottom:6px">Mensajes</div>${msgs}</div>`;
+    modal.classList.add('open');
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// HANDOFFS HUMANOS
+// ═══════════════════════════════════════════════════
+async function loadHandoffs() {
+  try {
+    const rows = await api('/api/handoffs');
+    const wrap = document.getElementById('handoffs-list');
+    if (!wrap) return;
+    const pending = rows.filter(r => r.estado === 'pendiente').length;
+    // Update badge
+    const badge = document.getElementById('handoffs-badge');
+    if (badge) {
+      badge.textContent = pending;
+      badge.style.display = pending > 0 ? 'inline-block' : 'none';
+    }
+    if (!rows.length) {
+      wrap.innerHTML = '<div style="padding:32px;color:var(--text-muted);font-size:12px;text-align:center">Sin handoffs aun</div>';
+      return;
+    }
+    wrap.innerHTML = `<div class="card" style="padding:16px">
+      <div class="dtable-wrap">
+        <table class="dtable"><thead><tr><th>Fecha</th><th>Cliente</th><th>Motivo</th><th>Urgencia</th><th>Estado</th><th>Notificado</th><th></th></tr></thead><tbody>
+          ${rows.map(h => {
+            const urgBadge = {'critica':'badge-danger','alta':'badge-warning','media':'badge-info','baja':'badge-neutral'}[h.urgencia] || 'badge-neutral';
+            const estadoBadge = {'pendiente':'badge-danger','asignado':'badge-warning','resuelto':'badge-success'}[h.estado] || 'badge-neutral';
+            const notif = h.whatsapp_sent ? '<i class="fab fa-whatsapp" style="color:#25D366"></i> WhatsApp' : (h.notified_via || '—');
+            return `<tr>
+              <td style="font-size:11px">${h.created_at ? new Date(h.created_at).toLocaleString('es-CL',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+              <td style="font-size:12px;font-weight:500">${h.visitor_nombre || '—'}<br><span style="font-weight:400;color:var(--text-muted);font-size:10px">${h.visitor_email || ''}</span></td>
+              <td style="font-size:11px;max-width:280px">${(h.motivo || '').substring(0,120)}</td>
+              <td><span class="badge ${urgBadge}">${h.urgencia}</span></td>
+              <td><span class="badge ${estadoBadge}">${h.estado}</span></td>
+              <td style="font-size:11px">${notif}</td>
+              <td>${h.estado !== 'resuelto' ? `<button class="btn btn-outline btn-sm" onclick="resolveHandoff(${h.id})" title="Marcar como resuelto"><i class="fas fa-check"></i></button>` : ''}</td>
+            </tr>`;
+          }).join('')}
+        </tbody></table>
+      </div>
+    </div>`;
+  } catch (err) {
+    document.getElementById('handoffs-list').innerHTML = `<div style="color:var(--danger);padding:12px">Error: ${err.message}</div>`;
+  }
+}
+
+async function resolveHandoff(id) {
+  const notas = prompt('Notas de resolucion (opcional):') || '';
+  try {
+    await api('/api/handoffs/' + id, { method: 'PUT', body: JSON.stringify({ estado: 'resuelto', asignado_a: currentUser?.email || 'admin', notas_resolucion: notas }) });
+    toast('success', 'Handoff resuelto', '');
+    loadHandoffs();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// Poll handoffs count cada 60s para actualizar badge
+async function pollHandoffsBadge() {
+  try {
+    const r = await api('/api/handoffs/count');
+    const badge = document.getElementById('handoffs-badge');
+    if (badge) {
+      badge.textContent = r.pending;
+      badge.style.display = r.pending > 0 ? 'inline-block' : 'none';
+    }
+  } catch {}
+}
+setInterval(pollHandoffsBadge, 60000);
+
+// ═══════════════════════════════════════════════════
+// INTEGRATIONS POR AGENTE
+// ═══════════════════════════════════════════════════
+async function loadAgentIntegrations() {
+  if (!_currentAgentId) { toast('error','Error','Selecciona un agente primero'); return; }
+  try {
+    const integs = await api('/api/agents/' + _currentAgentId + '/integrations');
+    const extras = document.getElementById('agent-extras');
+    const hasGcal = integs.find(i => i.tipo === 'google_calendar' && i.has_credentials);
+    const hasWebhook = integs.find(i => i.tipo === 'custom_webhook');
+    extras.innerHTML = `<div class="card" style="padding:20px;margin-top:16px">
+      <h4 style="font-size:14px;margin-bottom:12px"><i class="fas fa-plug" style="margin-right:6px;color:var(--info)"></i>Integraciones del agente</h4>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:16px">Conecta este agente a servicios externos. Cada agente tiene sus propias credenciales (ej: un agente usa la agenda del socio A, otro usa Slack del socio B).</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+        <div style="padding:14px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid #4285F4">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <i class="fab fa-google" style="color:#4285F4;font-size:16px"></i>
+            <div style="font-weight:600;font-size:13px">Google Calendar</div>
+            ${hasGcal ? '<span class="badge badge-success" style="font-size:9px">CONECTADO</span>' : '<span class="badge badge-neutral" style="font-size:9px">NO</span>'}
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Permite al agente consultar disponibilidad y crear reuniones en el calendario del admin.</p>
+          <button class="btn ${hasGcal ? 'btn-outline' : 'btn-dark'} btn-sm" onclick="connectGoogleCalendar()" style="font-size:11px;width:100%">
+            <i class="fab fa-google"></i> ${hasGcal ? 'Reconectar' : 'Conectar Google Calendar'}
+          </button>
+        </div>
+        <div style="padding:14px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid #25D366">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <i class="fab fa-whatsapp" style="color:#25D366;font-size:16px"></i>
+            <div style="font-weight:600;font-size:13px">WhatsApp handoff</div>
+            <span class="badge badge-info" style="font-size:9px">GLOBAL</span>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Cuando un agente detecta handoff humano, envia notificacion WhatsApp al equipo. Configurable via env vars <code style="font-size:10px">HANDOFF_ADMIN_PHONES</code> + Twilio/Meta.</p>
+          <div style="font-size:10px;color:var(--text-muted)">Config actualmente: ${integs.find(i => i.tipo === 'whatsapp') ? 'personalizada' : 'global del sistema'}</div>
+        </div>
+        <div style="padding:14px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid var(--warning)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <i class="fas fa-bolt" style="color:var(--warning);font-size:16px"></i>
+            <div style="font-weight:600;font-size:13px">Webhook custom</div>
+            ${hasWebhook ? '<span class="badge badge-success" style="font-size:9px">CONFIGURADO</span>' : ''}
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">URL HTTPS que el agente puede llamar con tool <code>send_webhook</code>.</p>
+          <button class="btn btn-outline btn-sm" onclick="configureWebhook()" style="font-size:11px;width:100%"><i class="fas fa-cog"></i> Configurar</button>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <h5 style="font-size:12px;margin-bottom:8px">Integraciones existentes (${integs.length})</h5>
+        ${integs.length ? integs.map(i => `<div style="padding:6px 10px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:4px;font-size:11px;display:flex;justify-content:space-between;align-items:center">
+          <div><b>${i.tipo}</b> ${i.nombre ? '· '+i.nombre : ''} ${i.has_credentials ? '<i class="fas fa-key" style="color:var(--success)" title="Credentials configured"></i>' : ''}</div>
+          <div><span class="badge ${i.activo?'badge-success':'badge-neutral'}" style="font-size:9px">${i.activo?'activo':'inactivo'}</span> <button class="btn btn-outline btn-sm" onclick="deleteIntegration(${i.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button></div>
+        </div>`).join('') : '<div style="color:var(--text-muted);font-size:11px;padding:8px">Sin integraciones configuradas</div>'}
+      </div>
+    </div>`;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function connectGoogleCalendar() {
+  if (!_currentAgentId) return;
+  try {
+    const r = await api('/api/integrations/google-calendar/oauth/start?agent_id=' + _currentAgentId);
+    if (r.auth_url) {
+      window.open(r.auth_url, '_blank');
+      toast('info', 'Conectando', 'Se abrio una pestaña para autorizar con Google. Vuelve aqui al terminar.');
+    }
+  } catch (err) { toast('error', 'Error', err.message + ' (requiere GOOGLE_OAUTH_CLIENT_ID/SECRET/REDIRECT_URI en env vars)'); }
+}
+
+async function configureWebhook() {
+  const url = prompt('URL HTTPS del webhook:');
+  if (!url) return;
+  if (!url.startsWith('https://')) { toast('error', 'Error', 'Solo URLs HTTPS'); return; }
+  const nombre = prompt('Nombre de la integracion:', 'Webhook custom') || 'Webhook custom';
+  try {
+    await api('/api/agents/' + _currentAgentId + '/integrations', {
+      method: 'POST',
+      body: JSON.stringify({ tipo: 'custom_webhook', nombre, activo: true, config: JSON.stringify({ url }) })
+    });
+    toast('success', 'Webhook agregado', '');
+    loadAgentIntegrations();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function deleteIntegration(id) {
+  if (!confirm('¿Eliminar esta integracion?')) return;
+  try {
+    await api('/api/integrations/' + id, { method: 'DELETE' });
+    toast('success', 'Eliminada', '');
+    loadAgentIntegrations();
+  } catch (err) { toast('error', 'Error', err.message); }
 }
 </script>
 </body>

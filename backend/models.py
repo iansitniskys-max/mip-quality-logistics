@@ -598,3 +598,101 @@ class AgentTrace(Base):
     error = Column(Text)
     provider = Column(String(30))  # gemini, claude, openai
     created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
+# ═══════════════════════════════════════════════════
+# PIPELINE DE CONVERSACIONES + HANDOFF HUMANO
+# ═══════════════════════════════════════════════════
+
+class ConversationPipeline(Base):
+    """Pipeline que lleva una conversacion desde lead a cliente.
+    Tracks el stage actual + agente asignado + datos del cliente capturados.
+    """
+    __tablename__ = "conversation_pipelines"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), unique=True, index=True)  # ID de la conversacion
+    current_stage = Column(String(50), default="lead_inicial", index=True)
+    # Stages: lead_inicial, calificando, cotizando, cerrando, cliente_activo, cliente_perdido, soporte_post_venta
+    current_agent_id = Column(Integer, ForeignKey("agent_configs.id"), nullable=True)
+    prospect_id = Column(Integer, ForeignKey("prospects.id"), nullable=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    cotizacion_id = Column(Integer, ForeignKey("cotizaciones.id"), nullable=True)
+    pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=True)
+    # Datos capturados
+    visitor_nombre = Column(String(200))
+    visitor_email = Column(String(200), index=True)
+    visitor_telefono = Column(String(50))
+    visitor_empresa = Column(String(200))
+    # Clasificacion de intent
+    intent_detected = Column(String(100))  # intencion_compra, info_general, soporte, queja, despedida
+    intent_score = Column(Float, default=0.0)  # 0-1
+    sentiment = Column(String(30), default="neutral")  # positivo, neutral, negativo
+    # Handoff humano
+    requires_human = Column(Boolean, default=False)
+    human_handoff_reason = Column(Text)
+    handoff_at = Column(DateTime)
+    handled_by_admin = Column(String(200))
+    # Metadata
+    notes = Column(Text)
+    total_messages = Column(Integer, default=0)
+    last_message_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    stage_history = relationship("PipelineStageLog", cascade="all, delete-orphan", back_populates="pipeline", order_by="PipelineStageLog.created_at")
+
+
+class PipelineStageLog(Base):
+    """Log de cambios de stage para auditar el movimiento del lead."""
+    __tablename__ = "pipeline_stage_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    pipeline_id = Column(Integer, ForeignKey("conversation_pipelines.id", ondelete="CASCADE"), index=True)
+    from_stage = Column(String(50))
+    to_stage = Column(String(50))
+    from_agent_id = Column(Integer)
+    to_agent_id = Column(Integer)
+    trigger_type = Column(String(50))  # intent_detected, manual, timeout, escalation
+    trigger_data = Column(Text)  # JSON con detalles
+    created_at = Column(DateTime, server_default=func.now())
+    pipeline = relationship("ConversationPipeline", back_populates="stage_history")
+
+
+# ═══════════════════════════════════════════════════
+# INTEGRACIONES POR AGENTE
+# ═══════════════════════════════════════════════════
+
+class AgentIntegration(Base):
+    """Credenciales/config de integracion especificas por agente.
+    Ej: un agente conecta a GCal del admin X, otro agente a WhatsApp Y."""
+    __tablename__ = "agent_integrations"
+    id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(Integer, ForeignKey("agent_configs.id", ondelete="CASCADE"), index=True)
+    tipo = Column(String(50), nullable=False)  # google_calendar, whatsapp, slack, email, custom_webhook
+    nombre = Column(String(200))
+    activo = Column(Boolean, default=True)
+    # Credenciales - JSON encriptado idealmente. Por ahora plain JSON.
+    credentials = Column(Text)  # JSON: {access_token, refresh_token, expires_at, metadata}
+    config = Column(Text)  # JSON: config especifica (ej: {calendar_id, whatsapp_from_number})
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class HumanHandoff(Base):
+    """Eventos de derivacion a humano, con seguimiento."""
+    __tablename__ = "human_handoffs"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(100), index=True)
+    pipeline_id = Column(Integer, ForeignKey("conversation_pipelines.id"), nullable=True)
+    agent_id = Column(Integer, ForeignKey("agent_configs.id"), nullable=True)
+    visitor_nombre = Column(String(200))
+    visitor_email = Column(String(200))
+    visitor_telefono = Column(String(50))
+    motivo = Column(Text)
+    urgencia = Column(String(20), default="media")  # baja, media, alta, critica
+    estado = Column(String(30), default="pendiente", index=True)  # pendiente, asignado, resuelto
+    asignado_a = Column(String(200))
+    resuelto_at = Column(DateTime)
+    notas_resolucion = Column(Text)
+    notified_via = Column(String(50))  # whatsapp, email, none
+    whatsapp_sent = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now(), index=True)

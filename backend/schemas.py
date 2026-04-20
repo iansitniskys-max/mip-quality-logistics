@@ -598,3 +598,54 @@ class KBDocOut(BaseModel):
     tokens_totales: int
     class Config:
         from_attributes = True
+
+
+# --- Pipeline / Handoff / Integrations ---
+class ConversationPipelineOut(BaseModel):
+    id: int
+    session_id: str
+    current_stage: str
+    current_agent_id: Optional[int] = None
+    prospect_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    visitor_nombre: Optional[str] = ""
+    visitor_email: Optional[str] = ""
+    visitor_telefono: Optional[str] = ""
+    visitor_empresa: Optional[str] = ""
+    intent_detected: Optional[str] = ""
+    intent_score: float = 0.0
+    sentiment: Optional[str] = "neutral"
+    requires_human: bool
+    human_handoff_reason: Optional[str] = ""
+    total_messages: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class HumanHandoffOut(BaseModel):
+    id: int
+    session_id: str
+    visitor_nombre: Optional[str] = ""
+    visitor_email: Optional[str] = ""
+    visitor_telefono: Optional[str] = ""
+    motivo: Optional[str] = ""
+    urgencia: str
+    estado: str
+    asignado_a: Optional[str] = ""
+    notified_via: Optional[str] = ""
+    whatsapp_sent: bool
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+class AgentIntegrationOut(BaseModel):
+    id: int
+    agent_id: int
+    tipo: str
+    nombre: Optional[str] = ""
+    activo: bool
+    config: Optional[str] = "{}"
+    class Config:
+        from_attributes = True
