@@ -2174,9 +2174,16 @@ def _compose_agent_prompt(agent: "AgentConfig", db, extra_context: str = "") -> 
     if allowed:
         tool_rows = db.query(Tool).filter(Tool.name.in_(allowed), Tool.activo == True).all()
         if tool_rows:
-            parts.append("\n\n# TOOLS DISPONIBLES")
+            parts.append("\n\n# TOOLS DISPONIBLES (FUNCIONES)")
+            parts.append("\nCuando necesites informacion especifica o quieras ejecutar acciones, LLAMA a estas funciones EN VEZ de responder directamente:")
             for t in tool_rows:
                 parts.append(f"\n- `{t.name}`: {t.description}")
+            parts.append("\n\nREGLAS DE USO DE TOOLS:")
+            parts.append("\n- Si el usuario pregunta por precios/politicas/productos/plazos -> LLAMA `search_kb` ANTES de responder.")
+            parts.append("\n- Si el usuario comparte su email/nombre/empresa con intencion de cotizar -> LLAMA `create_prospect` con sus datos.")
+            parts.append("\n- Si el usuario quiere agendar una reunion/llamada/demo -> LLAMA `calendar_create_event`.")
+            parts.append("\n- Si la consulta es muy compleja o pide hablar con humano -> LLAMA `escalate_to_human`.")
+            parts.append("\n- DESPUES de ejecutar un tool y recibir el resultado, redacta una respuesta natural al usuario usando esa info.")
 
     if extra_context:
         parts.append("\n\n# CONTEXTO DINAMICO\n" + extra_context)
@@ -2629,6 +2636,26 @@ def _execute_tool(tool_name: str, args: dict, agent, db) -> dict:
         return {"error": str(e)[:300]}
 
 
+def _clean_schema_for_gemini(schema):
+    """Remueve fields que Gemini schema no soporta (default, additionalProperties, etc)."""
+    if not isinstance(schema, dict):
+        return schema
+    ALLOWED = {"type", "properties", "required", "items", "description", "enum", "format", "nullable"}
+    cleaned = {}
+    for k, v in schema.items():
+        if k not in ALLOWED:
+            continue
+        if k == "properties" and isinstance(v, dict):
+            cleaned[k] = {pk: _clean_schema_for_gemini(pv) for pk, pv in v.items()}
+        elif k == "items" and isinstance(v, dict):
+            cleaned[k] = _clean_schema_for_gemini(v)
+        else:
+            cleaned[k] = v
+    if "type" in cleaned and isinstance(cleaned["type"], str):
+        cleaned["type"] = cleaned["type"].upper()
+    return cleaned
+
+
 def _build_gemini_tools(agent, db):
     """Construye la lista de FunctionDeclaration para Gemini."""
     try:
@@ -2649,15 +2676,21 @@ def _build_gemini_tools(agent, db):
                 schema = json.loads(t.schema_input or "{}")
             except Exception:
                 schema = {"type": "object", "properties": {}}
-            # Normalize: Gemini necesita type:OBJECT + properties
+            cleaned = _clean_schema_for_gemini(schema)
+            if not cleaned.get("type"):
+                cleaned["type"] = "OBJECT"
+            if "properties" not in cleaned:
+                cleaned["properties"] = {}
             decls.append(FunctionDeclaration(
                 name=t.name,
                 description=t.description,
-                parameters=schema,
+                parameters=cleaned,
             ))
         return [GTool(function_declarations=decls)]
     except Exception as e:
         print(f"[gemini tools build] error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
