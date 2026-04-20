@@ -1747,6 +1747,8 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group" style="grid-column:span 3"><label class="form-label">Descripción</label><textarea class="form-input" id="aed-descripcion" style="min-height:50px"></textarea></div>
             <div class="form-group" style="grid-column:span 2"><label class="form-label">Tools permitidos (JSON array)</label><input type="text" class="form-input" id="aed-tools" placeholder='["search_kb","create_prospect"]'></div>
             <div class="form-group"><label class="form-label">Activo</label><div style="padding:10px 0"><div class="switch" id="aed-activo" onclick="this.classList.toggle('on')"></div></div></div>
+            <div class="form-group" style="grid-column:span 3"><label class="form-label">Pipeline / Etapas donde opera <span style="font-weight:400;color:var(--text-muted)">(comma-separated)</span></label><input type="text" class="form-input" id="aed-stages" placeholder="lead_inicial, calificando, cotizando, cerrando"><div style="font-size:10px;color:var(--text-muted);margin-top:4px">El agente puede ser invocado en estas etapas del embudo. Ej: un agente SDR opera en 'lead_inicial' y 'calificando', otro agente cerrador en 'cerrando'.</div></div>
+            <div class="form-group" style="grid-column:span 3"><label class="form-label">KB Folders IDs <span style="font-weight:400;color:var(--text-muted)">(JSON array - usa boton Knowledge Base arriba para verlos)</span></label><input type="text" class="form-input" id="aed-kb-folders" placeholder="[1, 2, 3]"></div>
           </div>
 
           <!-- BLOQUES DE PROMPT -->
@@ -4989,6 +4991,12 @@ async function loadAgent(id) {
     document.getElementById('aed-temp').value = a.temperatura;
     document.getElementById('aed-max-tokens').value = a.max_tokens;
     document.getElementById('aed-tools').value = a.tools_allowed || '[]';
+    // Stages: convert JSON array to comma-separated for friendlier UX
+    try {
+      const stagesArr = JSON.parse(a.stages || '[]');
+      document.getElementById('aed-stages').value = Array.isArray(stagesArr) ? stagesArr.join(', ') : '';
+    } catch { document.getElementById('aed-stages').value = ''; }
+    document.getElementById('aed-kb-folders').value = a.kb_folder_ids || '[]';
     const sw = document.getElementById('aed-activo');
     if (sw) sw.classList.toggle('on', !!a.activo);
     // Stats
@@ -5009,27 +5017,52 @@ function renderBlocksList(blocks) {
   }
   const catLabels = { identidad:'IDENTIDAD', instrucciones:'INSTRUCCIONES', info_clave:'INFORMACIÓN CLAVE' };
   const catColors = { identidad:'var(--info)', instrucciones:'var(--warning)', info_clave:'var(--success)' };
-  // Group by categoria
   const grouped = {};
   blocks.forEach(b => { (grouped[b.categoria] = grouped[b.categoria] || []).push(b); });
   wrap.innerHTML = Object.keys(grouped).map(cat => {
     const bs = grouped[cat].sort((x,y) => x.orden - y.orden);
     return `<div style="margin-bottom:18px">
-      <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:${catColors[cat]};margin-bottom:6px">${catLabels[cat] || cat.toUpperCase()}</div>
-      ${bs.map(b => `<div style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${catColors[cat]};opacity:${b.activo?1:0.5}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-weight:500;font-size:13px">${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span></div>
-          <div style="display:flex;gap:4px;align-items:center">
-            <span style="font-size:10px;color:var(--text-muted)">orden ${b.orden}</span>
-            <div class="switch ${b.activo?'on':''}" onclick="toggleBlockActive(${b.id}, this)" style="width:30px;height:16px"></div>
-            <button class="btn btn-outline btn-sm" onclick='editBlock(${JSON.stringify(b).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button>
-            <button class="btn btn-outline btn-sm" onclick="deleteBlock(${b.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+      <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:${catColors[cat]};margin-bottom:6px">${catLabels[cat] || cat.toUpperCase()} <span style="font-weight:400;color:var(--text-muted);margin-left:6px"><i class="fas fa-grip-vertical"></i> arrastra para reordenar</span></div>
+      <div class="blocks-sortable" data-category="${cat}">
+        ${bs.map(b => `<div data-block-id="${b.id}" style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${catColors[cat]};opacity:${b.activo?1:0.5};cursor:move">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <i class="fas fa-grip-vertical" style="color:var(--text-muted);font-size:11px;cursor:grab"></i>
+              <div style="font-weight:500;font-size:13px">${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span></div>
+            </div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <span style="font-size:10px;color:var(--text-muted)">orden ${b.orden}</span>
+              <div class="switch ${b.activo?'on':''}" onclick="event.stopPropagation(); toggleBlockActive(${b.id}, this)" style="width:30px;height:16px"></div>
+              <button class="btn btn-outline btn-sm" onclick='event.stopPropagation(); editBlock(${JSON.stringify(b).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button>
+              <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); deleteBlock(${b.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+            </div>
           </div>
-        </div>
-        <div style="font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:80px;overflow:hidden;line-height:1.4">${(b.contenido||'').substring(0,250)}${(b.contenido||'').length>250?'...':''}</div>
-      </div>`).join('')}
+          <div style="font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:80px;overflow:hidden;line-height:1.4">${(b.contenido||'').substring(0,250)}${(b.contenido||'').length>250?'...':''}</div>
+        </div>`).join('')}
+      </div>
     </div>`;
   }).join('');
+
+  // Activar Sortable en cada grupo
+  setTimeout(() => {
+    if (typeof Sortable === 'undefined') return;
+    wrap.querySelectorAll('.blocks-sortable').forEach(el => {
+      Sortable.create(el, {
+        animation: 150,
+        handle: '.fa-grip-vertical',
+        ghostClass: 'sortable-ghost',
+        onEnd: async (evt) => {
+          const ids = Array.from(el.children).map(c => parseInt(c.dataset.blockId)).filter(Boolean);
+          if (!ids.length) return;
+          try {
+            await api('/api/blocks/reorder', { method:'POST', body: JSON.stringify({ block_ids: ids }) });
+            toast('success', 'Orden actualizado', '');
+            loadAgent(_currentAgentId);
+          } catch (err) { toast('error', 'Error al reordenar', err.message); }
+        }
+      });
+    });
+  }, 60);
 }
 
 async function toggleBlockActive(id, el) {
@@ -5069,6 +5102,14 @@ async function createAgent() {
 
 async function saveAgentSettings() {
   if (!_currentAgentId) return;
+  // Parse stages: comma-separated -> JSON array
+  const stagesRaw = document.getElementById('aed-stages').value || '';
+  const stagesArr = stagesRaw.split(',').map(s => s.trim()).filter(Boolean);
+  // Validate tools_allowed is valid JSON
+  const toolsRaw = document.getElementById('aed-tools').value || '[]';
+  try { JSON.parse(toolsRaw); } catch { toast('error','Error','tools_allowed debe ser JSON array valido'); return; }
+  const kbRaw = document.getElementById('aed-kb-folders').value || '[]';
+  try { JSON.parse(kbRaw); } catch { toast('error','Error','kb_folder_ids debe ser JSON array valido'); return; }
   const data = {
     display_name: document.getElementById('aed-display-name').value,
     avatar: document.getElementById('aed-avatar-input').value,
@@ -5076,7 +5117,9 @@ async function saveAgentSettings() {
     modelo: document.getElementById('aed-modelo').value,
     temperatura: parseFloat(document.getElementById('aed-temp').value) || 0.7,
     max_tokens: parseInt(document.getElementById('aed-max-tokens').value) || 800,
-    tools_allowed: document.getElementById('aed-tools').value || '[]',
+    tools_allowed: toolsRaw,
+    stages: JSON.stringify(stagesArr),
+    kb_folder_ids: kbRaw,
     activo: document.getElementById('aed-activo').classList.contains('on'),
   };
   try {
@@ -5189,8 +5232,18 @@ async function sendTestChat() {
       body: JSON.stringify({ message: msg, history: _testChatHistory.slice(-10) })
     });
     document.getElementById('test-typing')?.remove();
+    // Render tool calls si hubo
+    if (r.tool_calls && r.tool_calls.length) {
+      r.tool_calls.forEach(tc => {
+        body.innerHTML += `<div style="margin-bottom:6px;padding:8px 10px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid var(--warning);font-size:11px">
+          <div style="font-weight:600;color:var(--warning)"><i class="fas fa-bolt"></i> tool: ${tc.name}</div>
+          <div style="font-family:monospace;font-size:10px;color:var(--text-muted);margin-top:4px">args: ${JSON.stringify(tc.args || {}).substring(0,200)}</div>
+          <div style="font-family:monospace;font-size:10px;color:var(--text-muted);margin-top:4px">result: ${JSON.stringify(tc.result || {}).substring(0,200)}</div>
+        </div>`;
+      });
+    }
     body.innerHTML += `<div style="margin-bottom:8px;padding:8px 10px;background:var(--bg-white);border-radius:var(--radius);border-left:3px solid var(--info)">
-      <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">${r.provider} · ${r.tokens.input}+${r.tokens.output} tokens · ${r.latency_ms}ms · $${r.cost_usd.toFixed(6)}</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">${r.provider} · ${r.tokens.input}+${r.tokens.output} tokens · ${r.latency_ms}ms · $${r.cost_usd.toFixed(6)}${(r.tool_calls && r.tool_calls.length) ? ' · <b>'+r.tool_calls.length+' tool calls</b>' : ''}</div>
       <div style="white-space:pre-wrap">${r.reply.replace(/</g,'&lt;')}</div>
     </div>`;
     _testChatHistory.push({ role: 'assistant', content: r.reply });
@@ -5248,14 +5301,15 @@ async function loadKBFolders() {
         <h4 style="margin:0;font-size:14px"><i class="fas fa-book" style="margin-right:6px"></i>Knowledge Base (${folders.length} carpetas)</h4>
         <button class="btn btn-dark btn-sm" onclick="createKBFolder()"><i class="fas fa-plus"></i> Nueva carpeta</button>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Organiza documentos que los agentes pueden consultar con RAG (embeddings via Gemini)</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Organiza documentos que los agentes pueden consultar con RAG (embeddings Gemini text-embedding-004, 768d). Haz click en una carpeta para gestionar sus docs.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
-        ${folders.length ? folders.map(f => `<div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid ${f.color}">
+        ${folders.length ? folders.map(f => `<div class="kb-folder-card" style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid ${f.color};cursor:pointer;transition:transform .15s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''" onclick='openKBFolder(${f.id}, ${JSON.stringify(f).replace(/'/g,"&#39;")})'>
           <div style="font-weight:600;font-size:13px">${f.nombre}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${f.descripcion || '—'}</div>
           <div style="font-size:10px;color:var(--text-muted);margin-top:8px"><i class="fas fa-file-alt"></i> ${f.docs_count} docs</div>
-        </div>`).join('') : '<div style="color:var(--text-muted);padding:14px;text-align:center;grid-column:1/-1">Sin carpetas</div>'}
+        </div>`).join('') : '<div style="color:var(--text-muted);padding:14px;text-align:center;grid-column:1/-1">Sin carpetas. Crea la primera.</div>'}
       </div>
+      <div id="kb-folder-detail" style="display:none;margin-top:16px"></div>
     </div>`;
     document.getElementById('agent-extras').innerHTML = html;
   } catch (err) { toast('error', 'Error', err.message); }
@@ -5269,6 +5323,106 @@ async function createKBFolder() {
     toast('success', 'Carpeta creada', nombre);
     loadKBFolders();
   } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function openKBFolder(folderId, folder) {
+  try {
+    const docs = await api('/api/kb/folders/' + folderId + '/docs');
+    const wrap = document.getElementById('kb-folder-detail');
+    if (!wrap) return;
+    wrap.style.display = 'block';
+    wrap.innerHTML = `<div style="padding:16px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <h5 style="margin:0;font-size:14px"><i class="fas fa-folder-open" style="margin-right:6px;color:${folder.color||'#0A6FE0'}"></i>${folder.nombre}</h5>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-dark btn-sm" onclick="openKBDocModal(${folderId})"><i class="fas fa-plus"></i> Agregar documento</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('kb-folder-detail').style.display='none'"><i class="fas fa-times"></i> Cerrar</button>
+        </div>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable"><thead><tr><th>Nombre</th><th>Tokens totales</th><th>Chunks</th><th></th></tr></thead><tbody>
+          ${docs.length ? docs.map(d => `<tr>
+            <td style="font-weight:500">${d.nombre}</td>
+            <td>${(d.tokens_totales||0).toLocaleString()}</td>
+            <td><span class="badge badge-info">${d.chunks_count}</span></td>
+            <td style="font-size:11px;color:var(--text-muted)">doc #${d.id}</td>
+          </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted)">Sin documentos en esta carpeta</td></tr>'}
+        </tbody></table>
+      </div>
+    </div>`;
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function openKBDocModal(folderId) {
+  let modal = document.getElementById('kbDocModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kbDocModal';
+    modal.className = 'modal-bg';
+    modal.innerHTML = `<div class="modal-box" style="max-width:680px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0;font-size:15px"><i class="fas fa-file-alt" style="margin-right:6px;color:var(--info)"></i>Agregar documento al KB</h3>
+        <button onclick="document.getElementById('kbDocModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">El contenido se divide automaticamente en chunks de ~500 chars y se genera un embedding Gemini (768d) por chunk para busqueda RAG.</p>
+      <form onsubmit="event.preventDefault(); submitKBDoc();">
+        <input type="hidden" id="kbd-folder-id">
+        <div class="form-group"><label class="form-label">Nombre del documento *</label><input type="text" class="form-input" id="kbd-nombre" required placeholder="Politica de devoluciones MIP"></div>
+        <div class="form-group"><label class="form-label">Subir archivo (txt, md) <span style="color:var(--text-muted);font-weight:400">opcional</span></label><input type="file" class="form-input" id="kbd-file" accept=".txt,.md,.text" onchange="readKBFile(event)" style="padding:8px"></div>
+        <div class="form-group"><label class="form-label">Contenido del documento *</label><textarea class="form-input" id="kbd-contenido" style="min-height:260px;font-family:monospace;font-size:11px" required placeholder="Pega aqui el texto o usa el input de arriba para cargar un archivo..."></textarea><div style="font-size:10px;color:var(--text-muted);margin-top:4px" id="kbd-stats">0 caracteres · ~0 tokens · ~0 chunks</div></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border);margin-top:10px">
+          <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('kbDocModal').classList.remove('open')">Cancelar</button>
+          <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Guardar y generar embeddings</button>
+        </div>
+      </form>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('kbd-folder-id').value = folderId;
+  document.getElementById('kbd-nombre').value = '';
+  document.getElementById('kbd-contenido').value = '';
+  document.getElementById('kbd-stats').textContent = '0 caracteres · ~0 tokens · ~0 chunks';
+  const ta = document.getElementById('kbd-contenido');
+  ta.oninput = () => {
+    const chars = ta.value.length;
+    const tokens = Math.ceil(chars / 4);
+    const chunks = Math.max(1, Math.ceil(chars / 500));
+    document.getElementById('kbd-stats').textContent = `${chars.toLocaleString()} caracteres · ~${tokens.toLocaleString()} tokens · ~${chunks} chunks`;
+  };
+  modal.classList.add('open');
+}
+
+function readKBFile(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const ta = document.getElementById('kbd-contenido');
+    ta.value = ev.target.result;
+    if (ta.oninput) ta.oninput();
+    if (!document.getElementById('kbd-nombre').value) {
+      document.getElementById('kbd-nombre').value = f.name.replace(/\.(txt|md|text)$/i, '');
+    }
+  };
+  reader.readAsText(f);
+}
+
+async function submitKBDoc() {
+  const folderId = parseInt(document.getElementById('kbd-folder-id').value);
+  const nombre = document.getElementById('kbd-nombre').value.trim();
+  const contenido = document.getElementById('kbd-contenido').value.trim();
+  if (!nombre || !contenido) { toast('error','Error','Nombre y contenido requeridos'); return; }
+  const btn = document.querySelector('#kbDocModal button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando embeddings...'; }
+  try {
+    const r = await api('/api/kb/docs', { method:'POST', body: JSON.stringify({ folder_id: folderId, nombre, contenido }) });
+    document.getElementById('kbDocModal').classList.remove('open');
+    toast('success', 'Documento agregado', `${r.chunks_created} chunks con embeddings generados`);
+    loadKBFolders();
+  } catch (err) { toast('error', 'Error', err.message); }
+  finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Guardar y generar embeddings'; }
+  }
 }
 </script>
 </body>

@@ -2491,6 +2491,235 @@ def _kb_search(query: str, folder_ids: list, top_k: int, db) -> list:
     return [{"score": 0.5, "contenido": c.contenido, "doc_id": c.doc_id} for c in chunks]
 
 
+# ═══════════════════════════════════════════════════
+# TOOL HANDLERS - executa las acciones reales
+# que el LLM solicita via function calling.
+# ═══════════════════════════════════════════════════
+
+def _handler_kb_search(args: dict, agent, db) -> dict:
+    q = args.get("query", "")
+    folder_id = args.get("folder_id")
+    top_k = args.get("top_k", 3)
+    folder_ids = [folder_id] if folder_id else json.loads(agent.kb_folder_ids or "[]")
+    results = _kb_search(q, folder_ids, top_k, db)
+    return {"results": results, "count": len(results)}
+
+
+def _handler_create_prospect(args: dict, agent, db) -> dict:
+    nombre = args.get("nombre", "").strip()
+    email = args.get("email", "").strip()
+    if not nombre and not email:
+        return {"error": "Requiere nombre o email"}
+    # Dedup por email
+    if email:
+        existing = db.query(Prospect).filter(Prospect.email == email).first()
+        if existing:
+            return {"prospect_id": existing.id, "already_existed": True}
+    p = Prospect(
+        nombre=nombre or email.split("@")[0],
+        email=email, telefono=args.get("telefono", ""),
+        empresa=args.get("empresa", ""),
+        fuente="agent_tool",
+        estado="nuevo",
+        notas=f"Interes: {args.get('interes', '')}\nAgente: {agent.agent_type}",
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    return {"prospect_id": p.id, "created": True}
+
+
+def _handler_calendar_book(args: dict, agent, db) -> dict:
+    email = args.get("email", "").strip()
+    fecha_iso = args.get("fecha_iso", "").strip()
+    if not email or not fecha_iso:
+        return {"error": "Requiere email y fecha_iso"}
+    try:
+        fecha = datetime.fromisoformat(fecha_iso.replace("Z", ""))
+    except Exception:
+        return {"error": "fecha_iso invalida. Usar ISO 8601 (YYYY-MM-DDTHH:MM)"}
+    b = MateoCalendarBooking(
+        visitor_email=email,
+        visitor_nombre=args.get("nombre", ""),
+        fecha_reunion=fecha,
+        duracion_min=args.get("duracion_min", 30),
+        motivo=args.get("motivo", f"Reunion solicitada por agente {agent.display_name}"),
+        estado="confirmada",
+        meet_link="https://meet.google.com/new",
+    )
+    db.add(b)
+    db.commit()
+    db.refresh(b)
+    # Enqueue confirmation email
+    try:
+        db.add(EmailLog(
+            destinatario=email,
+            asunto=f"Reunion agendada - {fecha.strftime('%d/%m/%Y %H:%M')}",
+            cuerpo=f"Hola {args.get('nombre','')},\n\nTu reunion esta confirmada.\n\nFecha: {fecha.strftime('%d/%m/%Y %H:%M')}\nLink: {b.meet_link}\n\nSaludos,\n{agent.display_name}",
+            estado="pendiente",
+        ))
+        db.commit()
+    except Exception:
+        pass
+    return {"booking_id": b.id, "meet_link": b.meet_link, "fecha": fecha.isoformat()}
+
+
+def _handler_escalate(args: dict, agent, db) -> dict:
+    motivo = args.get("motivo", "Sin especificar")
+    urgencia = args.get("urgencia", "media")
+    # Crea un ticket para que el equipo humano se haga cargo
+    from models import Ticket as _Ticket
+    t = _Ticket(
+        urgencia=urgencia,
+        tipo_error="funcionalidad",
+        seccion="Chatbot",
+        descripcion=f"[ESCALATION desde {agent.display_name}]\n{motivo}",
+        usuario="agent_escalation",
+        estado="abierto",
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return {"ticket_id": t.id, "escalated": True, "urgencia": urgencia}
+
+
+def _handler_webhook(args: dict, agent, db) -> dict:
+    url = args.get("url")
+    payload = args.get("payload", {})
+    if not url:
+        return {"error": "Requiere url"}
+    # Solo HTTPS por seguridad
+    if not url.startswith("https://"):
+        return {"error": "Solo URLs HTTPS permitidas"}
+    try:
+        import requests as _req
+        r = _req.post(url, json=payload, timeout=10)
+        return {"status_code": r.status_code, "response_preview": r.text[:200]}
+    except Exception as e:
+        return {"error": str(e)[:200]}
+
+
+TOOL_HANDLERS = {
+    "kb_search": _handler_kb_search,
+    "search_kb": _handler_kb_search,
+    "create_prospect": _handler_create_prospect,
+    "prospect_create": _handler_create_prospect,
+    "calendar_book": _handler_calendar_book,
+    "calendar_create_event": _handler_calendar_book,
+    "escalate": _handler_escalate,
+    "escalate_to_human": _handler_escalate,
+    "webhook_send": _handler_webhook,
+    "send_webhook": _handler_webhook,
+}
+
+
+def _execute_tool(tool_name: str, args: dict, agent, db) -> dict:
+    """Ejecuta un tool por name. Retorna dict con resultado o error."""
+    # Resolve handler: priority tool.handler field, fallback to tool name
+    tool = db.query(Tool).filter(Tool.name == tool_name, Tool.activo == True).first()
+    if not tool:
+        return {"error": f"Tool '{tool_name}' no existe o inactivo"}
+    handler_name = tool.handler or tool.name
+    handler = TOOL_HANDLERS.get(handler_name) or TOOL_HANDLERS.get(tool.name)
+    if not handler:
+        return {"error": f"No handler registrado para '{tool_name}' (handler='{handler_name}')"}
+    try:
+        return handler(args, agent, db)
+    except Exception as e:
+        return {"error": str(e)[:300]}
+
+
+def _build_gemini_tools(agent, db):
+    """Construye la lista de FunctionDeclaration para Gemini."""
+    try:
+        allowed = json.loads(agent.tools_allowed or "[]")
+    except Exception:
+        allowed = []
+    if not allowed:
+        return None
+    rows = db.query(Tool).filter(Tool.name.in_(allowed), Tool.activo == True).all()
+    if not rows:
+        return None
+    try:
+        import google.generativeai as genai
+        from google.generativeai.types import Tool as GTool, FunctionDeclaration
+        decls = []
+        for t in rows:
+            try:
+                schema = json.loads(t.schema_input or "{}")
+            except Exception:
+                schema = {"type": "object", "properties": {}}
+            # Normalize: Gemini necesita type:OBJECT + properties
+            decls.append(FunctionDeclaration(
+                name=t.name,
+                description=t.description,
+                parameters=schema,
+            ))
+        return [GTool(function_declarations=decls)]
+    except Exception as e:
+        print(f"[gemini tools build] error: {e}")
+        return None
+
+
+def _agent_chat_gemini_with_tools(agent, system, messages, message, db, max_iterations=5):
+    """Loop de function calling con Gemini. Retorna (reply, provider, tokens_in, tokens_out, tool_calls)."""
+    import google.generativeai as genai
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_tools = _build_gemini_tools(agent, db)
+    model = genai.GenerativeModel(
+        agent.modelo or "gemini-2.5-flash",
+        system_instruction=system,
+        tools=gemini_tools,
+    )
+    gemini_history = []
+    for m in messages[:-1]:
+        gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+    chat = model.start_chat(history=gemini_history)
+    tool_calls_log = []
+    tokens_in = 0
+    tokens_out = 0
+    current_msg = message
+    for iteration in range(max_iterations):
+        response = chat.send_message(current_msg)
+        # Accumulate tokens
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            tokens_in += getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+            tokens_out += getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+        # Check if there are function calls
+        fn_calls = []
+        try:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, "function_call") and part.function_call and part.function_call.name:
+                    fn_calls.append(part.function_call)
+        except Exception:
+            pass
+        if not fn_calls:
+            # Final text reply
+            try:
+                return response.text, "gemini", tokens_in, tokens_out, tool_calls_log
+            except Exception:
+                return "", "gemini", tokens_in, tokens_out, tool_calls_log
+        # Execute each tool call and send back the result
+        responses = []
+        for fc in fn_calls:
+            args = dict(fc.args) if fc.args else {}
+            result = _execute_tool(fc.name, args, agent, db)
+            tool_calls_log.append({"name": fc.name, "args": args, "result": result})
+            try:
+                from google.generativeai.types import content_types
+                responses.append({
+                    "function_response": {
+                        "name": fc.name,
+                        "response": result,
+                    }
+                })
+            except Exception:
+                responses.append({"function_response": {"name": fc.name, "response": result}})
+        # Prepare next iteration with function responses
+        current_msg = responses
+    return "[Maximo de iteraciones alcanzado]", "gemini", tokens_in, tokens_out, tool_calls_log
+
+
 # ─── Endpoints: Agent chat runtime ───
 @app.post("/api/agents/{id}/chat")
 def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
@@ -2533,28 +2762,42 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
     tokens_in = 0
     tokens_out = 0
     error_msg = None
+    tool_calls_executed = []
 
     # Model routing
     use_gemini = a.modelo.startswith("gemini") if a.modelo else True
 
+    # Check if this agent has tools allowed
+    try:
+        allowed_tools = json.loads(a.tools_allowed or "[]")
+    except Exception:
+        allowed_tools = []
+    has_tools = bool(allowed_tools)
+
     if use_gemini and GEMINI_API_KEY:
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel(a.modelo or "gemini-2.5-flash", system_instruction=system)
-            gemini_history = []
-            for m in messages[:-1]:
-                gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
-            chat = model.start_chat(history=gemini_history)
-            response = chat.send_message(message)
-            reply_text = response.text
-            provider_used = "gemini"
-            if hasattr(response, "usage_metadata") and response.usage_metadata:
-                tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
-                tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+            if has_tools:
+                # Tool-aware loop (function calling)
+                reply_text, provider_used, tokens_in, tokens_out, tool_calls_executed = \
+                    _agent_chat_gemini_with_tools(a, system, messages, message, db, max_iterations=a.max_tool_calls or 8)
             else:
-                tokens_in = len(system + message) // 4
-                tokens_out = len(reply_text) // 4
+                # Simple chat sin tools (mas rapido)
+                import google.generativeai as genai
+                genai.configure(api_key=GEMINI_API_KEY)
+                model = genai.GenerativeModel(a.modelo or "gemini-2.5-flash", system_instruction=system)
+                gemini_history = []
+                for m in messages[:-1]:
+                    gemini_history.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+                chat = model.start_chat(history=gemini_history)
+                response = chat.send_message(message)
+                reply_text = response.text
+                provider_used = "gemini"
+                if hasattr(response, "usage_metadata") and response.usage_metadata:
+                    tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+                    tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+                else:
+                    tokens_in = len(system + message) // 4
+                    tokens_out = len(reply_text) // 4
         except Exception as e:
             error_msg = str(e)
             print(f"[agent-chat gemini] error: {e}")
@@ -2594,9 +2837,9 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
         output_tokens=tokens_out,
         cost_usd=cost,
         latency_ms=latency_ms,
-        tool_calls="[]",
+        tool_calls=json.dumps(tool_calls_executed) if tool_calls_executed else "[]",
         input_summary=message[:200],
-        output_summary=reply_text[:200] if reply_text else "",
+        output_summary=(reply_text[:200] if reply_text else ""),
         error=error_msg,
         provider=provider_used,
     )
@@ -2617,20 +2860,29 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
         "tokens": {"input": tokens_in, "output": tokens_out},
         "cost_usd": round(cost, 6),
         "latency_ms": latency_ms,
+        "tool_calls": tool_calls_executed,
     }
 
 
 @app.get("/api/agents/{id}/traces")
 def list_agent_traces(id: int, limit: int = 50, db: Session = Depends(get_db)):
     traces = db.query(AgentTrace).filter(AgentTrace.agent_id == id).order_by(AgentTrace.created_at.desc()).limit(limit).all()
-    return [{
-        "id": t.id, "session_id": t.session_id,
-        "prompt_tokens": t.prompt_tokens, "output_tokens": t.output_tokens,
-        "cost_usd": t.cost_usd, "latency_ms": t.latency_ms,
-        "provider": t.provider, "error": t.error,
-        "input_summary": t.input_summary, "output_summary": t.output_summary,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
-    } for t in traces]
+    out = []
+    for t in traces:
+        try:
+            tc = json.loads(t.tool_calls or "[]")
+        except Exception:
+            tc = []
+        out.append({
+            "id": t.id, "session_id": t.session_id,
+            "prompt_tokens": t.prompt_tokens, "output_tokens": t.output_tokens,
+            "cost_usd": t.cost_usd, "latency_ms": t.latency_ms,
+            "provider": t.provider, "error": t.error,
+            "input_summary": t.input_summary, "output_summary": t.output_summary,
+            "tool_calls": tc, "tool_calls_count": len(tc),
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+        })
+    return out
 
 
 # ═══ FASE 1: EXPORT/IMPORT EXCEL DE CLIENTES ═══
