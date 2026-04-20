@@ -20,6 +20,7 @@ from models import (
     MateoConfig, MateoConversation, MateoMessage, MateoCalendarBooking,
     AgentConfig, AgentBlock, Tool, KnowledgeFolder, KnowledgeDoc, KnowledgeChunk, AgentTrace,
     ConversationPipeline, PipelineStageLog, AgentIntegration, HumanHandoff,
+    StageAssignment, AgentAutoRule,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -3043,13 +3044,24 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
     intent_data = _detect_intent(message, history)
     stage_changed = _maybe_handoff_pipeline(pipeline, intent_data, message, db)
     if stage_changed and pipeline.current_agent_id != a.id:
-        # Hubo cambio de agente, usar el nuevo
         target_agent = db.query(AgentConfig).get(pipeline.current_agent_id)
         if target_agent and target_agent.activo:
             a = target_agent
     pipeline.total_messages = (pipeline.total_messages or 0) + 1
     pipeline.last_message_at = datetime.now()
     db.commit()
+
+    # AUTO RULES del agente actual: evaluar triggers custom
+    try:
+        auto_result = _evaluate_auto_rules(a, pipeline, message, intent_data, db)
+        if auto_result.get("actions_executed"):
+            # Si alguna auto-rule cambio el agente, respetar
+            if pipeline.current_agent_id and pipeline.current_agent_id != a.id:
+                target_agent = db.query(AgentConfig).get(pipeline.current_agent_id)
+                if target_agent and target_agent.activo:
+                    a = target_agent
+    except Exception as e:
+        print(f"[auto-rules eval] {e}")
 
     # Agrega info del pipeline al contexto
     extra_context += f"\n\n[PIPELINE STATE]\nStage: {pipeline.current_stage}\nIntent: {intent_data.get('intent')} (score={intent_data.get('score')})\nSentiment: {intent_data.get('sentiment')}"
@@ -3688,6 +3700,249 @@ def update_handoff(id: int, data: dict, db: Session = Depends(get_db)):
         h.resuelto_at = datetime.now()
     db.commit()
     return {"id": h.id, "estado": h.estado}
+
+
+# ═══════════════════════════════════════════════════
+# STAGE ASSIGNMENTS - agente/humano por etapa
+# ═══════════════════════════════════════════════════
+
+@app.get("/api/stage-assignments")
+def list_stage_assignments(stage_type: Optional[str] = None, db: Session = Depends(get_db)):
+    q = db.query(StageAssignment).filter(StageAssignment.activo == True)
+    if stage_type:
+        q = q.filter(StageAssignment.stage_type == stage_type)
+    rows = q.all()
+    # Enrich con info del agente
+    out = []
+    for r in rows:
+        agent_info = None
+        if r.agent_id:
+            a = db.query(AgentConfig).get(r.agent_id)
+            if a:
+                agent_info = {"id": a.id, "display_name": a.display_name, "avatar": a.avatar}
+        out.append({
+            "id": r.id,
+            "stage_type": r.stage_type,
+            "stage_key": r.stage_key,
+            "agent_id": r.agent_id,
+            "agent": agent_info,
+            "human_email": r.human_email or "",
+            "human_nombre": r.human_nombre or "",
+            "fallback_to_human": r.fallback_to_human,
+            "notify_on_entry": r.notify_on_entry,
+            "activo": r.activo,
+        })
+    return out
+
+
+@app.put("/api/stage-assignments")
+def upsert_stage_assignment(data: dict, db: Session = Depends(get_db)):
+    """Crea o actualiza la asignacion de un stage. Solo 1 assignment activo por stage_key+stage_type."""
+    stage_type = data.get("stage_type", "prospect")
+    stage_key = data.get("stage_key")
+    if not stage_key:
+        raise HTTPException(400, "Requiere stage_key")
+    # Buscar existente
+    existing = db.query(StageAssignment).filter(
+        StageAssignment.stage_type == stage_type,
+        StageAssignment.stage_key == stage_key,
+    ).first()
+    if existing:
+        for k in ["agent_id", "human_email", "human_nombre", "fallback_to_human", "notify_on_entry", "activo"]:
+            if k in data:
+                setattr(existing, k, data[k])
+        db.commit()
+        db.refresh(existing)
+        return {"id": existing.id, "updated": True}
+    sa = StageAssignment(
+        stage_type=stage_type, stage_key=stage_key,
+        agent_id=data.get("agent_id"),
+        human_email=data.get("human_email", ""),
+        human_nombre=data.get("human_nombre", ""),
+        fallback_to_human=data.get("fallback_to_human", False),
+        notify_on_entry=data.get("notify_on_entry", True),
+        activo=data.get("activo", True),
+    )
+    db.add(sa)
+    db.commit()
+    db.refresh(sa)
+    return {"id": sa.id, "created": True}
+
+
+@app.delete("/api/stage-assignments/{id}")
+def delete_stage_assignment(id: int, db: Session = Depends(get_db)):
+    sa = db.query(StageAssignment).get(id)
+    if not sa:
+        raise HTTPException(404, "Assignment no encontrado")
+    db.delete(sa)
+    db.commit()
+    return {"deleted": True}
+
+
+# ═══════════════════════════════════════════════════
+# AGENT AUTO RULES - triggers automaticos
+# ═══════════════════════════════════════════════════
+
+@app.get("/api/agents/{agent_id}/auto-rules")
+def list_auto_rules(agent_id: int, db: Session = Depends(get_db)):
+    rules = db.query(AgentAutoRule).filter(AgentAutoRule.agent_id == agent_id).order_by(AgentAutoRule.prioridad).all()
+    return [{
+        "id": r.id, "agent_id": r.agent_id,
+        "nombre": r.nombre, "descripcion": r.descripcion or "",
+        "trigger_type": r.trigger_type, "trigger_config": r.trigger_config,
+        "action_type": r.action_type, "action_config": r.action_config,
+        "prioridad": r.prioridad, "activo": r.activo,
+        "total_triggered": r.total_triggered or 0,
+        "last_triggered_at": r.last_triggered_at.isoformat() if r.last_triggered_at else None,
+    } for r in rules]
+
+
+@app.post("/api/agents/{agent_id}/auto-rules")
+def create_auto_rule(agent_id: int, data: dict, db: Session = Depends(get_db)):
+    a = db.query(AgentConfig).get(agent_id)
+    if not a:
+        raise HTTPException(404, "Agente no encontrado")
+    r = AgentAutoRule(
+        agent_id=agent_id,
+        nombre=data.get("nombre", "Regla sin nombre"),
+        descripcion=data.get("descripcion", ""),
+        trigger_type=data.get("trigger_type", "keyword"),
+        trigger_config=data.get("trigger_config", "{}"),
+        action_type=data.get("action_type", "move_stage"),
+        action_config=data.get("action_config", "{}"),
+        prioridad=data.get("prioridad", 100),
+        activo=data.get("activo", True),
+    )
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return {"id": r.id}
+
+
+@app.put("/api/auto-rules/{id}")
+def update_auto_rule(id: int, data: dict, db: Session = Depends(get_db)):
+    r = db.query(AgentAutoRule).get(id)
+    if not r:
+        raise HTTPException(404, "Regla no encontrada")
+    for k in ["nombre", "descripcion", "trigger_type", "trigger_config", "action_type", "action_config", "prioridad", "activo"]:
+        if k in data:
+            setattr(r, k, data[k])
+    db.commit()
+    return {"id": r.id, "updated": True}
+
+
+@app.delete("/api/auto-rules/{id}")
+def delete_auto_rule(id: int, db: Session = Depends(get_db)):
+    r = db.query(AgentAutoRule).get(id)
+    if not r:
+        raise HTTPException(404, "Regla no encontrada")
+    db.delete(r)
+    db.commit()
+    return {"deleted": True}
+
+
+def _evaluate_auto_rules(agent: AgentConfig, pipeline, message: str, intent_data: dict, db) -> dict:
+    """Evalua todas las auto-rules del agente contra el mensaje actual.
+    Si alguna matchea, ejecuta la accion. Retorna dict con info de lo que paso.
+    """
+    rules = db.query(AgentAutoRule).filter(
+        AgentAutoRule.agent_id == agent.id,
+        AgentAutoRule.activo == True,
+    ).order_by(AgentAutoRule.prioridad).all()
+    actions_executed = []
+    for r in rules:
+        try:
+            matched = False
+            config = {}
+            try:
+                config = json.loads(r.trigger_config or "{}")
+            except Exception:
+                config = {}
+            # Evaluar segun tipo
+            if r.trigger_type == "keyword":
+                keywords = config.get("keywords", [])
+                match_any = config.get("match_any", True)
+                msg_lower = (message or "").lower()
+                matches = [kw for kw in keywords if kw.lower() in msg_lower]
+                matched = (len(matches) > 0) if match_any else (len(matches) == len(keywords))
+            elif r.trigger_type == "intent":
+                target_intents = config.get("intents", [])
+                min_score = float(config.get("min_score", 0.5))
+                matched = (intent_data.get("intent") in target_intents) and (intent_data.get("score", 0) >= min_score)
+            elif r.trigger_type == "sentiment":
+                target_sentiments = config.get("sentiments", [])
+                matched = intent_data.get("sentiment") in target_sentiments
+            elif r.trigger_type == "message_count":
+                min_count = int(config.get("min_count", 5))
+                matched = (pipeline.total_messages or 0) >= min_count
+            elif r.trigger_type == "lead_data":
+                # Match si el pipeline tiene los campos requeridos
+                required = config.get("required_fields", ["email"])
+                has_all = all(getattr(pipeline, f"visitor_{f}", "") for f in required)
+                matched = has_all
+            if not matched:
+                continue
+
+            # Ejecutar accion
+            action_config = {}
+            try:
+                action_config = json.loads(r.action_config or "{}")
+            except Exception:
+                action_config = {}
+            if r.action_type == "move_stage":
+                target_stage = action_config.get("target_stage")
+                if target_stage:
+                    old = pipeline.current_stage
+                    pipeline.current_stage = target_stage
+                    # Buscar agente asignado al nuevo stage
+                    new_agent = _find_agent_for_stage(target_stage, db)
+                    if new_agent:
+                        pipeline.current_agent_id = new_agent.id
+                    db.add(PipelineStageLog(
+                        pipeline_id=pipeline.id,
+                        from_stage=old, to_stage=target_stage,
+                        from_agent_id=agent.id, to_agent_id=pipeline.current_agent_id,
+                        trigger_type=f"auto_rule_{r.id}",
+                        trigger_data=json.dumps({"rule_nombre": r.nombre, "trigger_type": r.trigger_type}),
+                    ))
+                    actions_executed.append({"rule_id": r.id, "action": "move_stage", "from": old, "to": target_stage})
+            elif r.action_type == "switch_agent":
+                target_agent_id = action_config.get("target_agent_id")
+                if target_agent_id:
+                    pipeline.current_agent_id = int(target_agent_id)
+                    actions_executed.append({"rule_id": r.id, "action": "switch_agent", "to": target_agent_id})
+            elif r.action_type == "escalate_human":
+                pipeline.requires_human = True
+                pipeline.human_handoff_reason = f"Auto rule: {r.nombre}"
+                pipeline.handoff_at = datetime.now()
+                db.add(HumanHandoff(
+                    session_id=pipeline.session_id,
+                    pipeline_id=pipeline.id,
+                    agent_id=agent.id,
+                    visitor_email=pipeline.visitor_email,
+                    visitor_nombre=pipeline.visitor_nombre,
+                    motivo=f"Auto rule '{r.nombre}' triggered",
+                    urgencia=action_config.get("urgencia", "media"),
+                    estado="pendiente",
+                ))
+                actions_executed.append({"rule_id": r.id, "action": "escalate_human"})
+            elif r.action_type == "tag_prospect":
+                # Si pipeline tiene prospect_id, update notas
+                if pipeline.prospect_id:
+                    p = db.query(Prospect).get(pipeline.prospect_id)
+                    if p:
+                        tag = action_config.get("tag", r.nombre)
+                        p.notas = (p.notas or "") + f"\n[TAG auto-rule]: {tag}"
+                        actions_executed.append({"rule_id": r.id, "action": "tag_prospect", "tag": tag})
+
+            # Actualizar stats
+            r.total_triggered = (r.total_triggered or 0) + 1
+            r.last_triggered_at = datetime.now()
+        except Exception as e:
+            print(f"[auto-rule {r.id}] error: {e}")
+    if actions_executed:
+        db.commit()
+    return {"actions_executed": actions_executed}
 
 
 # Agent Integrations endpoints
@@ -4686,11 +4941,50 @@ def update_prospect(id: int, data: dict, db: Session = Depends(get_db)):
     p = db.query(Prospect).get(id)
     if not p:
         raise HTTPException(404, "Prospect no encontrado")
+    old_estado = p.estado
     for k, v in data.items():
         if hasattr(p, k):
             setattr(p, k, v)
     db.commit()
-    return {"id": p.id, "estado": p.estado}
+    # Si cambio estado -> aplicar StageAssignment (notificar al agente/humano responsable)
+    new_assignment_info = None
+    if "estado" in data and data["estado"] != old_estado:
+        sa = db.query(StageAssignment).filter(
+            StageAssignment.stage_type == "prospect",
+            StageAssignment.stage_key == data["estado"],
+            StageAssignment.activo == True,
+        ).first()
+        if sa:
+            new_assignment_info = {
+                "agent_id": sa.agent_id,
+                "agent_name": None,
+                "human_email": sa.human_email or None,
+                "human_nombre": sa.human_nombre or None,
+            }
+            if sa.agent_id:
+                agent = db.query(AgentConfig).get(sa.agent_id)
+                if agent:
+                    new_assignment_info["agent_name"] = agent.display_name
+                    # Si el prospect tiene pipeline, actualizar el agente del pipeline
+                    pipes = db.query(ConversationPipeline).filter(ConversationPipeline.prospect_id == id).all()
+                    for pipe in pipes:
+                        pipe.current_agent_id = agent.id
+                    db.commit()
+            # Actividad
+            try:
+                db.add(Actividad(
+                    tipo="asignacion",
+                    titulo=f"Prospect pasado a '{data['estado']}'",
+                    descripcion=f"Asignado a {sa.human_nombre or sa.human_email or new_assignment_info['agent_name'] or 'sin asignar'}",
+                    autor="system-stage-assignment",
+                ))
+                db.commit()
+            except Exception:
+                pass
+    return {
+        "id": p.id, "estado": p.estado,
+        "new_assignment": new_assignment_info,
+    }
 
 
 @app.delete("/api/prospects/{id}")

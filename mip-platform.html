@@ -1785,6 +1785,77 @@ html,body{overflow-x:hidden;max-width:100vw}
               <div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">Cargando bloques...</div>
             </div>
           </div>
+
+          <!-- TRIGGERS AUTOMATICOS -->
+          <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+              <div>
+                <h4 style="font-size:14px;font-weight:600;margin:0"><i class="fas fa-bolt" style="margin-right:6px;color:var(--warning)"></i>Triggers automaticos</h4>
+                <p style="font-size:11px;color:var(--text-muted);margin-top:3px">Reglas que se disparan automaticamente al detectar palabras, intenciones o comportamientos. Ejecutan acciones: mover de stage, cambiar agente, escalar, taggear.</p>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="openAutoRuleModal()"><i class="fas fa-plus"></i> Nueva regla</button>
+            </div>
+            <div id="aed-auto-rules-list">
+              <div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">Cargando reglas...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal crear/editar Auto Rule -->
+      <div class="modal-bg" id="autoRuleModal">
+        <div class="modal-box" style="max-width:640px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <h3 style="margin:0;font-size:15px" id="ar-title"><i class="fas fa-bolt" style="margin-right:6px;color:var(--warning)"></i>Nueva regla automatica</h3>
+            <button onclick="document.getElementById('autoRuleModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">Define <b>cuando</b> (trigger) y <b>que hacer</b> (accion). La regla se evalua en cada mensaje del usuario.</p>
+          <form onsubmit="event.preventDefault(); saveAutoRule();">
+            <input type="hidden" id="ar-id">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="ar-nombre" required placeholder="Ej: Cliente con intencion de compra"></div>
+              <div class="form-group"><label class="form-label">Prioridad</label><input type="number" class="form-input" id="ar-prioridad" value="100" min="1" max="999" title="Menor numero = mayor prioridad"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Descripcion (opcional)</label><input type="text" class="form-input" id="ar-descripcion" placeholder="Explica cuando se dispara y por que"></div>
+
+            <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid var(--info);margin-bottom:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--info);margin-bottom:6px">CUANDO (trigger)</div>
+              <div class="form-group"><label class="form-label">Tipo de trigger *</label>
+                <select class="form-input" id="ar-trigger-type" onchange="updateAutoRuleTriggerUI()">
+                  <option value="keyword">Palabras clave en el mensaje</option>
+                  <option value="intent">Intencion detectada</option>
+                  <option value="sentiment">Sentimiento del cliente</option>
+                  <option value="message_count">Cantidad de mensajes enviados</option>
+                  <option value="lead_data">Lead completo (email + datos)</option>
+                </select>
+              </div>
+              <div id="ar-trigger-config">
+                <!-- Se llena dinamicamente segun trigger -->
+              </div>
+            </div>
+
+            <div style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid var(--warning);margin-bottom:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--warning);margin-bottom:6px">QUE HACER (accion)</div>
+              <div class="form-group"><label class="form-label">Tipo de accion *</label>
+                <select class="form-input" id="ar-action-type" onchange="updateAutoRuleActionUI()">
+                  <option value="move_stage">Mover al siguiente stage del pipeline</option>
+                  <option value="switch_agent">Cambiar a otro agente</option>
+                  <option value="escalate_human">Escalar a humano</option>
+                  <option value="tag_prospect">Taggear el prospect</option>
+                </select>
+              </div>
+              <div id="ar-action-config">
+                <!-- Se llena dinamicamente -->
+              </div>
+            </div>
+
+            <div class="form-group" style="display:flex;align-items:center;gap:10px"><div class="switch on" id="ar-activo" onclick="this.classList.toggle('on')"></div><span style="font-size:13px">Regla activa</span></div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border);margin-top:10px">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('autoRuleModal').classList.remove('open')">Cancelar</button>
+              <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Guardar regla</button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -2318,7 +2389,21 @@ html,body{overflow-x:hidden;max-width:100vw}
 
       <!-- Tab: Kanban CRM clasico (prospects por estado) -->
       <div id="pr-tab-kanban-crm" class="pr-tab-content" style="display:none">
-        <p style="font-size:11px;color:var(--text-muted);margin:8px 0">Prospects en el pipeline CRM (estados tradicionales: nuevo, contactado, calificado, convertido).</p>
+        <!-- BARRA DE ASIGNACION por etapa -->
+        <div class="card" style="padding:14px;margin:10px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div>
+              <div style="font-size:13px;font-weight:600"><i class="fas fa-user-tag" style="margin-right:6px;color:var(--info)"></i>Responsable por etapa del embudo</div>
+              <div style="font-size:10px;color:var(--text-muted)">Asigna un agente IA o un humano a cada columna. Cuando un prospect entra a esa etapa, queda bajo su responsabilidad.</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="loadStageAssignments()"><i class="fas fa-sync"></i></button>
+          </div>
+          <div id="stage-assignment-bar" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+            <div style="color:var(--text-muted);font-size:11px;grid-column:1/-1">Cargando...</div>
+          </div>
+        </div>
+
+        <p style="font-size:11px;color:var(--text-muted);margin:8px 0">Prospects en el pipeline CRM (estados tradicionales). Click en cualquier card para ver chat completo + detalle.</p>
         <div class="kanban-board" id="prosp-kanban" style="min-height:360px">
           <div class="kanban-col" data-status="nuevo"><div class="kanban-col-head"><h4>Nuevo</h4><span class="cnt" data-estado="nuevo">0</span></div><div class="kanban-col-body" id="pk-nuevo"></div></div>
           <div class="kanban-col" data-status="contactado"><div class="kanban-col-head"><h4>Contactado</h4><span class="cnt" data-estado="contactado">0</span></div><div class="kanban-col-body" id="pk-contactado"></div></div>
@@ -4528,6 +4613,8 @@ async function saveProveedor() {
 // ═══════════════════════════════════════════════════
 async function loadProspects() {
   try {
+    // Cargar stage assignments en paralelo
+    if (typeof loadStageAssignments === 'function') setTimeout(loadStageAssignments, 30);
     const prospects = await api('/api/prospects');
     const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
     el('prosp-total', prospects.length);
@@ -5265,8 +5352,9 @@ async function loadAgent(id) {
     document.getElementById('aed-stat-in').textContent = (a.total_tokens_in||0).toLocaleString();
     document.getElementById('aed-stat-out').textContent = (a.total_tokens_out||0).toLocaleString();
     document.getElementById('aed-stat-cost').textContent = '$' + (a.total_cost_usd||0).toFixed(4);
-    // Render blocks
+    // Render blocks + auto rules
     renderBlocksList(a.blocks || []);
+    loadAutoRules(a.id);
   } catch (err) { toast('error', 'Error', err.message); }
 }
 
@@ -6083,6 +6171,276 @@ async function deleteIntegration(id) {
     await api('/api/integrations/' + id, { method: 'DELETE' });
     toast('success', 'Eliminada', '');
     loadAgentIntegrations();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// STAGE ASSIGNMENTS - asignar agente/humano a cada etapa del CRM
+// ═══════════════════════════════════════════════════
+
+const CRM_STAGES = [
+  { key: "nuevo", label: "Nuevo", color: "#6366f1" },
+  { key: "contactado", label: "Contactado", color: "#f59e0b" },
+  { key: "calificado", label: "Calificado", color: "#8b5cf6" },
+  { key: "convertido", label: "Convertido", color: "#10b981" },
+];
+
+async function loadStageAssignments() {
+  try {
+    const [agents, assignments] = await Promise.all([
+      api('/api/agents'),
+      api('/api/stage-assignments?stage_type=prospect'),
+    ]);
+    const assignMap = {};
+    (assignments || []).forEach(a => { assignMap[a.stage_key] = a; });
+    const wrap = document.getElementById('stage-assignment-bar');
+    if (!wrap) return;
+    wrap.innerHTML = CRM_STAGES.map(s => {
+      const a = assignMap[s.key];
+      const agentOptions = (agents || []).map(ag => `<option value="${ag.id}" ${a && a.agent_id === ag.id ? 'selected' : ''}>${ag.avatar || '🤖'} ${ag.display_name}</option>`).join('');
+      const humanEmail = a ? (a.human_email || '') : '';
+      const humanNombre = a ? (a.human_nombre || '') : '';
+      const currentLabel = a ? (a.agent ? `🤖 ${a.agent.display_name}` : (a.human_nombre || a.human_email ? `👤 ${a.human_nombre || a.human_email}` : 'Sin asignar')) : 'Sin asignar';
+      return `<div style="padding:10px;background:var(--bg-surface);border-radius:var(--radius);border-top:3px solid ${s.color}">
+        <div style="font-size:11px;font-weight:600;margin-bottom:4px">${s.label}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px">${currentLabel}</div>
+        <select class="form-input" id="sa-agent-${s.key}" style="font-size:11px;padding:4px;margin-bottom:4px" onchange="updateStageAssignmentPreview('${s.key}')">
+          <option value="">— Sin agente IA —</option>
+          ${agentOptions}
+        </select>
+        <input type="text" class="form-input" id="sa-humemail-${s.key}" placeholder="Email humano (opcional)" value="${humanEmail}" style="font-size:11px;padding:4px;margin-bottom:4px">
+        <input type="text" class="form-input" id="sa-humname-${s.key}" placeholder="Nombre humano" value="${humanNombre}" style="font-size:11px;padding:4px;margin-bottom:6px">
+        <button class="btn btn-dark btn-sm" onclick="saveStageAssignment('${s.key}')" style="width:100%;font-size:11px"><i class="fas fa-save"></i> Guardar</button>
+      </div>`;
+    }).join('');
+  } catch (err) { console.error('loadStageAssignments:', err); }
+}
+
+function updateStageAssignmentPreview(stageKey) {
+  // Puede extenderse con un preview visual. Por ahora no-op.
+}
+
+async function saveStageAssignment(stageKey) {
+  const agentSel = document.getElementById('sa-agent-' + stageKey);
+  const email = document.getElementById('sa-humemail-' + stageKey).value.trim();
+  const nombre = document.getElementById('sa-humname-' + stageKey).value.trim();
+  const agentId = agentSel.value ? parseInt(agentSel.value) : null;
+  try {
+    await api('/api/stage-assignments', { method: 'PUT', body: JSON.stringify({
+      stage_type: 'prospect', stage_key: stageKey,
+      agent_id: agentId, human_email: email, human_nombre: nombre,
+      activo: true,
+    }) });
+    toast('success', 'Asignacion guardada', stageKey);
+    loadStageAssignments();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// AUTO RULES (triggers automaticos del agente)
+// ═══════════════════════════════════════════════════
+
+async function loadAutoRules(agentId) {
+  try {
+    const rules = await api('/api/agents/' + agentId + '/auto-rules');
+    const wrap = document.getElementById('aed-auto-rules-list');
+    if (!wrap) return;
+    if (!rules || !rules.length) {
+      wrap.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;background:var(--bg-surface);border-radius:var(--radius)">Sin reglas automaticas. Crea una para que el agente tome acciones al detectar X comportamiento.</div>';
+      return;
+    }
+    wrap.innerHTML = rules.map(r => {
+      let trig = {}, act = {};
+      try { trig = JSON.parse(r.trigger_config || '{}'); } catch {}
+      try { act = JSON.parse(r.action_config || '{}'); } catch {}
+      const trigDesc = {
+        keyword: `palabras: ${(trig.keywords || []).join(', ')}`,
+        intent: `intent: ${(trig.intents || []).join(', ')} (score≥${trig.min_score || 0.5})`,
+        sentiment: `sentimiento: ${(trig.sentiments || []).join(', ')}`,
+        message_count: `despues de ${trig.min_count || 5} mensajes`,
+        lead_data: `datos completos: ${(trig.required_fields || ['email']).join(', ')}`,
+      }[r.trigger_type] || r.trigger_type;
+      const actDesc = {
+        move_stage: `mover a stage: ${act.target_stage || '?'}`,
+        switch_agent: `cambiar a agente #${act.target_agent_id || '?'}`,
+        escalate_human: `escalar a humano (${act.urgencia || 'media'})`,
+        tag_prospect: `taggear: ${act.tag || r.nombre}`,
+      }[r.action_type] || r.action_type;
+      return `<div style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${r.activo ? 'var(--warning)' : 'var(--border)'};opacity:${r.activo ? 1 : 0.5}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-weight:600;font-size:13px">${r.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">prioridad ${r.prioridad}</span></div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <span style="font-size:10px;color:var(--text-muted)">disparada ${r.total_triggered}x</span>
+            <div class="switch ${r.activo ? 'on' : ''}" onclick="toggleAutoRuleActive(${r.id}, this)" style="width:30px;height:16px"></div>
+            <button class="btn btn-outline btn-sm" onclick='editAutoRule(${JSON.stringify(r).replace(/'/g, "&#39;")})'><i class="fas fa-edit"></i></button>
+            <button class="btn btn-outline btn-sm" onclick="deleteAutoRule(${r.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>
+        ${r.descripcion ? `<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">${r.descripcion}</div>` : ''}
+        <div style="font-size:11px;color:var(--text-muted)"><b>Cuando:</b> ${trigDesc} · <b>Accion:</b> ${actDesc}</div>
+      </div>`;
+    }).join('');
+  } catch (err) { console.error('loadAutoRules:', err); }
+}
+
+async function toggleAutoRuleActive(id, el) {
+  el.classList.toggle('on');
+  const activo = el.classList.contains('on');
+  try {
+    await api('/api/auto-rules/' + id, { method: 'PUT', body: JSON.stringify({ activo }) });
+    if (_currentAgentId) loadAutoRules(_currentAgentId);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function openAutoRuleModal() {
+  if (!_currentAgentId) { toast('error', 'Error', 'Selecciona un agente primero'); return; }
+  document.getElementById('ar-title').innerHTML = '<i class="fas fa-bolt" style="margin-right:6px;color:var(--warning)"></i>Nueva regla automatica';
+  ['ar-id', 'ar-nombre', 'ar-descripcion'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+  document.getElementById('ar-prioridad').value = '100';
+  document.getElementById('ar-trigger-type').value = 'keyword';
+  document.getElementById('ar-action-type').value = 'move_stage';
+  document.getElementById('ar-activo').classList.add('on');
+  updateAutoRuleTriggerUI();
+  updateAutoRuleActionUI();
+  document.getElementById('autoRuleModal').classList.add('open');
+}
+
+function editAutoRule(r) {
+  document.getElementById('ar-title').innerHTML = '<i class="fas fa-edit" style="margin-right:6px"></i>Editar regla';
+  document.getElementById('ar-id').value = r.id;
+  document.getElementById('ar-nombre').value = r.nombre;
+  document.getElementById('ar-descripcion').value = r.descripcion || '';
+  document.getElementById('ar-prioridad').value = r.prioridad;
+  document.getElementById('ar-trigger-type').value = r.trigger_type;
+  document.getElementById('ar-action-type').value = r.action_type;
+  document.getElementById('ar-activo').classList.toggle('on', !!r.activo);
+  updateAutoRuleTriggerUI();
+  updateAutoRuleActionUI();
+  // Prellenar campos del config
+  try {
+    const trig = JSON.parse(r.trigger_config || '{}');
+    if (trig.keywords) document.getElementById('ar-tc-keywords').value = trig.keywords.join(', ');
+    if (trig.intents) document.getElementById('ar-tc-intents').value = trig.intents.join(', ');
+    if (trig.min_score) document.getElementById('ar-tc-minscore').value = trig.min_score;
+    if (trig.sentiments) document.getElementById('ar-tc-sentiments').value = trig.sentiments.join(', ');
+    if (trig.min_count) document.getElementById('ar-tc-mincount').value = trig.min_count;
+  } catch {}
+  try {
+    const act = JSON.parse(r.action_config || '{}');
+    if (act.target_stage) { const el = document.getElementById('ar-ac-stage'); if (el) el.value = act.target_stage; }
+    if (act.target_agent_id) { const el = document.getElementById('ar-ac-agent'); if (el) el.value = act.target_agent_id; }
+    if (act.urgencia) { const el = document.getElementById('ar-ac-urgencia'); if (el) el.value = act.urgencia; }
+    if (act.tag) { const el = document.getElementById('ar-ac-tag'); if (el) el.value = act.tag; }
+  } catch {}
+  document.getElementById('autoRuleModal').classList.add('open');
+}
+
+function updateAutoRuleTriggerUI() {
+  const type = document.getElementById('ar-trigger-type').value;
+  const wrap = document.getElementById('ar-trigger-config');
+  if (type === 'keyword') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Palabras clave (separadas por coma)</label><input type="text" class="form-input" id="ar-tc-keywords" placeholder="comprar, cotizar, precio, urgente" style="font-size:12px"></div>
+    <div style="font-size:10px;color:var(--text-muted)">Se dispara si el mensaje contiene CUALQUIERA de estas palabras (case-insensitive).</div>`;
+  } else if (type === 'intent') {
+    wrap.innerHTML = `<div class="form-row">
+      <div class="form-group"><label class="form-label">Intenciones (coma)</label><input type="text" class="form-input" id="ar-tc-intents" placeholder="intencion_compra, calificado" style="font-size:12px"></div>
+      <div class="form-group"><label class="form-label">Score minimo</label><input type="number" class="form-input" id="ar-tc-minscore" value="0.6" min="0" max="1" step="0.05" style="font-size:12px"></div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted)">Valores validos: intencion_compra, calificado, soporte, cliente_perdido, derivar_humano, info_general.</div>`;
+  } else if (type === 'sentiment') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Sentimientos (coma)</label><input type="text" class="form-input" id="ar-tc-sentiments" placeholder="negativo" style="font-size:12px"></div>
+    <div style="font-size:10px;color:var(--text-muted)">Valores: positivo, neutral, negativo.</div>`;
+  } else if (type === 'message_count') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Dispara despues de N mensajes</label><input type="number" class="form-input" id="ar-tc-mincount" value="5" min="1" max="50" style="font-size:12px"></div>`;
+  } else if (type === 'lead_data') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Campos requeridos (coma)</label><input type="text" class="form-input" id="ar-tc-fields" value="email, nombre" style="font-size:12px"></div>
+    <div style="font-size:10px;color:var(--text-muted)">Dispara cuando el pipeline tiene estos campos del visitor.</div>`;
+  }
+}
+
+function updateAutoRuleActionUI() {
+  const type = document.getElementById('ar-action-type').value;
+  const wrap = document.getElementById('ar-action-config');
+  if (type === 'move_stage') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Stage destino</label>
+      <select class="form-input" id="ar-ac-stage" style="font-size:12px">
+        <option value="lead_inicial">lead_inicial</option>
+        <option value="calificando">calificando</option>
+        <option value="cotizando">cotizando</option>
+        <option value="cerrando">cerrando</option>
+        <option value="cliente_activo">cliente_activo</option>
+        <option value="soporte_post_venta">soporte_post_venta</option>
+        <option value="cliente_perdido">cliente_perdido</option>
+      </select>
+    </div><div style="font-size:10px;color:var(--text-muted)">Se movera el pipeline a ese stage. Si hay agente asignado al stage, el pipeline lo tomara automaticamente.</div>`;
+  } else if (type === 'switch_agent') {
+    // Populate with all agents
+    api('/api/agents').then(agents => {
+      const opts = (agents || []).map(a => `<option value="${a.id}">${a.avatar} ${a.display_name}</option>`).join('');
+      wrap.innerHTML = `<div class="form-group"><label class="form-label">Cambiar al agente</label><select class="form-input" id="ar-ac-agent" style="font-size:12px">${opts}</select></div>`;
+    });
+    wrap.innerHTML = `<div style="font-size:11px;color:var(--text-muted)">Cargando agentes...</div>`;
+  } else if (type === 'escalate_human') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Urgencia</label>
+      <select class="form-input" id="ar-ac-urgencia" style="font-size:12px"><option>baja</option><option selected>media</option><option>alta</option><option>critica</option></select>
+    </div>`;
+  } else if (type === 'tag_prospect') {
+    wrap.innerHTML = `<div class="form-group"><label class="form-label">Tag a agregar</label><input type="text" class="form-input" id="ar-ac-tag" placeholder="HOT_LEAD" style="font-size:12px"></div>`;
+  }
+}
+
+async function saveAutoRule() {
+  if (!_currentAgentId) return;
+  const id = document.getElementById('ar-id').value;
+  const triggerType = document.getElementById('ar-trigger-type').value;
+  let triggerConfig = {};
+  if (triggerType === 'keyword') {
+    const kws = document.getElementById('ar-tc-keywords').value.split(',').map(s => s.trim()).filter(Boolean);
+    triggerConfig = { keywords: kws, match_any: true };
+  } else if (triggerType === 'intent') {
+    triggerConfig = {
+      intents: document.getElementById('ar-tc-intents').value.split(',').map(s => s.trim()).filter(Boolean),
+      min_score: parseFloat(document.getElementById('ar-tc-minscore').value) || 0.5,
+    };
+  } else if (triggerType === 'sentiment') {
+    triggerConfig = { sentiments: document.getElementById('ar-tc-sentiments').value.split(',').map(s => s.trim()).filter(Boolean) };
+  } else if (triggerType === 'message_count') {
+    triggerConfig = { min_count: parseInt(document.getElementById('ar-tc-mincount').value) || 5 };
+  } else if (triggerType === 'lead_data') {
+    triggerConfig = { required_fields: (document.getElementById('ar-tc-fields')?.value || 'email').split(',').map(s => s.trim()).filter(Boolean) };
+  }
+  const actionType = document.getElementById('ar-action-type').value;
+  let actionConfig = {};
+  if (actionType === 'move_stage') actionConfig = { target_stage: document.getElementById('ar-ac-stage').value };
+  else if (actionType === 'switch_agent') actionConfig = { target_agent_id: parseInt(document.getElementById('ar-ac-agent').value) };
+  else if (actionType === 'escalate_human') actionConfig = { urgencia: document.getElementById('ar-ac-urgencia').value };
+  else if (actionType === 'tag_prospect') actionConfig = { tag: document.getElementById('ar-ac-tag').value };
+
+  const payload = {
+    nombre: document.getElementById('ar-nombre').value,
+    descripcion: document.getElementById('ar-descripcion').value,
+    prioridad: parseInt(document.getElementById('ar-prioridad').value) || 100,
+    trigger_type: triggerType,
+    trigger_config: JSON.stringify(triggerConfig),
+    action_type: actionType,
+    action_config: JSON.stringify(actionConfig),
+    activo: document.getElementById('ar-activo').classList.contains('on'),
+  };
+  try {
+    if (id) await api('/api/auto-rules/' + id, { method: 'PUT', body: JSON.stringify(payload) });
+    else await api('/api/agents/' + _currentAgentId + '/auto-rules', { method: 'POST', body: JSON.stringify(payload) });
+    document.getElementById('autoRuleModal').classList.remove('open');
+    toast('success', 'Regla guardada', payload.nombre);
+    loadAutoRules(_currentAgentId);
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function deleteAutoRule(id) {
+  if (!confirm('¿Eliminar regla automatica?')) return;
+  try {
+    await api('/api/auto-rules/' + id, { method: 'DELETE' });
+    toast('success', 'Eliminada', '');
+    if (_currentAgentId) loadAutoRules(_currentAgentId);
   } catch (err) { toast('error', 'Error', err.message); }
 }
 </script>

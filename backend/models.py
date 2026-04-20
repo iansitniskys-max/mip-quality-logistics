@@ -696,3 +696,57 @@ class HumanHandoff(Base):
     notified_via = Column(String(50))  # whatsapp, email, none
     whatsapp_sent = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
+# ═══════════════════════════════════════════════════
+# STAGE ASSIGNMENTS - quien atiende cada etapa del embudo
+# ═══════════════════════════════════════════════════
+
+class StageAssignment(Base):
+    """Asigna un agente IA o humano a una etapa del embudo CRM.
+    Tipos de stage: del embudo de Prospects (nuevo/contactado/calificado/convertido)
+    o del ConversationPipeline (lead_inicial/calificando/cotizando/cerrando/etc).
+    """
+    __tablename__ = "stage_assignments"
+    id = Column(Integer, primary_key=True, index=True)
+    stage_type = Column(String(30), default="prospect")  # prospect | pipeline
+    stage_key = Column(String(50), nullable=False, index=True)  # nuevo, contactado, calificado, etc
+    # Puede ser un agente IA o un humano, solo uno
+    agent_id = Column(Integer, ForeignKey("agent_configs.id", ondelete="SET NULL"), nullable=True)
+    human_email = Column(String(200))  # email del admin/humano asignado
+    human_nombre = Column(String(200))
+    # Si hay fallback
+    fallback_to_human = Column(Boolean, default=False)  # si el agente no contesta o error
+    notify_on_entry = Column(Boolean, default=True)  # notificar al responsable cuando un prospect entra
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+# ═══════════════════════════════════════════════════
+# AGENT AUTO RULES - triggers que disparan acciones
+# ═══════════════════════════════════════════════════
+
+class AgentAutoRule(Base):
+    """Reglas que se evaluan en cada mensaje del usuario.
+    Si match, ejecuta la accion (mover de stage, cambiar agente, escalar).
+    """
+    __tablename__ = "agent_auto_rules"
+    id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(Integer, ForeignKey("agent_configs.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(200), nullable=False)
+    descripcion = Column(Text)
+    # Tipo de trigger
+    trigger_type = Column(String(50), nullable=False)  # keyword, intent, sentiment, message_count, lead_data
+    # Config del trigger (JSON)
+    trigger_config = Column(Text, default="{}")  # ej: {"keywords":["comprar","cotizar"], "match_any":true}
+    # Accion a ejecutar
+    action_type = Column(String(50), nullable=False)  # move_stage, switch_agent, escalate_human, tag_prospect
+    action_config = Column(Text, default="{}")  # ej: {"target_stage":"cerrando"} o {"target_agent_id":2}
+    prioridad = Column(Integer, default=100)  # lower = mayor prioridad
+    activo = Column(Boolean, default=True)
+    # Stats
+    total_triggered = Column(Integer, default=0)
+    last_triggered_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
