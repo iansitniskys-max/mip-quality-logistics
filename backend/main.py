@@ -2110,9 +2110,11 @@ def _seed_agent_builder(db):
             ))
     db.commit()
 
-    # Seed Mateo as first agent (solo si no existe)
+    # Seed Mateo as first agent (solo si no existe). Si ya existe, saltar Mateo pero seguir con los demas.
     existing_mateo = db.query(AgentConfig).filter(AgentConfig.agent_type == "mateo-sdr").first()
     if existing_mateo:
+        # Seed solo los adicionales si aun no estan
+        _seed_additional_agents(db)
         return
     # Carry over config from legacy MateoConfig if exists
     legacy = db.query(MateoConfig).order_by(MateoConfig.id).first()
