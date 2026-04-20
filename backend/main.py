@@ -2446,33 +2446,37 @@ def list_kb_docs(id: int, db: Session = Depends(get_db)):
 
 
 def _gemini_embed(text: str):
-    """Genera embedding via Gemini (768d)."""
+    """Genera embedding via Gemini REST API (768d)."""
     if not GEMINI_API_KEY or not text:
         return None
-    # Try multiple model names (API version differences)
-    candidates = ["text-embedding-004", "models/text-embedding-004", "embedding-001", "models/embedding-001"]
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        last_err = None
-        for model_name in candidates:
-            try:
-                result = genai.embed_content(
-                    model=model_name,
-                    content=text,
-                    task_type="retrieval_document",
-                )
-                emb = result.get("embedding") or result.get("embeddings")
-                if emb:
+    import requests as _req
+    # Try v1 first, fallback to v1beta
+    endpoints = [
+        f"https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={GEMINI_API_KEY}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key={GEMINI_API_KEY}",
+    ]
+    payload = {
+        "content": {"parts": [{"text": text[:20000]}]},
+        "taskType": "RETRIEVAL_DOCUMENT",
+    }
+    last_err = None
+    for url in endpoints:
+        try:
+            r = _req.post(url, json=payload, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                emb = data.get("embedding", {}).get("values") or data.get("embeddings", [{}])[0].get("values")
+                if emb and len(emb) > 0:
                     return emb
-            except Exception as e:
-                last_err = str(e)
-                continue
-        print(f"[embed] all models failed. last_err: {last_err}")
-        return None
-    except Exception as e:
-        print(f"[embed] error: {e}")
-        return None
+                last_err = f"empty embedding in response: {str(data)[:200]}"
+            else:
+                last_err = f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            last_err = str(e)[:200]
+            continue
+    print(f"[embed] all endpoints failed. last_err: {last_err}")
+    return None
 
 
 def _cosine_sim(a, b):
