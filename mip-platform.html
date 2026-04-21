@@ -1411,7 +1411,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" onclick="aView('a-agents')"><i class="fas fa-robot"></i> Agent Builder</a>
         <a class="sb-link" onclick="aView('a-config')"><i class="fas fa-cog"></i> Configuración</a>
         <a class="sb-link" onclick="aView('a-integrations')"><i class="fas fa-plug"></i> Integraciones</a>
-        <a class="sb-link" onclick="aView('a-costs')"><i class="fas fa-dollar-sign"></i> Costos $ <span class="cnt" id="costs-badge" style="display:none;background:var(--warning);color:#fff">!</span></a>
+        <a class="sb-link" onclick="aView('a-costs')"><i class="fas fa-dollar-sign"></i> Costos <span class="cnt" id="costs-badge" style="display:none;background:var(--warning);color:#fff">!</span></a>
         <a class="sb-link" onclick="aView('a-editor')"><i class="fas fa-paint-brush"></i> Editor Web</a>
         <a class="sb-link" onclick="aView('a-history')"><i class="fas fa-clock"></i> Historial</a>
         <a class="sb-link" onclick="aView('a-tickets')"><i class="fas fa-bug"></i> Tickets</a>
@@ -2372,7 +2372,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       </div>
     </div>
 
-    <!-- ADMIN: Costos $ -->
+    <!-- ADMIN: Costos -->
     <div class="page-body" id="a-costs" style="display:none">
       <div class="admin-header-flex">
         <div>
@@ -4414,7 +4414,9 @@ async function loadAdminClients() {
           const kam = c.kam_responsable || c.vendedor_asignado || '—';
           const ciudad = c.ciudad || '—';
           const activo = c.activo === 'false' ? '<span style="color:var(--danger);font-size:10px">●</span> Inactivo' : '<span style="color:var(--success);font-size:10px">●</span> Activo';
-          return `<tr><td>${c.id}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div style="font-weight:500">${c.nombre}</div></div></td><td>${c.empresa || '—'}</td><td style="color:var(--text-muted);font-size:11px">${c.rut || '—'}</td><td style="color:var(--text-muted)">${ciudad}</td><td style="color:var(--text-muted);font-size:12px">${kam}</td><td style="color:var(--text-muted)">${c.email}</td><td style="font-size:11px">${activo}</td><td><button class="btn btn-outline btn-sm" onclick='editClient(${JSON.stringify(c).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button></td></tr>`;
+          const canDelete = (c.role || '').toLowerCase() !== 'admin';
+          const deleteBtn = canDelete ? `<button class="btn btn-outline btn-sm" onclick="deleteClient(${c.id}, '${(c.nombre||'').replace(/'/g,"\\'")}')" style="color:var(--danger)" title="Eliminar"><i class="fas fa-trash"></i></button>` : '';
+          return `<tr><td>${c.id}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div style="font-weight:500">${c.nombre}</div></div></td><td>${c.empresa || '—'}</td><td style="color:var(--text-muted);font-size:11px">${c.rut || '—'}</td><td style="color:var(--text-muted)">${ciudad}</td><td style="color:var(--text-muted);font-size:12px">${kam}</td><td style="color:var(--text-muted)">${c.email}</td><td style="font-size:11px">${activo}</td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick='editClient(${JSON.stringify(c).replace(/'/g,"&#39;")})' title="Editar"><i class="fas fa-edit"></i></button>${deleteBtn}</td></tr>`;
         }).join('');
       } else {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted)"><i class="fas fa-users" style="font-size:24px;display:block;margin-bottom:8px"></i>Sin clientes registrados aún</td></tr>';
@@ -4455,6 +4457,31 @@ function editClient(c) {
   $('ec-referido').value = c.referido_por || '';
   $('ec-notas').value = c.notas || '';
   document.getElementById('editClientModal').classList.add('open');
+}
+
+async function deleteClient(id, nombre) {
+  // Primer intento: borrado soft. Si tiene cotizaciones, el backend devuelve 400 y preguntamos cascade.
+  const ok = confirm(`¿Eliminar al cliente "${nombre}"?\n\nSi tiene cotizaciones asociadas, te lo avisaré para confirmar el borrado en cascada.\n\nEsta acción no se puede deshacer.`);
+  if (!ok) return;
+  try {
+    await api('/api/clientes/' + id, { method: 'DELETE' });
+    toast('success', 'Cliente eliminado', nombre);
+    loadAdminClients();
+  } catch (err) {
+    const msg = err.message || '';
+    if (msg.includes('cotizacion')) {
+      const hard = confirm(`⚠️ ${msg}\n\n¿Confirmás el borrado en CASCADA? Esto eliminará TODAS sus cotizaciones, productos, archivos y pedidos.\n\nNO SE PUEDE DESHACER.`);
+      if (!hard) return;
+      try {
+        const res = await api('/api/clientes/' + id + '?hard=true', { method: 'DELETE' });
+        const cc = res.cascade || {};
+        toast('success', 'Cliente eliminado en cascada', `Borradas: ${cc.cotizaciones||0} cotizaciones, ${cc.productos||0} productos, ${cc.archivos||0} archivos`);
+        loadAdminClients();
+      } catch (err2) { toast('error', 'Error', err2.message); }
+    } else {
+      toast('error', 'Error', msg);
+    }
+  }
 }
 
 async function saveEditClient() {
@@ -4819,7 +4846,7 @@ async function submitFeedback(e) {
 }
 
 // ─── Admin Tickets ───
-// ─── Costos $ ───
+// ─── Costos ───
 async function loadCosts() {
   const days = parseInt(document.getElementById('cost-period')?.value || 30);
   try {

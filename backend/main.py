@@ -1301,6 +1301,63 @@ def update_cliente(id: int, data: ClienteUpdate, db: Session = Depends(get_db)):
     return c
 
 
+@app.delete("/api/clientes/{id}")
+def delete_cliente(id: int, hard: bool = False, db: Session = Depends(get_db)):
+    """Elimina un cliente.
+    - hard=false (default): solo se puede eliminar si no tiene cotizaciones/pedidos asociados.
+    - hard=true: elimina en cascada TODAS las cotizaciones, productos, archivos, actividades, facturas del cliente.
+    No se permite eliminar admin.
+    """
+    c = db.query(Cliente).get(id)
+    if not c:
+        raise HTTPException(404, "Cliente no encontrado")
+    if (c.role or "").lower() == "admin":
+        raise HTTPException(400, "No se puede eliminar un usuario admin")
+    cots = db.query(Cotizacion).filter(Cotizacion.cliente_id == id).all()
+    if cots and not hard:
+        raise HTTPException(400, f"El cliente tiene {len(cots)} cotizacion(es) asociadas. Usar ?hard=true para borrar todo en cascada.")
+    # Cascade delete
+    nombre_bk = c.nombre
+    deleted_counts = {"cotizaciones": 0, "productos": 0, "archivos": 0, "actividades": 0, "facturas": 0, "pedidos": 0}
+    if hard:
+        for cot in cots:
+            try:
+                for p in db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == cot.id).all():
+                    db.delete(p); deleted_counts["productos"] += 1
+            except Exception: pass
+            try:
+                for a in db.query(Archivo).filter(Archivo.cotizacion_id == cot.id).all():
+                    db.delete(a); deleted_counts["archivos"] += 1
+            except Exception: pass
+            try:
+                for act in db.query(Actividad).filter(Actividad.entidad_id == cot.id, Actividad.entidad_tipo == "cotizacion").all():
+                    db.delete(act); deleted_counts["actividades"] += 1
+            except Exception: pass
+            try:
+                for ped in db.query(Pedido).filter(Pedido.cotizacion_id == cot.id).all():
+                    db.delete(ped); deleted_counts["pedidos"] += 1
+            except Exception: pass
+            db.delete(cot); deleted_counts["cotizaciones"] += 1
+        # Actividades y archivos directos del cliente
+        try:
+            for act in db.query(Actividad).filter(Actividad.cliente_id == id).all():
+                db.delete(act); deleted_counts["actividades"] += 1
+        except Exception: pass
+        try:
+            for fa in db.query(Archivo).filter(Archivo.cliente_id == id).all():
+                db.delete(fa); deleted_counts["archivos"] += 1
+        except Exception: pass
+        try:
+            for f in db.query(Factura).filter(Factura.cliente_id == id).all():
+                db.delete(f); deleted_counts["facturas"] += 1
+        except Exception: pass
+        db.commit()
+    db.delete(c)
+    db.commit()
+    log_evento(db, "cliente", "eliminado", f"Cliente {nombre_bk} eliminado (hard={hard})", entidad_id=id)
+    return {"deleted": True, "cliente_id": id, "cascade": deleted_counts if hard else None}
+
+
 @app.post("/api/clientes/bulk")
 def bulk_import_clientes(clientes: list[ClienteCreate], db: Session = Depends(get_db)):
     created = 0
