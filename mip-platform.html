@@ -3536,7 +3536,13 @@ async function openDetail(cotId) {
       }
     } catch {}
     content.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><div style="width:40px;height:40px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--text-secondary)">${initials}</div><div><div style="font-weight:600">${cl.nombre}</div><div style="font-size:12px;color:var(--text-muted)">${cl.empresa||''} — ${cl.email}</div></div></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:40px;height:40px;border-radius:50%;background:var(--bg-surface);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:var(--text-secondary)">${initials}</div><div style="flex:1"><div style="font-weight:600">${cl.nombre}</div><div style="font-size:12px;color:var(--text-muted)">${cl.empresa||''} — ${cl.email}</div></div></div>
+      <div style="display:flex;gap:6px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditSolicitudModal(${c.id})" title="Editar datos"><i class="fas fa-edit"></i> Editar</button>
+        <button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id}, null)" title="Subir archivo"><i class="fas fa-upload"></i> Subir archivo</button>
+        <button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')" title="Invitar cliente"><i class="fas fa-envelope"></i> Invitar</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteSolicitud(${c.id}, ${c.cliente_id}, '${(cl.nombre||'').replace(/'/g,"&#39;")}', '${c.producto ? c.producto.replace(/'/g,"&#39;").substring(0,40) : ''}')" title="Eliminar solicitud" style="color:var(--danger);margin-left:auto"><i class="fas fa-trash"></i> Eliminar</button>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
         <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Producto</span><span style="font-weight:500;font-size:13px">${c.producto}</span></div>
         <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Cantidad</span><span style="font-weight:500;font-size:13px">${c.cantidad||'—'}</span></div>
@@ -3575,6 +3581,120 @@ async function openDetail(cotId) {
 }
 function closeDetail() { document.getElementById('dPanel').classList.remove('open'); document.getElementById('dOverlay').classList.remove('open'); }
 function sendQuote() { closeDetail(); toast('success', 'Cotización enviada', 'Email generado vía IA Copilot y enviado al cliente.'); }
+
+// ═══════════════════════════════════════════════════
+// EDITAR / ELIMINAR SOLICITUDES
+// ═══════════════════════════════════════════════════
+async function openEditSolicitudModal(cotId) {
+  try {
+    const c = await api('/api/cotizaciones/' + cotId);
+    let modal = document.getElementById('editSolicitudModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'editSolicitudModal';
+      modal.className = 'modal-bg';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:560px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0;font-size:15px"><i class="fas fa-edit" style="margin-right:6px;color:var(--info)"></i>Editar solicitud #SOL-${String(cotId).padStart(3,'0')}</h3>
+        <button onclick="document.getElementById('editSolicitudModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); saveEditSolicitud(${cotId});">
+        <div class="form-group"><label class="form-label">Producto *</label><input type="text" class="form-input" id="es-producto" value="${(c.producto||'').replace(/"/g,'&quot;')}" required></div>
+        <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="es-descripcion" style="min-height:70px;resize:vertical">${c.descripcion||''}</textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Cantidad</label><input type="text" class="form-input" id="es-cantidad" value="${(c.cantidad||'').replace(/"/g,'&quot;')}"></div>
+          <div class="form-group"><label class="form-label">Precio objetivo</label><input type="text" class="form-input" id="es-precio" value="${(c.precio_objetivo||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Plazo</label><input type="text" class="form-input" id="es-plazo" value="${(c.plazo||'').replace(/"/g,'&quot;')}"></div>
+          <div class="form-group"><label class="form-label">Estado</label>
+            <select class="form-input" id="es-estado">
+              <option value="pendiente" ${c.estado==='pendiente'?'selected':''}>Pendiente</option>
+              <option value="cotizado" ${c.estado==='cotizado'?'selected':''}>Cotizado</option>
+              <option value="produccion" ${c.estado==='produccion'?'selected':''}>En producción</option>
+              <option value="entregado" ${c.estado==='entregado'?'selected':''}>Entregado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Personalización</label><input type="text" class="form-input" id="es-personalizacion" value="${(c.personalizacion||'').replace(/"/g,'&quot;')}"></div>
+        <div class="form-group"><label class="form-label">Uso final</label><input type="text" class="form-input" id="es-uso-final" value="${(c.uso_final||'').replace(/"/g,'&quot;')}"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border);margin-top:10px">
+          <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('editSolicitudModal').classList.remove('open')">Cancelar</button>
+          <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Guardar cambios</button>
+        </div>
+      </form>
+    </div>`;
+    modal.classList.add('open');
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function saveEditSolicitud(cotId) {
+  const getVal = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  const data = {
+    producto: getVal('es-producto').trim(),
+    descripcion: getVal('es-descripcion'),
+    cantidad: getVal('es-cantidad'),
+    precio_objetivo: getVal('es-precio'),
+    plazo: getVal('es-plazo'),
+    estado: getVal('es-estado'),
+    personalizacion: getVal('es-personalizacion'),
+    uso_final: getVal('es-uso-final'),
+  };
+  if (!data.producto) { toast('error', 'Error', 'El producto es requerido'); return; }
+  try {
+    await api('/api/cotizaciones/' + cotId, { method: 'PUT', body: JSON.stringify(data) });
+    document.getElementById('editSolicitudModal').classList.remove('open');
+    toast('success', 'Solicitud actualizada', data.producto);
+    // Reload detail panel + list
+    openDetail(cotId);
+    if (typeof loadAdminData === 'function') loadAdminData();
+  } catch (err) { toast('error', 'Error al actualizar', err.message); }
+}
+
+async function deleteSolicitud(cotId, clienteId, clienteNombre, producto) {
+  // Modal de confirmacion con opcion de eliminar cliente tambien
+  let modal = document.getElementById('deleteSolicitudModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'deleteSolicitudModal';
+    modal.className = 'modal-bg';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="modal-box" style="max-width:460px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <i class="fas fa-exclamation-triangle" style="color:var(--danger);font-size:22px"></i>
+      <h3 style="margin:0;font-size:15px">¿Eliminar solicitud?</h3>
+    </div>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Vas a eliminar <b>#SOL-${String(cotId).padStart(3,'0')}${producto ? ' — ' + producto : ''}</b> de <b>${clienteNombre || 'cliente'}</b>.<br><br>Esto elimina <b>permanentemente</b>:<br>• La solicitud/cotización<br>• Todos los productos asociados<br>• Pedidos derivados<br>• Archivos subidos<br>• Actividades / timeline<br>• Email logs asociados</p>
+    <div style="padding:10px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="del-also-cliente">
+        <span>También eliminar al cliente <b>${clienteNombre || ''}</b> si no tiene otras solicitudes</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:10px;border-top:1px solid var(--border)">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('deleteSolicitudModal').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-dark btn-sm" onclick="confirmDeleteSolicitud(${cotId})" style="background:var(--danger);border-color:var(--danger)"><i class="fas fa-trash"></i> Eliminar definitivamente</button>
+    </div>
+  </div>`;
+  modal.classList.add('open');
+}
+
+async function confirmDeleteSolicitud(cotId) {
+  const alsoCliente = document.getElementById('del-also-cliente')?.checked || false;
+  try {
+    const r = await api('/api/cotizaciones/' + cotId + (alsoCliente ? '?delete_cliente=true' : ''), { method: 'DELETE' });
+    document.getElementById('deleteSolicitudModal').classList.remove('open');
+    closeDetail();
+    let msg = 'Solicitud eliminada';
+    if (r.cliente_deleted) msg += ' + cliente';
+    else if (alsoCliente) msg += ' (cliente preservado porque tiene otras solicitudes)';
+    toast('success', 'Eliminada', msg);
+    if (typeof loadAdminData === 'function') loadAdminData();
+  } catch (err) { toast('error', 'Error al eliminar', err.message); }
+}
 function toggleSw(sid, did) { const s = document.getElementById(sid); const d = document.getElementById(did); s.classList.toggle('on'); d.style.display = s.classList.contains('on') ? 'block' : 'none'; }
 function openExpModal() {
   // Reset form

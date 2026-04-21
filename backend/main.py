@@ -660,6 +660,59 @@ def update_cotizacion(id: int, data: CotizacionUpdate, db: Session = Depends(get
     return c
 
 
+@app.delete("/api/cotizaciones/{id}")
+def delete_cotizacion(id: int, delete_cliente: bool = False, db: Session = Depends(get_db)):
+    """Elimina una cotizacion (y opcionalmente su cliente si este no tiene mas cotizaciones).
+    Tambien elimina en cascada: productos, actividades, archivos, pedidos asociados.
+    """
+    c = db.query(Cotizacion).get(id)
+    if not c:
+        raise HTTPException(404, "Cotización no encontrada")
+    cliente_id = c.cliente_id
+    # Delete related data
+    try:
+        # Productos de cotizacion
+        db.query(ProductoCotizacion).filter(ProductoCotizacion.cotizacion_id == id).delete()
+        # Actividades asociadas a esta cotizacion
+        db.query(Actividad).filter(Actividad.cotizacion_id == id).delete()
+        # Pedidos asociados (y sus archivos)
+        pedidos = db.query(Pedido).filter(Pedido.cotizacion_id == id).all()
+        for p in pedidos:
+            db.query(Archivo).filter(Archivo.pedido_id == p.id).delete()
+            db.query(Factura).filter(Factura.pedido_id == p.id).delete()
+            db.delete(p)
+        # Archivos directamente asociados a la cotizacion
+        db.query(Archivo).filter(Archivo.cotizacion_id == id).delete()
+        # Cotizaciones formales (PDF)
+        db.query(CotizacionFormal).filter(CotizacionFormal.cotizacion_id == id).delete()
+        # Email logs
+        db.query(EmailLog).filter(EmailLog.cotizacion_id == id).delete()
+        # Finally the cotizacion
+        db.delete(c)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Error eliminando cotización: {str(e)[:200]}")
+
+    cliente_deleted = False
+    if delete_cliente and cliente_id:
+        # Solo eliminar cliente si no tiene otras cotizaciones
+        remaining = db.query(Cotizacion).filter(Cotizacion.cliente_id == cliente_id).count()
+        if remaining == 0:
+            cl = db.query(Cliente).get(cliente_id)
+            if cl:
+                try:
+                    # Clean up actividades del cliente
+                    db.query(Actividad).filter(Actividad.cliente_id == cliente_id).delete()
+                    db.delete(cl)
+                    db.commit()
+                    cliente_deleted = True
+                except Exception as e:
+                    db.rollback()
+
+    return {"deleted": True, "cotizacion_id": id, "cliente_id": cliente_id, "cliente_deleted": cliente_deleted}
+
+
 # ─── Productos de Cotización ───
 @app.post("/api/cotizaciones/{cot_id}/productos")
 def add_productos(cot_id: int, data: dict, db: Session = Depends(get_db)):
