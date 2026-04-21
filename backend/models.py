@@ -35,7 +35,9 @@ class Cotizacion(Base):
     __tablename__ = "cotizaciones"
     id = Column(Integer, primary_key=True, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
-    producto = Column(String(300), nullable=False)
+    proyecto_nombre = Column(String(300))  # nombre del proyecto global (ej "Bichos-Emonk")
+    proyecto_descripcion = Column(Text)  # descripcion del proyecto
+    producto = Column(String(300), nullable=False)  # legacy: resumen de productos
     descripcion = Column(Text)
     cantidad = Column(String(100))
     precio_objetivo = Column(String(100))

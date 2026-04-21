@@ -52,22 +52,33 @@ class CotizacionCreate(BaseModel):
     plazo: str = ""
     uso_final: str = ""
     personalizacion: str = ""
+    proyecto_nombre: Optional[str] = ""
+    proyecto_descripcion: Optional[str] = ""
 
 class CotizacionUpdate(BaseModel):
     estado: Optional[str] = None
     producto: Optional[str] = None
     descripcion: Optional[str] = None
+    cantidad: Optional[str] = None
+    precio_objetivo: Optional[str] = None
+    plazo: Optional[str] = None
+    uso_final: Optional[str] = None
+    personalizacion: Optional[str] = None
+    proyecto_nombre: Optional[str] = None
+    proyecto_descripcion: Optional[str] = None
 
 class CotizacionOut(BaseModel):
     id: int
     cliente_id: int
     producto: str
-    descripcion: str
-    cantidad: str
-    precio_objetivo: str
-    plazo: str
-    uso_final: str
-    personalizacion: str
+    descripcion: Optional[str] = ""
+    cantidad: Optional[str] = ""
+    precio_objetivo: Optional[str] = ""
+    plazo: Optional[str] = ""
+    uso_final: Optional[str] = ""
+    personalizacion: Optional[str] = ""
+    proyecto_nombre: Optional[str] = ""
+    proyecto_descripcion: Optional[str] = ""
     estado: str
     created_at: datetime
     updated_at: datetime

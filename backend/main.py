@@ -113,6 +113,17 @@ def on_startup():
                     print(f"Added column conversation_pipelines.{col}")
                 except Exception:
                     conn.rollback()
+            # Migrate cotizaciones: agregar proyecto_nombre y proyecto_descripcion
+            for col, col_type in [
+                ("proyecto_nombre", "VARCHAR(300)"),
+                ("proyecto_descripcion", "TEXT"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE cotizaciones ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column cotizaciones.{col}")
+                except Exception:
+                    conn.rollback()
         # Seed Agent Builder defaults (tools + Mateo como primer agente)
         try:
             from sqlalchemy.orm import Session as _Sess
@@ -433,7 +444,7 @@ def admin_create_project(data: dict, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(cliente)
 
-    # Create cotizacion
+    # Create cotizacion con proyecto_nombre/descripcion si viene
     cot = Cotizacion(
         cliente_id=cliente.id,
         producto=data.get("producto", ""),
@@ -444,6 +455,8 @@ def admin_create_project(data: dict, db: Session = Depends(get_db)):
         uso_final=data.get("uso_final", ""),
         personalizacion=data.get("personalizacion", ""),
         estado=data.get("estado", "pendiente"),
+        proyecto_nombre=data.get("proyecto_nombre", "") or None,
+        proyecto_descripcion=data.get("proyecto_descripcion", "") or None,
     )
     db.add(cot)
     db.commit()
@@ -737,10 +750,17 @@ def add_productos(cot_id: int, data: dict, db: Session = Depends(get_db)):
         db.add(prod)
         db.flush()
         created.append({"id": prod.id, "nombre": prod.nombre})
-    # Update cotizacion producto field with summary
+    # Update cotizacion resumen:
+    # Si hay proyecto_nombre, ese es el display principal (NO concatenamos productos).
+    # Si NO hay proyecto_nombre, usamos la concatenacion como fallback.
     names = [p.get("nombre", "") for p in productos if p.get("nombre")]
-    if names:
+    if cot.proyecto_nombre:
+        # Mantener producto como esta (ya fue seteado al crear) o usar proyecto_nombre
+        if not cot.producto or len(cot.producto) < 3:
+            cot.producto = cot.proyecto_nombre
+    elif names:
         cot.producto = " + ".join(names[:5]) + (f" (+{len(names)-5} más)" if len(names) > 5 else "")
+    if names:
         cot.cantidad = f"{len(productos)} productos"
     db.commit()
     return {"cotizacion_id": cot_id, "productos_creados": len(created), "productos": created}
@@ -3985,22 +4005,35 @@ def _detect_intent(message: str, history: list = None) -> dict:
     }
 
 
+def _has_contact_data(visitor: dict) -> bool:
+    """True si el visitor dio algun dato de contacto real (nombre, email o telefono)."""
+    v = visitor or {}
+    nombre = (v.get("nombre") or "").strip()
+    email = (v.get("email") or "").strip()
+    telefono = (v.get("telefono") or "").strip()
+    # Ignorar nombres placeholder tipo "Anonimo"
+    nombre_real = nombre and not nombre.lower().startswith(("anonimo", "anónimo", "visitante"))
+    return bool(nombre_real or email or telefono)
+
+
 def _get_or_create_pipeline(session_id: str, agent_id: int, visitor: dict, db) -> ConversationPipeline:
-    """Obtiene o crea un pipeline + Prospect asociado para la sesion.
-    TODOS los chats crean prospect automaticamente (anonimo si hace falta).
+    """Obtiene o crea un pipeline para la sesion.
+    El Prospect se crea SOLO si el visitor dio datos de contacto (nombre, email o telefono).
+    Si ya existe pipeline sin prospect y ahora llegan datos, se crea el prospect.
     """
     p = db.query(ConversationPipeline).filter(ConversationPipeline.session_id == session_id).first()
     v = visitor or {}
+    has_contact = _has_contact_data(v)
     if p:
-        # Si el pipeline existe pero aun no tiene prospect asociado, crearlo
-        if not p.prospect_id:
+        # Crear Prospect ahora solo si llegaron datos de contacto
+        if not p.prospect_id and has_contact:
             p.prospect_id = _ensure_prospect_from_pipeline(p, session_id, v, agent_id, db)
             db.commit()
-        # Si hay datos de visitor nuevos (ej: email despues), actualizar Prospect
+        # Si ya hay prospect y hay datos nuevos, actualizar
         if p.prospect_id:
             _update_prospect_from_pipeline(p, v, db)
         return p
-    # Crear pipeline nuevo
+    # Crear pipeline nuevo (sin prospect si no hay datos)
     p = ConversationPipeline(
         session_id=session_id,
         current_stage="lead_inicial",
@@ -4013,9 +4046,10 @@ def _get_or_create_pipeline(session_id: str, agent_id: int, visitor: dict, db) -
     db.add(p)
     db.commit()
     db.refresh(p)
-    # Auto-create Prospect asociado
-    p.prospect_id = _ensure_prospect_from_pipeline(p, session_id, v, agent_id, db)
-    db.commit()
+    # Crear Prospect solo si hay datos de contacto
+    if has_contact:
+        p.prospect_id = _ensure_prospect_from_pipeline(p, session_id, v, agent_id, db)
+        db.commit()
     return p
 
 
@@ -4222,12 +4256,25 @@ def list_pipeline_stages():
 
 
 @app.get("/api/pipeline/conversations")
-def list_pipeline_conversations(stage: Optional[str] = None, db: Session = Depends(get_db)):
-    """Lista todas las conversaciones con su stage y datos del cliente. Para Kanban."""
+def list_pipeline_conversations(stage: Optional[str] = None, include_anonymous: bool = False, db: Session = Depends(get_db)):
+    """Lista conversaciones con su stage para Kanban.
+    Por default SOLO incluye conversaciones con datos de contacto (nombre/email/telefono)
+    o con prospect_id asociado. Usar ?include_anonymous=true para ver todas.
+    """
     q = db.query(ConversationPipeline)
     if stage:
         q = q.filter(ConversationPipeline.current_stage == stage)
     rows = q.order_by(ConversationPipeline.updated_at.desc()).all()
+    if not include_anonymous:
+        def _tiene_contacto(p):
+            if p.prospect_id:
+                return True
+            nombre = (p.visitor_nombre or "").strip()
+            email = (p.visitor_email or "").strip()
+            tel = (p.visitor_telefono or "").strip()
+            nombre_real = nombre and not nombre.lower().startswith(("anonimo", "anónimo", "visitante"))
+            return bool(nombre_real or email or tel)
+        rows = [p for p in rows if _tiene_contacto(p)]
     return [{
         "id": p.id,
         "session_id": p.session_id,

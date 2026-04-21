@@ -1520,8 +1520,8 @@ html,body{overflow-x:hidden;max-width:100vw}
             <div class="form-group"><label class="form-label">Condiciones</label><input type="text" class="form-input" id="np-condiciones" placeholder="50/50, FOB, etc."></div>
           </div>
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-file-alt" style="margin-right:4px"></i> DOCUMENTOS (opcional)</div>
-          <div class="form-group"><label class="form-label">Cotización enviada al cliente</label><input type="file" class="form-input" id="np-doc-cotizacion" accept=".pdf,.doc,.docx,.xlsx" style="padding:8px"></div>
-          <div class="form-group"><label class="form-label">Otros documentos del proyecto</label><input type="file" class="form-input" id="np-doc-otros" accept=".pdf,.doc,.docx,.xlsx,.jpg,.png" multiple style="padding:8px"></div>
+          <div class="form-group"><label class="form-label">Cotización enviada al cliente <span style="font-weight:400;color:var(--text-muted)">(puedes subir varios)</span></label><input type="file" class="form-input" id="np-doc-cotizacion" accept=".pdf,.doc,.docx,.xlsx" multiple style="padding:8px"><div style="font-size:10px;color:var(--text-muted);margin-top:3px">Mantén Ctrl/Cmd o Shift para seleccionar múltiples archivos.</div></div>
+          <div class="form-group"><label class="form-label">Otros documentos del proyecto <span style="font-weight:400;color:var(--text-muted)">(puedes subir varios)</span></label><input type="file" class="form-input" id="np-doc-otros" accept=".pdf,.doc,.docx,.xlsx,.jpg,.png,.webp" multiple style="padding:8px"></div>
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin:16px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)"><i class="fas fa-envelope" style="margin-right:4px"></i> INVITAR CLIENTE</div>
           <div class="switch-wrap" style="margin-bottom:8px"><div class="switch" id="sw-invitar-cliente" onclick="this.classList.toggle('on')"></div><span style="font-size:13px;color:var(--text-secondary)">Enviar invitación por email al crear</span></div>
           <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px">El cliente recibirá un email para registrarse. Solo necesitará crear su contraseña y verá toda la información del proyecto ya cargada.</p>
@@ -3250,8 +3250,10 @@ async function loadAdminData() {
           const cl = clientes[c.cliente_id] || { nombre: 'N/A', empresa: '', email: '' };
           const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
           const date = new Date(c.created_at).toLocaleDateString('es-CL', { day:'2-digit', month:'short' });
+          // Mostrar proyecto_nombre si existe, sino fallback al producto legacy
+          const displayName = c.proyecto_nombre && c.proyecto_nombre.trim() ? c.proyecto_nombre : c.producto;
           return `<div class="kanban-card" data-cot-id="${c.id}" onclick="openDetail(${c.id})">
-            <div class="kc-product">${c.producto}</div>
+            <div class="kc-product" title="${(displayName||'').replace(/"/g,'&quot;')}">${displayName}</div>
             <div class="kc-client"><span class="kc-av">${initials}</span>${cl.nombre}</div>
             <div class="kc-meta"><span class="kc-amount">${c.cantidad || '—'}</span><span class="kc-date">${date}</span></div>
             <div class="kc-actions">
@@ -3273,7 +3275,8 @@ async function loadAdminData() {
         const cl = clientes[c.cliente_id] || { nombre: 'N/A', empresa: '', email: '' };
         const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
         const date = new Date(c.created_at).toLocaleDateString('es-CL', { day:'2-digit', month:'short' });
-        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')"><i class="fas fa-envelope"></i></button><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail(${c.id})"><i class="fas fa-eye"></i></button></td></tr>`;
+        const displayName = c.proyecto_nombre && c.proyecto_nombre.trim() ? c.proyecto_nombre : c.producto;
+        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td><div class="client-cell"><div class="c-av">${initials}</div><div><div style="font-weight:500">${cl.nombre}</div><div style="font-size:11px;color:var(--text-muted)">${cl.empresa}</div></div></div></td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(displayName||'').replace(/"/g,'&quot;')}">${displayName}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado]}">${labels[c.estado]}</span></td><td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')"><i class="fas fa-envelope"></i></button><button class="btn btn-outline btn-sm" onclick="openAdminUploadModal(${c.id},null)"><i class="fas fa-upload"></i></button><button class="btn btn-outline btn-sm" onclick="openDetail(${c.id})"><i class="fas fa-eye"></i></button></td></tr>`;
       }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px"><i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px"></i>No hay solicitudes</td></tr>';
     }
     // Initialize drag & drop on kanban after render
@@ -3510,7 +3513,8 @@ async function openDetail(cotId) {
     const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
     const badges = { pendiente:'badge-warning', cotizado:'badge-info', produccion:'badge-success', entregado:'badge-neutral' };
     const labels = { pendiente:'Pendiente', cotizado:'Cotizado', produccion:'Producción', entregado:'Entregado' };
-    title.textContent = `#SOL-${String(c.id).padStart(3,'0')} — ${c.producto}`;
+    const displayName = c.proyecto_nombre && c.proyecto_nombre.trim() ? c.proyecto_nombre : c.producto;
+    title.textContent = `#SOL-${String(c.id).padStart(3,'0')} — ${displayName}`;
     badge.className = `badge ${badges[c.estado]||'badge-neutral'}`;
     badge.innerHTML = `${labels[c.estado]||c.estado}`;
     // Load products for this cotizacion
@@ -3601,6 +3605,9 @@ async function openEditSolicitudModal(cotId) {
         <button onclick="document.getElementById('editSolicitudModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
       </div>
       <form onsubmit="event.preventDefault(); saveEditSolicitud(${cotId});">
+        <div class="form-group"><label class="form-label">Nombre del proyecto <span style="font-weight:400;color:var(--text-muted)">(se muestra en el pipeline y tablas)</span></label><input type="text" class="form-input" id="es-proyecto-nombre" value="${(c.proyecto_nombre||'').replace(/"/g,'&quot;')}" placeholder="Ej: Bichos-Emonk, Campaña Retail Q4"></div>
+        <div class="form-group"><label class="form-label">Descripción del proyecto</label><textarea class="form-input" id="es-proyecto-desc" style="min-height:60px;resize:vertical" placeholder="Contexto general del proyecto">${c.proyecto_descripcion||''}</textarea></div>
+        <div style="padding-top:10px;border-top:1px solid var(--border);margin-top:4px;margin-bottom:12px;font-size:11px;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase">Producto principal / legacy</div>
         <div class="form-group"><label class="form-label">Producto *</label><input type="text" class="form-input" id="es-producto" value="${(c.producto||'').replace(/"/g,'&quot;')}" required></div>
         <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="es-descripcion" style="min-height:70px;resize:vertical">${c.descripcion||''}</textarea></div>
         <div class="form-row">
@@ -3633,6 +3640,8 @@ async function openEditSolicitudModal(cotId) {
 async function saveEditSolicitud(cotId) {
   const getVal = id => { const e = document.getElementById(id); return e ? e.value : ''; };
   const data = {
+    proyecto_nombre: getVal('es-proyecto-nombre').trim(),
+    proyecto_descripcion: getVal('es-proyecto-desc'),
     producto: getVal('es-producto').trim(),
     descripcion: getVal('es-descripcion'),
     cantidad: getVal('es-cantidad'),
@@ -3929,9 +3938,9 @@ function addProductRow() {
       <div class="form-group"><label class="form-label">Precio objetivo (FOB USD)</label><input type="text" class="form-input np-p-precio" placeholder="$1.20 USD/un"></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Archivo de referencia <span style="color:var(--text-muted);font-weight:400">(foto, spec sheet, link pinterest, etc)</span></label>
-      <input type="file" class="form-input np-p-archivo" accept=".pdf,.doc,.docx,.xlsx,.jpg,.jpeg,.png,.webp,.zip" style="padding:8px">
-      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Formatos: PDF, Word, Excel, imágenes, ZIP. Max 10MB.</div>
+      <label class="form-label">Archivos de referencia <span style="color:var(--text-muted);font-weight:400">(puedes subir varios: fotos, spec sheets, PDFs)</span></label>
+      <input type="file" class="form-input np-p-archivo" accept=".pdf,.doc,.docx,.xlsx,.jpg,.jpeg,.png,.webp,.zip" multiple style="padding:8px">
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">Formatos: PDF, Word, Excel, imágenes, ZIP. Max 10MB por archivo. Ctrl/Cmd+click para seleccionar varios.</div>
     </div>
   `;
   list.appendChild(row);
@@ -3975,12 +3984,13 @@ async function submitNewProject(e) {
     const desc = r.querySelector('.np-p-desc').value.trim();
     const cantidad = r.querySelector('.np-p-cantidad').value.trim();
     const precio = r.querySelector('.np-p-precio').value.trim();
-    const archivo = r.querySelector('.np-p-archivo').files[0] || null;
+    // Soportar multiples archivos de referencia por producto
+    const archivos = Array.from(r.querySelector('.np-p-archivo').files || []);
     if (!categoria || !nombreP || !desc || !cantidad) {
       toast('error', 'Error', 'Completa los campos requeridos de cada producto (categoria, nombre, descripcion, cantidad)');
       return;
     }
-    productos.push({ categoria, nombre: nombreP, descripcion: desc, cantidad, precio_objetivo: precio, archivo });
+    productos.push({ categoria, nombre: nombreP, descripcion: desc, cantidad, precio_objetivo: precio, archivos });
   }
   if (!productos.length) { toast('error', 'Error', 'Agrega al menos un producto'); return; }
 
@@ -4024,28 +4034,36 @@ async function submitNewProject(e) {
       } catch (e) { console.warn('productos extra fail:', e); }
     }
 
-    // Subir archivos de referencia de cada producto
+    // Subir archivos de referencia de cada producto (puede ser varios por producto)
     for (let i = 0; i < productos.length; i++) {
-      const file = productos[i].archivo;
-      if (!file) continue;
-      const fd = new FormData(); fd.append('file', file);
+      const files = productos[i].archivos || [];
       const cat = productos[i].categoria || 'referencia_producto';
-      try {
-        await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=referencia_${cat}&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
-      } catch (e) { console.warn('upload ref fail:', e); }
+      for (const file of files) {
+        const fd = new FormData(); fd.append('file', file);
+        try {
+          await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=referencia_${cat}&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+        } catch (e) { console.warn('upload ref fail:', e); }
+      }
     }
 
-    // Subir docs de proyecto
-    const cotDoc = document.getElementById('np-doc-cotizacion')?.files[0];
-    if (cotDoc) {
-      const fd = new FormData(); fd.append('file', cotDoc);
-      await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=cotizacion_formal&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+    // Subir cotizaciones al cliente (ahora multiples)
+    const cotDocs = document.getElementById('np-doc-cotizacion')?.files;
+    if (cotDocs?.length) {
+      for (const f of cotDocs) {
+        const fd = new FormData(); fd.append('file', f);
+        try {
+          await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=cotizacion_formal&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+        } catch (e) { console.warn('upload cot fail:', e); }
+      }
     }
+    // Otros documentos del proyecto
     const otrosDocs = document.getElementById('np-doc-otros')?.files;
     if (otrosDocs?.length) {
       for (const f of otrosDocs) {
         const fd = new FormData(); fd.append('file', f);
-        await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=otro&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+        try {
+          await fetch(`${API}/api/admin/upload?cotizacion_id=${cotId}&categoria=otro&subido_por_email=${encodeURIComponent(currentUser?.email||'admin')}`, { method:'POST', body:fd });
+        } catch (e) { console.warn('upload other fail:', e); }
       }
     }
     // Invite client if switch is on
@@ -4884,7 +4902,10 @@ async function loadProyectos() {
     // Populate cotizaciones select
     const sel = document.getElementById('proy-cotizacion');
     if (sel && cots.length) {
-      sel.innerHTML = '<option value="">Ninguna</option>' + cots.map(c => `<option value="${c.id}">#SOL-${String(c.id).padStart(3,'0')} - ${c.producto}</option>`).join('');
+      sel.innerHTML = '<option value="">Ninguna</option>' + cots.map(c => {
+        const nm = (c.proyecto_nombre && c.proyecto_nombre.trim()) ? c.proyecto_nombre : c.producto;
+        return `<option value="${c.id}">#SOL-${String(c.id).padStart(3,'0')} - ${(nm || '').substring(0,60)}</option>`;
+      }).join('');
     }
   } catch (err) { console.error('Proyectos error:', err); }
 }
