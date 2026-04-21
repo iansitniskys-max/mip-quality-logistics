@@ -124,6 +124,34 @@ def on_startup():
                     print(f"Added column cotizaciones.{col}")
                 except Exception:
                     conn.rollback()
+            # Migrate agent_blocks: agregar columna functions JSON (per-block function calling)
+            for col, col_type in [
+                ("functions", "TEXT DEFAULT '[]'"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE agent_blocks ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column agent_blocks.{col}")
+                except Exception:
+                    conn.rollback()
+            # Crear tabla cost_limits (spending caps por proveedor) si no existe
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS cost_limits (
+                        id SERIAL PRIMARY KEY,
+                        provider VARCHAR(50) UNIQUE NOT NULL,
+                        monthly_limit_usd FLOAT DEFAULT 0.0,
+                        alert_pct INTEGER DEFAULT 80,
+                        hard_block BOOLEAN DEFAULT FALSE,
+                        billing_account VARCHAR(200),
+                        billing_card_last4 VARCHAR(10),
+                        notas TEXT,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.commit()
+            except Exception:
+                conn.rollback()
         # Seed Agent Builder defaults (tools + Mateo como primer agente)
         try:
             from sqlalchemy.orm import Session as _Sess
@@ -2580,12 +2608,36 @@ def _compose_agent_prompt(agent: "AgentConfig", db, extra_context: str = "") -> 
                     parts.append(line)
         except Exception:
             pass
+        # Render functions asociadas a este bloque (function-calling automatico)
+        try:
+            block_fns = json.loads(getattr(b, "functions", None) or "[]")
+            if block_fns:
+                parts.append("\n\n**FUNCIONES DE ESTE BLOQUE** (llamalas cuando corresponda):")
+                for fn in block_fns:
+                    fn_name = fn.get("name", "")
+                    fn_label = fn.get("label", fn_name)
+                    fn_when = fn.get("when", "")
+                    line = f"\n- `{fn_name}` — {fn_label}"
+                    if fn_when:
+                        line += f" · Cuando: {fn_when}"
+                    parts.append(line)
+        except Exception:
+            pass
 
-    # Append allowed tools hint
+    # Append allowed tools hint — combina tools_allowed + todas las functions de los bloques
     try:
         allowed = json.loads(agent.tools_allowed or "[]")
     except Exception:
         allowed = []
+    # Merge: agregar functions declaradas en cada bloque
+    for b in blocks:
+        try:
+            for fn in json.loads(getattr(b, "functions", None) or "[]"):
+                fname = fn.get("name")
+                if fname and fname not in allowed:
+                    allowed.append(fname)
+        except Exception:
+            pass
     if allowed:
         tool_rows = db.query(Tool).filter(Tool.name.in_(allowed), Tool.activo == True).all()
         if tool_rows:
@@ -2709,6 +2761,7 @@ def create_block(agent_id: int, data: dict, db: Session = Depends(get_db)):
         orden=data.get("orden", 0),
         activo=data.get("activo", True),
         sub_steps=data.get("sub_steps", "[]"),
+        functions=data.get("functions", "[]"),
         es_reusable=data.get("es_reusable", False),
         block_key=data.get("block_key"),
     )
@@ -2779,6 +2832,42 @@ def create_tool(data: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(t)
     return {"id": t.id, "name": t.name}
+
+
+# ─── Catalogo de funciones disponibles para asociar a bloques ───
+AGENT_FUNCTION_CATALOG = [
+    # Pipeline & CRM
+    {"name": "create_prospect", "label": "Registrar prospect", "icon": "user-plus", "categoria": "crm",
+     "description": "Guarda el cliente en el CRM con nombre/email/telefono."},
+    {"name": "move_pipeline_stage", "label": "Cambiar etapa en pipeline", "icon": "exchange-alt", "categoria": "crm",
+     "description": "Mueve la conversacion a otra etapa (calificando, cotizando, cerrando, etc)."},
+    {"name": "tag_prospect", "label": "Etiquetar prospect", "icon": "tag", "categoria": "crm",
+     "description": "Agrega una etiqueta o nota al prospect (ej: 'interesado en SKU X')."},
+    # Calendar
+    {"name": "check_calendar_availability", "label": "Consultar disponibilidad calendario", "icon": "calendar-check", "categoria": "calendar",
+     "description": "Chequea slots libres en el calendario del equipo."},
+    {"name": "calendar_create_event", "label": "Agendar reunion", "icon": "calendar-plus", "categoria": "calendar",
+     "description": "Crea un evento en Google Calendar con invitacion al cliente."},
+    # Data
+    {"name": "search_kb", "label": "Buscar en base de conocimiento", "icon": "search", "categoria": "data",
+     "description": "Busca info en la KB (precios, plazos, politicas)."},
+    # Handoff
+    {"name": "escalate_to_human", "label": "Derivar a humano", "icon": "user-friends", "categoria": "handoff",
+     "description": "Crea un handoff para que un humano tome la conversacion."},
+    {"name": "switch_agent", "label": "Cambiar de agente", "icon": "random", "categoria": "handoff",
+     "description": "Pasa la conversacion a otro agente IA (ej: Mateo -> Carla)."},
+    # Email
+    {"name": "send_templated_email", "label": "Enviar email con template", "icon": "envelope", "categoria": "email",
+     "description": "Dispara un envio de email usando un template predefinido."},
+    {"name": "trigger_email_sequence", "label": "Activar secuencia de emails", "icon": "paper-plane", "categoria": "email",
+     "description": "Inicia una secuencia automatizada de follow-up."},
+]
+
+
+@app.get("/api/agent-functions/catalog")
+def list_function_catalog():
+    """Devuelve el catalogo de funciones asignables a bloques del Agent Builder."""
+    return AGENT_FUNCTION_CATALOG
 
 
 # ─── Endpoints: Knowledge Base ───
@@ -3115,11 +3204,29 @@ def _clean_schema_for_gemini(schema):
 
 
 def _build_gemini_tools(agent, db):
-    """Construye la lista de FunctionDeclaration para Gemini."""
+    """Construye la lista de FunctionDeclaration para Gemini.
+    Incluye tools_allowed del agente + todas las functions declaradas en sus bloques activos.
+    """
     try:
         allowed = json.loads(agent.tools_allowed or "[]")
     except Exception:
         allowed = []
+    # Agregar functions de los bloques activos
+    try:
+        active_blocks = db.query(AgentBlock).filter(
+            AgentBlock.agent_id == agent.id,
+            AgentBlock.activo == True,
+        ).all()
+        for b in active_blocks:
+            try:
+                for fn in json.loads(getattr(b, "functions", None) or "[]"):
+                    fname = fn.get("name")
+                    if fname and fname not in allowed:
+                        allowed.append(fname)
+            except Exception:
+                continue
+    except Exception:
+        pass
     if not allowed:
         return None
     rows = db.query(Tool).filter(Tool.name.in_(allowed), Tool.activo == True).all()
@@ -5560,6 +5667,156 @@ def import_clientes_excel(data: dict, db: Session = Depends(get_db)):
 
 
 # ═══ FASE 2: DASHBOARD KPIS ═══
+# ─── Costos $ ───
+# Pricing por 1M tokens (USD) segun tarifas publicas al 2026-04
+LLM_PRICING = {
+    "gemini": {"input_per_1m": 0.075, "output_per_1m": 0.30, "label": "Gemini 2.5 Flash"},
+    "claude": {"input_per_1m": 3.00, "output_per_1m": 15.00, "label": "Claude Sonnet 4.5"},
+    "openai": {"input_per_1m": 2.50, "output_per_1m": 10.00, "label": "OpenAI GPT-4o"},
+    "embeddings": {"input_per_1m": 0.025, "output_per_1m": 0.0, "label": "Gemini Embeddings"},
+}
+
+
+def _estimate_cost(provider: str, tokens_in: int, tokens_out: int) -> float:
+    p = LLM_PRICING.get((provider or "").lower()) or LLM_PRICING["gemini"]
+    return (tokens_in or 0) / 1_000_000.0 * p["input_per_1m"] + (tokens_out or 0) / 1_000_000.0 * p["output_per_1m"]
+
+
+@app.get("/api/admin/costs/summary")
+def costs_summary(days: int = 30, db: Session = Depends(get_db)):
+    """Resumen de costos en los ultimos N dias.
+    Agrega AgentTrace (agentes + copiloto) + MateoConversation (chats).
+    Calcula costos aun si cost_usd=0 en trace usando pricing publico.
+    """
+    from datetime import timedelta as _td
+    cutoff = datetime.now() - _td(days=days)
+    # Traces
+    traces = db.query(AgentTrace).filter(AgentTrace.created_at >= cutoff).all()
+    by_provider = {}
+    by_day = {}
+    for t in traces:
+        prov = (t.provider or "gemini").lower()
+        prov_key = "gemini" if "gemini" in prov else "claude" if "claude" in prov else "openai" if "openai" in prov or "gpt" in prov else prov
+        bp = by_provider.setdefault(prov_key, {"tokens_in": 0, "tokens_out": 0, "calls": 0, "cost_usd": 0.0})
+        bp["tokens_in"] += t.prompt_tokens or 0
+        bp["tokens_out"] += t.output_tokens or 0
+        bp["calls"] += 1
+        cost = t.cost_usd or _estimate_cost(prov_key, t.prompt_tokens or 0, t.output_tokens or 0)
+        bp["cost_usd"] += cost
+        day_key = (t.created_at or datetime.now()).strftime("%Y-%m-%d")
+        bd = by_day.setdefault(day_key, {"cost_usd": 0.0, "calls": 0, "tokens": 0})
+        bd["cost_usd"] += cost
+        bd["calls"] += 1
+        bd["tokens"] += (t.prompt_tokens or 0) + (t.output_tokens or 0)
+    # Mateo conversations (chat widget)
+    mateo_convs = db.query(MateoConversation).filter(MateoConversation.inicio_at >= cutoff).all()
+    mateo_tokens_in = sum(m.tokens_input or 0 for m in mateo_convs)
+    mateo_tokens_out = sum(m.tokens_output or 0 for m in mateo_convs)
+    mateo_cost = _estimate_cost("gemini", mateo_tokens_in, mateo_tokens_out)
+    # Feature breakdown (aproximado por agente / tipo)
+    by_feature = {"mateo_chat": mateo_cost, "copilot": 0.0, "agents": 0.0, "pdf_parser": 0.0, "embeddings": 0.0}
+    for t in traces:
+        feat = "agents"
+        sess = (t.session_id or "").lower()
+        if "copilot" in sess or "copilot" in (t.input_summary or "").lower():
+            feat = "copilot"
+        elif "pdf" in sess or "pdf" in (t.input_summary or "").lower():
+            feat = "pdf_parser"
+        elif "embed" in (t.provider or "").lower():
+            feat = "embeddings"
+        by_feature[feat] = by_feature.get(feat, 0.0) + (t.cost_usd or _estimate_cost(t.provider or "gemini", t.prompt_tokens or 0, t.output_tokens or 0))
+    # Totales
+    total_cost = sum(bp["cost_usd"] for bp in by_provider.values()) + mateo_cost
+    total_tokens = sum(bp["tokens_in"] + bp["tokens_out"] for bp in by_provider.values()) + mateo_tokens_in + mateo_tokens_out
+    # Limites configurados
+    limits = {}
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT provider, monthly_limit_usd, alert_pct, hard_block, billing_account, billing_card_last4 FROM cost_limits")).fetchall()
+            for r in rows:
+                limits[r[0]] = {
+                    "monthly_limit_usd": r[1] or 0, "alert_pct": r[2] or 80,
+                    "hard_block": bool(r[3]), "billing_account": r[4] or "",
+                    "billing_card_last4": r[5] or "",
+                }
+    except Exception:
+        pass
+    return {
+        "period_days": days,
+        "total_cost_usd": round(total_cost, 4),
+        "total_tokens": total_tokens,
+        "total_calls": len(traces) + len(mateo_convs),
+        "by_provider": {k: {**v, "cost_usd": round(v["cost_usd"], 4), "pricing": LLM_PRICING.get(k, {})} for k, v in by_provider.items()},
+        "by_day": [{"date": d, **{kk: round(vv, 4) if isinstance(vv, float) else vv for kk, vv in vals.items()}} for d, vals in sorted(by_day.items())],
+        "by_feature": {k: round(v, 4) for k, v in by_feature.items()},
+        "mateo_chat": {"tokens_in": mateo_tokens_in, "tokens_out": mateo_tokens_out, "cost_usd": round(mateo_cost, 4), "conversations": len(mateo_convs)},
+        "limits": limits,
+        "pricing_reference": LLM_PRICING,
+    }
+
+
+@app.get("/api/admin/costs/limits")
+def get_cost_limits(db: Session = Depends(get_db)):
+    out = []
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT id, provider, monthly_limit_usd, alert_pct, hard_block, billing_account, billing_card_last4, notas FROM cost_limits ORDER BY provider")).fetchall()
+            for r in rows:
+                out.append({
+                    "id": r[0], "provider": r[1], "monthly_limit_usd": r[2] or 0,
+                    "alert_pct": r[3] or 80, "hard_block": bool(r[4]),
+                    "billing_account": r[5] or "", "billing_card_last4": r[6] or "",
+                    "notas": r[7] or "",
+                })
+    except Exception:
+        pass
+    return out
+
+
+@app.put("/api/admin/costs/limits/{provider}")
+def set_cost_limit(provider: str, data: dict, db: Session = Depends(get_db)):
+    """Crea o actualiza limite de gasto para un proveedor."""
+    monthly = float(data.get("monthly_limit_usd", 0) or 0)
+    alert_pct = int(data.get("alert_pct", 80) or 80)
+    hard_block = bool(data.get("hard_block", False))
+    billing_account = str(data.get("billing_account", ""))[:200]
+    billing_card_last4 = str(data.get("billing_card_last4", ""))[:10]
+    notas = str(data.get("notas", ""))
+    with engine.connect() as conn:
+        # Upsert manual (portable)
+        existing = conn.execute(text("SELECT id FROM cost_limits WHERE provider = :p"), {"p": provider}).fetchone()
+        if existing:
+            conn.execute(text("""
+                UPDATE cost_limits SET monthly_limit_usd=:m, alert_pct=:a, hard_block=:h,
+                       billing_account=:ba, billing_card_last4=:bc, notas=:n, updated_at=CURRENT_TIMESTAMP
+                WHERE provider=:p
+            """), {"m": monthly, "a": alert_pct, "h": hard_block, "ba": billing_account, "bc": billing_card_last4, "n": notas, "p": provider})
+        else:
+            conn.execute(text("""
+                INSERT INTO cost_limits (provider, monthly_limit_usd, alert_pct, hard_block, billing_account, billing_card_last4, notas)
+                VALUES (:p, :m, :a, :h, :ba, :bc, :n)
+            """), {"p": provider, "m": monthly, "a": alert_pct, "h": hard_block, "ba": billing_account, "bc": billing_card_last4, "n": notas})
+        conn.commit()
+    return {"updated": True, "provider": provider}
+
+
+@app.get("/api/admin/costs/breakdown")
+def costs_breakdown(days: int = 7, db: Session = Depends(get_db)):
+    """Ultimas llamadas caras para debugging del consumo."""
+    from datetime import timedelta as _td
+    cutoff = datetime.now() - _td(days=days)
+    traces = db.query(AgentTrace).filter(AgentTrace.created_at >= cutoff).order_by(AgentTrace.cost_usd.desc()).limit(50).all()
+    return [{
+        "id": t.id, "agent_id": t.agent_id, "session_id": t.session_id,
+        "provider": t.provider, "prompt_tokens": t.prompt_tokens,
+        "output_tokens": t.output_tokens,
+        "cost_usd": round(t.cost_usd or _estimate_cost(t.provider or "gemini", t.prompt_tokens or 0, t.output_tokens or 0), 6),
+        "latency_ms": t.latency_ms,
+        "input_summary": (t.input_summary or "")[:150],
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    } for t in traces]
+
+
 @app.get("/api/admin/dashboard-metrics")
 def dashboard_metrics(db: Session = Depends(get_db)):
     """Comprehensive metrics for admin dashboard"""

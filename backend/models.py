@@ -523,6 +523,10 @@ class AgentBlock(Base):
     orden = Column(Integer, default=0)
     activo = Column(Boolean, default=True)
     sub_steps = Column(Text, default="[]")  # JSON: [{orden:"1.1", texto:"...", tool_assigned:"calendar_create"}]
+    # Funciones asociadas al bloque. La IA las invoca automaticamente mediante function-calling
+    # cuando detecte que corresponde segun el contenido del bloque y la conversacion.
+    # JSON: [{name:"create_prospect", label:"Registrar prospect", when:"cuando tenga email y nombre", params:{}}]
+    functions = Column(Text, default="[]")
     # Para bloques info_clave reusables entre agentes
     es_reusable = Column(Boolean, default=False)
     block_key = Column(String(200))  # si es reusable, identificador global

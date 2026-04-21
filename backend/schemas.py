@@ -523,6 +523,7 @@ class AgentBlockOut(BaseModel):
     orden: int
     activo: bool
     sub_steps: Optional[str] = "[]"
+    functions: Optional[str] = "[]"
     es_reusable: bool
     block_key: Optional[str] = ""
     class Config:
@@ -538,6 +539,7 @@ class AgentBlockCreate(BaseModel):
     orden: int = 0
     activo: bool = True
     sub_steps: str = "[]"
+    functions: str = "[]"
     es_reusable: bool = False
     block_key: Optional[str] = ""
 
