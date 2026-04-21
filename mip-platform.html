@@ -2386,6 +2386,17 @@ html,body{overflow-x:hidden;max-width:100vw}
             <option value="90">Ultimos 90 dias</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="loadCosts()"><i class="fas fa-sync"></i> Refrescar</button>
+          <button class="btn btn-dark btn-sm" onclick="openIncreaseQuotaModal()" style="background:#f59e0b;border-color:#f59e0b"><i class="fas fa-rocket"></i> Aumentar tokens</button>
+        </div>
+      </div>
+      <!-- Banner: sin creditos / quota -->
+      <div id="quota-warning-banner" style="display:none;background:linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);border:1px solid var(--warning);border-radius:var(--radius);padding:14px 16px;margin-top:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <div style="font-weight:600;font-size:14px;color:#78350f;margin-bottom:4px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i> ¿Te da error <code style="background:rgba(0,0,0,.1);padding:1px 4px;border-radius:3px">429 RESOURCE_EXHAUSTED</code>?</div>
+            <div style="font-size:12px;color:#78350f;line-height:1.5">El plan gratuito de Gemini tope 250k tokens/día. Activá billing en GCP para pasar a millones de tokens por ~$0.0015 por PDF.</div>
+          </div>
+          <button class="btn btn-dark btn-sm" onclick="openIncreaseQuotaModal()" style="background:#f59e0b;border-color:#f59e0b"><i class="fas fa-rocket"></i> Solucionar ahora</button>
         </div>
       </div>
       <!-- KPI cards -->
@@ -2425,6 +2436,73 @@ html,body{overflow-x:hidden;max-width:100vw}
           <table class="dtable"><thead><tr><th>Fecha</th><th>Proveedor</th><th>Tokens (in/out)</th><th>Costo</th><th>Latencia</th><th>Session</th></tr></thead>
           <tbody id="cost-breakdown-tbody"></tbody></table>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal: aumentar cuota / activar billing -->
+    <div class="modal-bg" id="increaseQuotaModal">
+      <div class="modal-box" style="max-width:620px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="font-size:16px;font-weight:600;margin:0"><i class="fas fa-rocket" style="margin-right:6px;color:#f59e0b"></i> Aumentar cuota de tokens</h3>
+          <button onclick="document.getElementById('increaseQuotaModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Seleccioná el proveedor con problema. Te abrimos directo la página de billing / cuotas.</p>
+        <!-- Gemini -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="font-size:22px">🔵</div>
+            <div style="flex:1"><div style="font-weight:600">Gemini (Google AI)</div><div style="font-size:11px;color:var(--text-muted)">Usado para Mateo, Copiloto, PDF parser, Embeddings</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;padding:8px;background:var(--bg-subtle);border-radius:var(--radius)">
+            <strong>Plan gratuito:</strong> 250k tokens/día · 10 req/min<br>
+            <strong>Plan pagado:</strong> Sin tope diario · 1000 req/min · $0.075/1M input · $0.30/1M output
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <a href="https://aistudio.google.com/apikey" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-key"></i> Ver mi API key</a>
+            <a href="https://console.cloud.google.com/billing" target="_blank" class="btn btn-dark btn-sm" style="background:#f59e0b;border-color:#f59e0b"><i class="fas fa-credit-card"></i> Activar billing en GCP</a>
+            <a href="https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-toggle-on"></i> Habilitar API</a>
+            <a href="https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-chart-line"></i> Ver cuotas actuales</a>
+          </div>
+        </div>
+        <!-- Claude -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="font-size:22px">🟣</div>
+            <div style="flex:1"><div style="font-weight:600">Claude (Anthropic)</div><div style="font-size:11px;color:var(--text-muted)">Fallback cuando Gemini falla</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;padding:8px;background:var(--bg-subtle);border-radius:var(--radius)">
+            <strong>Free tier:</strong> $5 USD de créditos iniciales<br>
+            <strong>Pagado:</strong> $3/1M input · $15/1M output (Sonnet 4.5)
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <a href="https://console.anthropic.com/settings/billing" target="_blank" class="btn btn-dark btn-sm" style="background:#cc785c;border-color:#cc785c"><i class="fas fa-credit-card"></i> Agregar créditos Claude</a>
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-key"></i> Ver API keys</a>
+            <a href="https://console.anthropic.com/settings/limits" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-chart-line"></i> Ver límites</a>
+          </div>
+        </div>
+        <!-- OpenAI (si se usa en el futuro) -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;opacity:.7">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="font-size:22px">🟢</div>
+            <div style="flex:1"><div style="font-weight:600">OpenAI <span style="font-size:10px;color:var(--text-muted);font-weight:400">(no usado actualmente)</span></div></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <a href="https://platform.openai.com/account/billing" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-credit-card"></i> Activar billing</a>
+            <a href="https://platform.openai.com/api-keys" target="_blank" class="btn btn-outline btn-sm"><i class="fas fa-key"></i> API keys</a>
+          </div>
+        </div>
+        <!-- Guia rapida -->
+        <details style="margin-top:10px;background:var(--bg-subtle);border-radius:var(--radius);padding:10px 14px">
+          <summary style="cursor:pointer;font-weight:500;font-size:13px">📖 Guía rápida: activar billing en Gemini (7 minutos)</summary>
+          <ol style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-top:8px;padding-left:20px">
+            <li>Ir a <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> y ver qué API key usás + en qué proyecto GCP está.</li>
+            <li>Ir a <a href="https://console.cloud.google.com/billing" target="_blank">console.cloud.google.com/billing</a> y vincular una tarjeta al proyecto.</li>
+            <li>Habilitar la <strong>Generative Language API</strong> en ese proyecto.</li>
+            <li>Esperar 3–5 minutos a que se propague.</li>
+            <li>Volver a intentar el PDF parser o Mateo — debería funcionar.</li>
+          </ol>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)"><strong>Costo real:</strong> ~$0.0015 por PDF parseado · $0.001 por turno de Mateo</div>
+        </details>
       </div>
     </div>
 
@@ -4837,6 +4915,11 @@ async function loadCosts() {
     });
     const badge = document.getElementById('costs-badge');
     if (badge) badge.style.display = hasAlert ? 'inline-block' : 'none';
+    // Mostrar banner de warning si hay errores 429 recientes en el breakdown o si Gemini llego al limite
+    const hasQuotaError = breakdown.some(t => (t.input_summary||'').includes('429') || (t.input_summary||'').toLowerCase().includes('quota') || (t.input_summary||'').toLowerCase().includes('resource_exhausted'));
+    const geminiNearLimit = (summary.by_provider?.gemini?.cost_usd || 0) > 0.05 && Object.keys(summary.limits || {}).length === 0;
+    const banner = document.getElementById('quota-warning-banner');
+    if (banner) banner.style.display = (hasQuotaError || hasAlert) ? 'block' : 'none';
   } catch (err) {
     console.error('loadCosts error:', err);
     toast('error', 'Error', err.message || 'No se pudo cargar costos');
@@ -4858,6 +4941,10 @@ function editCostLimit(provider, monthly, alert, hardBlock, billing, card, notas
   document.getElementById('cl-billing-account').value = billing;
   document.getElementById('cl-card-last4').value = card;
   document.getElementById('cl-notas').value = notas;
+}
+
+function openIncreaseQuotaModal() {
+  document.getElementById('increaseQuotaModal').classList.add('open');
 }
 
 async function saveCostLimit() {
