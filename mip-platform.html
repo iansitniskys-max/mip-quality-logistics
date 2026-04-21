@@ -6004,24 +6004,43 @@ function renderBlocksList(blocks) {
           const iconPrefix = b.tipo === 'que_no_hacer' ? '<i class="fas fa-ban" style="color:var(--danger);margin-right:4px"></i>' : '';
           let fns = [];
           try { fns = JSON.parse(b.functions || '[]'); } catch(e) { fns = []; }
-          const fnsHtml = fns.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${fns.map((fn,idx) => `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--info-bg,#e0f2fe);color:var(--info,#0369a1);border-radius:12px;font-size:10px;font-weight:500"><i class="fas fa-bolt" style="font-size:9px"></i>${fn.label||fn.name}${fn.when?` <span style="opacity:.7">· ${fn.when.substring(0,30)}${fn.when.length>30?'…':''}</span>`:''}<button onclick="event.stopPropagation();removeBlockFunction(${b.id},${idx})" style="background:none;border:none;padding:0;margin-left:2px;cursor:pointer;color:inherit;opacity:.6" title="Quitar"><i class="fas fa-times" style="font-size:9px"></i></button></span>`).join('')}</div>` : '';
-          return `<div data-block-id="${b.id}" style="padding:10px 12px;background:${bgColor};border-radius:var(--radius);margin-bottom:6px;border-left:3px solid ${borderColor};opacity:${b.activo?1:0.5};cursor:move">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div style="display:flex;align-items:center;gap:6px">
-              <i class="fas fa-grip-vertical" style="color:var(--text-muted);font-size:11px;cursor:grab"></i>
-              <div style="font-weight:500;font-size:13px">${iconPrefix}${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span></div>
+          // Mini-bloques pegados (con conector visual al bloque padre)
+          const fnsHtml = fns.length ? `<div style="position:relative;margin-left:20px;margin-top:-2px;margin-bottom:6px">
+            ${fns.map((fn, idx) => {
+              const fnName = fn.label || fn.name || 'funcion';
+              const fnWhen = (fn.when || '').trim();
+              return `<div style="position:relative;display:flex;align-items:stretch;margin-top:4px">
+                <div style="position:absolute;left:-12px;top:0;bottom:50%;width:12px;border-left:2px solid ${borderColor};border-bottom:2px solid ${borderColor};border-bottom-left-radius:6px"></div>
+                <div style="flex:1;display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fef3c7;border:1px solid #fbbf24;border-left:3px solid #f59e0b;border-radius:6px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                  <i class="fas fa-bolt" style="color:#d97706;font-size:10px"></i>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;color:#78350f">${fnName}</div>
+                    ${fnWhen ? `<div style="font-size:10px;color:#92400e;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${fnWhen.replace(/"/g,'&quot;')}"><i class="fas fa-play-circle" style="font-size:9px;margin-right:3px"></i>${fnWhen}</div>` : `<div style="font-size:10px;color:#a16207;font-style:italic">IA decide cuándo ejecutar</div>`}
+                  </div>
+                  <button onclick="event.stopPropagation();removeBlockFunction(${b.id},${idx})" style="background:none;border:none;padding:2px 4px;cursor:pointer;color:#92400e;opacity:.6;border-radius:4px" onmouseover="this.style.opacity='1';this.style.background='rgba(146,64,14,.1)'" onmouseout="this.style.opacity='.6';this.style.background='none'" title="Quitar funcion"><i class="fas fa-times" style="font-size:10px"></i></button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : '';
+          return `<div data-block-id="${b.id}" style="margin-bottom:${fns.length?8:6}px">
+            <div style="padding:10px 12px;background:${bgColor};border-radius:var(--radius);border-left:3px solid ${borderColor};opacity:${b.activo?1:0.5};cursor:move">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <i class="fas fa-grip-vertical" style="color:var(--text-muted);font-size:11px;cursor:grab"></i>
+                  <div style="font-weight:500;font-size:13px">${iconPrefix}${b.nombre} <span style="font-size:10px;color:var(--text-muted);font-weight:400">(${b.tipo})</span>${fns.length?` <span style="font-size:9px;padding:1px 6px;background:#fef3c7;color:#78350f;border-radius:8px;margin-left:4px;font-weight:600"><i class="fas fa-bolt" style="font-size:8px"></i> ${fns.length}</span>`:''}</div>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center">
+                  <span style="font-size:10px;color:var(--text-muted)">orden ${b.orden}</span>
+                  <div class="switch ${b.activo?'on':''}" onclick="event.stopPropagation(); toggleBlockActive(${b.id}, this)" style="width:30px;height:16px"></div>
+                  <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openAddFunctionModal(${b.id})" title="Agregar funcion"><i class="fas fa-bolt"></i></button>
+                  <button class="btn btn-outline btn-sm" onclick='event.stopPropagation(); editBlock(${JSON.stringify(b).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); deleteBlock(${b.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:80px;overflow:hidden;line-height:1.4">${(b.contenido||'').substring(0,250)}${(b.contenido||'').length>250?'...':''}</div>
             </div>
-            <div style="display:flex;gap:4px;align-items:center">
-              <span style="font-size:10px;color:var(--text-muted)">orden ${b.orden}</span>
-              <div class="switch ${b.activo?'on':''}" onclick="event.stopPropagation(); toggleBlockActive(${b.id}, this)" style="width:30px;height:16px"></div>
-              <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openAddFunctionModal(${b.id})" title="Agregar funcion"><i class="fas fa-bolt"></i></button>
-              <button class="btn btn-outline btn-sm" onclick='event.stopPropagation(); editBlock(${JSON.stringify(b).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button>
-              <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); deleteBlock(${b.id})" style="color:var(--danger)"><i class="fas fa-trash"></i></button>
-            </div>
-          </div>
-          <div style="font-size:11px;color:var(--text-secondary);white-space:pre-wrap;max-height:80px;overflow:hidden;line-height:1.4">${(b.contenido||'').substring(0,250)}${(b.contenido||'').length>250?'...':''}</div>
-          ${fnsHtml}
-        </div>`;
+            ${fnsHtml}
+          </div>`;
         }).join('')}
       </div>
     </div>`;
