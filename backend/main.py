@@ -803,6 +803,7 @@ async def parse_cotizacion_pdf(file: UploadFile = File(...)):
     """Recibe un PDF de cotizacion y retorna JSON estructurado con productos.
     Usa pypdf para extraer texto + Gemini para estructurar via function calling.
     """
+    _check_cost_limit("gemini")  # hard-block si se alcanzo el limite mensual
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Solo archivos PDF")
     content = await file.read()
@@ -1628,6 +1629,7 @@ REGLAS ESTRICTAS:
 @app.post("/api/chat")
 def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
     """Chat endpoint: sends message to Claude (primary) or Gemini (fallback)"""
+    _check_cost_limit("gemini", db)  # hard-block si se alcanzo el limite mensual
     message = data.get("message", "").strip()
     history = data.get("history", [])  # [{role: "user"/"assistant", content: "..."}]
     cliente_id = data.get("cliente_id")
@@ -2019,6 +2021,7 @@ def list_mateo_bookings(db: Session = Depends(get_db)):
 @app.post("/api/chat/v2")
 def chat_with_mateo_v2(data: dict, db: Session = Depends(get_db)):
     """Chat v2 con config editable, tracking de tokens, historial y lead capture."""
+    _check_cost_limit("gemini", db)  # hard-block si se alcanzo el limite mensual
     import uuid
     message = data.get("message", "").strip()
     history = data.get("history", [])
@@ -2953,6 +2956,7 @@ def create_kb_folder(data: dict, db: Session = Depends(get_db)):
 @app.post("/api/kb/docs")
 def create_kb_doc(data: dict, db: Session = Depends(get_db)):
     """Crea un doc y lo chunking + genera embeddings via Gemini."""
+    _check_cost_limit("embeddings", db)  # hard-block si se alcanzo el limite
     d = KnowledgeDoc(
         folder_id=data["folder_id"],
         nombre=data["nombre"],
@@ -3384,6 +3388,7 @@ def agent_chat(id: int, data: dict, db: Session = Depends(get_db)):
       - Intent detection + auto-handoff entre agentes
       - Human handoff con notificacion WhatsApp
     """
+    _check_cost_limit("gemini", db)  # hard-block si se alcanzo el limite mensual
     import uuid as _uuid
     import time as _time
     a = db.query(AgentConfig).get(id)
@@ -3908,6 +3913,7 @@ def agent_copilot(id: int, data: dict, db: Session = Depends(get_db)):
     """Chat del admin con el copiloto. El copiloto PROPONE cambios (no los aplica).
     Retorna reply + plan opcional con acciones que el admin puede aprobar/rechazar.
     """
+    _check_cost_limit("gemini", db)  # hard-block si se alcanzo el limite mensual
     agent = db.query(AgentConfig).get(id)
     if not agent:
         raise HTTPException(404, "Agente no encontrado")
@@ -5737,6 +5743,88 @@ LLM_PRICING = {
 def _estimate_cost(provider: str, tokens_in: int, tokens_out: int) -> float:
     p = LLM_PRICING.get((provider or "").lower()) or LLM_PRICING["gemini"]
     return (tokens_in or 0) / 1_000_000.0 * p["input_per_1m"] + (tokens_out or 0) / 1_000_000.0 * p["output_per_1m"]
+
+
+def _get_monthly_spent(provider: str, db=None) -> float:
+    """Calcula gasto del mes actual para un proveedor especifico.
+    Agrega AgentTrace + MateoConversation del mes calendario actual.
+    """
+    from datetime import datetime as _dt
+    # Primer dia del mes actual
+    now = _dt.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    prov_key = (provider or "gemini").lower()
+    spent = 0.0
+    try:
+        with engine.connect() as conn:
+            # AgentTrace del mes
+            tr_rows = conn.execute(text("""
+                SELECT COALESCE(SUM(cost_usd), 0) as total_cost,
+                       COALESCE(SUM(prompt_tokens), 0) as tin,
+                       COALESCE(SUM(output_tokens), 0) as tout
+                FROM agent_traces
+                WHERE created_at >= :start AND LOWER(COALESCE(provider, 'gemini')) LIKE :prov
+            """), {"start": month_start, "prov": f"%{prov_key}%"}).fetchone()
+            if tr_rows:
+                trace_cost = tr_rows[0] or 0.0
+                if trace_cost > 0:
+                    spent += trace_cost
+                else:
+                    # Si cost_usd=0 en DB, estimar por pricing
+                    spent += _estimate_cost(prov_key, tr_rows[1] or 0, tr_rows[2] or 0)
+            # Mateo chats solo computan si provider es gemini
+            if prov_key == "gemini":
+                m_rows = conn.execute(text("""
+                    SELECT COALESCE(SUM(tokens_input), 0), COALESCE(SUM(tokens_output), 0)
+                    FROM mateo_conversations
+                    WHERE inicio_at >= :start
+                """), {"start": month_start}).fetchone()
+                if m_rows:
+                    spent += _estimate_cost("gemini", m_rows[0] or 0, m_rows[1] or 0)
+    except Exception as e:
+        print(f"[_get_monthly_spent] error: {e}")
+    return spent
+
+
+def _check_cost_limit(provider: str, db=None):
+    """Verifica si el proveedor supero el limite mensual con hard-block activo.
+    Si se supero, levanta HTTPException 429 con mensaje claro.
+    Si no hay limite configurado o hard_block=False, pasa silenciosamente.
+    """
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT monthly_limit_usd, hard_block FROM cost_limits
+                WHERE provider = :p
+            """), {"p": (provider or "gemini").lower()}).fetchone()
+            if not row:
+                return  # sin limite configurado, dejar pasar
+            monthly_limit, hard_block = row[0] or 0.0, bool(row[1])
+            if monthly_limit <= 0 or not hard_block:
+                return  # limite en 0 o bloqueo desactivado
+            spent = _get_monthly_spent(provider, db)
+            if spent >= monthly_limit:
+                # Log al historial de actividades
+                try:
+                    if db is None:
+                        from sqlalchemy.orm import Session as _S
+                        with _S(engine) as _db:
+                            log_evento(_db, "sistema", "limite_costos_bloqueado",
+                                       f"Llamada a {provider} bloqueada: gasto ${spent:.4f} >= limite ${monthly_limit}")
+                    else:
+                        log_evento(db, "sistema", "limite_costos_bloqueado",
+                                   f"Llamada a {provider} bloqueada: gasto ${spent:.4f} >= limite ${monthly_limit}")
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Limite mensual de costos alcanzado para {provider}: ${spent:.2f} USD (limite: ${monthly_limit:.2f}). Contacta al admin o aumenta el limite en Sistema > Costos.",
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Si el check falla por cualquier razon, NO bloquear el servicio
+        print(f"[_check_cost_limit] error: {e}")
 
 
 @app.get("/api/admin/costs/summary")
