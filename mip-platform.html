@@ -6444,6 +6444,10 @@ async function openAddFunctionModal(blockId) {
     data: { label: 'Datos', color: 'var(--success)' },
     handoff: { label: 'Derivar', color: 'var(--danger)' },
     email: { label: 'Email', color: 'var(--info)' },
+    messaging: { label: 'WhatsApp / Mensajería', color: '#25d366' },
+    business: { label: 'Negocio MIP (importación)', color: '#f59e0b' },
+    support: { label: 'Soporte', color: '#6366f1' },
+    advanced: { label: 'Avanzado', color: 'var(--text-muted)' },
   };
   const grouped = {};
   _functionCatalog.forEach(fn => { (grouped[fn.categoria] = grouped[fn.categoria] || []).push(fn); });

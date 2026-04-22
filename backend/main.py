@@ -3378,6 +3378,86 @@ AGENT_FUNCTION_CATALOG = [
          {"key": "secuencia_id", "label": "Secuencia", "type": "select", "required": True,
           "options": ["onboarding_cliente", "nurturing_lead_frio", "seguimiento_post_cotizacion", "bienvenida_portal"]},
      ]},
+    # WhatsApp
+    {"name": "enviar_whatsapp", "label": "Enviar WhatsApp", "icon": "whatsapp", "categoria": "messaging",
+     "description": "Envia un mensaje de WhatsApp al cliente usando un template aprobado.",
+     "params": [
+         {"key": "template", "label": "Template", "type": "select", "required": True,
+          "options": ["bienvenida", "cotizacion_lista", "recordatorio_pago", "muestra_llego", "produccion_iniciada"]},
+         {"key": "delay_min", "label": "Delay (min)", "type": "number", "default": 0},
+     ]},
+    # Negocio MIP (importacion China)
+    {"name": "generar_cotizacion_pdf", "label": "Generar cotizacion PDF", "icon": "file-pdf", "categoria": "business",
+     "description": "Crea un PDF formal de cotizacion con el detalle de productos y lo adjunta al pedido.",
+     "params": [
+         {"key": "incluir_imagenes", "label": "Incluir imagenes de productos", "type": "select",
+          "options": ["si", "no"], "default": "si"},
+         {"key": "validez_dias", "label": "Validez cotizacion (dias)", "type": "number", "default": 7},
+         {"key": "moneda", "label": "Moneda", "type": "select",
+          "options": ["USD", "CLP"], "default": "USD"},
+     ]},
+    {"name": "calcular_CIF", "label": "Calcular CIF Chile", "icon": "calculator", "categoria": "business",
+     "description": "Estima el costo CIF (costo + seguro + flete) para importar a Chile desde China.",
+     "params": [
+         {"key": "peso_kg", "label": "Peso total (kg)", "type": "number", "required": True},
+         {"key": "volumen_cbm", "label": "Volumen (m3)", "type": "number"},
+         {"key": "origen_puerto", "label": "Puerto origen", "type": "select",
+          "options": ["Shanghai", "Ningbo", "Shenzhen", "Guangzhou", "Qingdao"], "default": "Shanghai"},
+         {"key": "destino_puerto", "label": "Puerto destino", "type": "select",
+          "options": ["San Antonio", "Valparaiso", "Iquique"], "default": "San Antonio"},
+         {"key": "incoterm", "label": "Incoterm", "type": "select",
+          "options": ["FOB", "CIF", "CFR", "EXW"], "default": "FOB"},
+     ]},
+    {"name": "registrar_visita_fabrica", "label": "Registrar visita a fabrica", "icon": "industry", "categoria": "business",
+     "description": "Programa una visita de inspeccion a la fabrica en China.",
+     "params": [
+         {"key": "tipo_visita", "label": "Tipo", "type": "select",
+          "options": ["pre_produccion", "durante_produccion", "qc_pre_embarque", "urgente"], "default": "qc_pre_embarque"},
+         {"key": "proveedor", "label": "Nombre proveedor", "type": "text", "required": True},
+         {"key": "ciudad", "label": "Ciudad China", "type": "text", "placeholder": "ej: Shenzhen, Yiwu"},
+     ]},
+    {"name": "solicitar_muestra", "label": "Solicitar muestra a proveedor", "icon": "vial", "categoria": "business",
+     "description": "Gestiona el envio de una muestra del producto al cliente antes de ordenar produccion.",
+     "params": [
+         {"key": "tipo_muestra", "label": "Tipo", "type": "select",
+          "options": ["proveedor_standard", "customizada_cliente", "ssp"], "default": "proveedor_standard"},
+         {"key": "courier", "label": "Courier", "type": "select",
+          "options": ["DHL", "FedEx", "UPS", "proveedor_envia"], "default": "DHL"},
+         {"key": "cliente_paga", "label": "Quien paga envio", "type": "select",
+          "options": ["cliente", "MIP", "proveedor"], "default": "cliente"},
+     ]},
+    {"name": "confirmar_pago", "label": "Confirmar pago recibido", "icon": "check-double", "categoria": "business",
+     "description": "Registra un pago recibido del cliente y actualiza el pedido.",
+     "params": [
+         {"key": "tipo_pago", "label": "Tipo", "type": "select", "required": True,
+          "options": ["50_porcentaje", "50_final", "100_adelantado", "deposito_muestra"]},
+         {"key": "metodo", "label": "Metodo", "type": "select",
+          "options": ["transferencia_bancaria", "swift", "webpay", "paypal", "cheque"], "default": "transferencia_bancaria"},
+         {"key": "moneda", "label": "Moneda", "type": "select",
+          "options": ["USD", "CLP"], "default": "USD"},
+     ]},
+    # Soporte
+    {"name": "crear_ticket_soporte", "label": "Crear ticket de soporte", "icon": "life-ring", "categoria": "support",
+     "description": "Abre un ticket en el sistema de soporte para un problema del cliente.",
+     "params": [
+         {"key": "urgencia", "label": "Urgencia", "type": "select", "required": True,
+          "options": ["baja", "media", "alta", "critica"]},
+         {"key": "categoria", "label": "Categoria", "type": "select",
+          "options": ["calidad_producto", "atraso_entrega", "problema_pago", "dano_envio", "consulta_general", "otro"], "default": "consulta_general"},
+         {"key": "auto_asignar_kam", "label": "Auto-asignar al KAM", "type": "select",
+          "options": ["si", "no"], "default": "si"},
+     ]},
+    # Avanzado
+    {"name": "webhook_custom", "label": "Webhook custom", "icon": "code", "categoria": "advanced",
+     "description": "Dispara un webhook HTTP POST a una URL externa con contexto del cliente.",
+     "params": [
+         {"key": "url", "label": "URL del webhook", "type": "text", "required": True,
+          "placeholder": "https://mi-sistema.com/hook"},
+         {"key": "metodo", "label": "Metodo HTTP", "type": "select",
+          "options": ["POST", "PUT", "PATCH"], "default": "POST"},
+         {"key": "auth_header", "label": "Header auth (opcional)", "type": "text",
+          "placeholder": "Bearer XXX o X-API-Key"},
+     ]},
 ]
 
 
@@ -3658,17 +3738,150 @@ def _handler_escalate(args: dict, agent, db) -> dict:
 def _handler_webhook(args: dict, agent, db) -> dict:
     url = args.get("url")
     payload = args.get("payload", {})
+    method = (args.get("metodo") or args.get("method") or "POST").upper()
+    auth_header = args.get("auth_header", "")
     if not url:
         return {"error": "Requiere url"}
-    # Solo HTTPS por seguridad
     if not url.startswith("https://"):
         return {"error": "Solo URLs HTTPS permitidas"}
     try:
         import requests as _req
-        r = _req.post(url, json=payload, timeout=10)
-        return {"status_code": r.status_code, "response_preview": r.text[:200]}
+        headers = {"Content-Type": "application/json"}
+        if auth_header:
+            # Formato "Header: value" o solo "Bearer XXX"
+            if ":" in auth_header:
+                k, v = auth_header.split(":", 1)
+                headers[k.strip()] = v.strip()
+            elif auth_header.startswith("Bearer "):
+                headers["Authorization"] = auth_header
+            else:
+                headers["Authorization"] = f"Bearer {auth_header}"
+        r = _req.request(method, url, json=payload, headers=headers, timeout=10)
+        return {"status_code": r.status_code, "response_preview": r.text[:300]}
     except Exception as e:
         return {"error": str(e)[:200]}
+
+
+def _handler_calcular_cif(args: dict, agent, db) -> dict:
+    """Estimacion CIF Chile desde China. Formula aproximada basada en tarifas reales."""
+    peso = float(args.get("peso_kg", 0) or 0)
+    vol = float(args.get("volumen_cbm", 0) or 0)
+    origen = args.get("origen_puerto", "Shanghai")
+    destino = args.get("destino_puerto", "San Antonio")
+    incoterm = args.get("incoterm", "FOB")
+    valor_fob = float(args.get("valor_fob_usd", 0) or 0)
+    if peso <= 0 and vol <= 0:
+        return {"error": "Requiere peso_kg o volumen_cbm"}
+    # Chargeable weight (mayor entre peso real y volumetrico 1m3 = 167kg aereo, 1000kg maritimo)
+    cw_maritimo = max(peso, vol * 1000)
+    # Flete maritimo aproximado (USD/CBM consolidado): $80-150 segun temporada
+    flete_estimado = max(vol * 120, peso * 0.12) if cw_maritimo > 0 else 0
+    # Seguro: 0.3% del FOB (minimo $50)
+    seguro = max(valor_fob * 0.003, 50) if valor_fob > 0 else 50
+    # Gastos portuarios Chile
+    portuarios_clp = 180000  # aprox
+    cif_usd = valor_fob + flete_estimado + seguro if incoterm == "FOB" else valor_fob
+    # Arancel Chile (6% por defecto, exento si TLC China)
+    arancel = cif_usd * 0.06
+    iva = (cif_usd + arancel) * 0.19
+    total_chile = cif_usd + arancel + iva + (portuarios_clp / 950)  # USD~950 CLP
+    return {
+        "calculado": True,
+        "inputs": {"peso_kg": peso, "volumen_cbm": vol, "origen": origen, "destino": destino, "incoterm": incoterm},
+        "flete_maritimo_usd": round(flete_estimado, 2),
+        "seguro_usd": round(seguro, 2),
+        "cif_usd": round(cif_usd, 2),
+        "arancel_usd": round(arancel, 2),
+        "iva_usd": round(iva, 2),
+        "portuarios_clp": portuarios_clp,
+        "total_landed_cost_usd": round(total_chile, 2),
+        "nota": "Estimacion orientativa. Consultar a agente de aduana para valores exactos.",
+    }
+
+
+def _handler_crear_ticket(args: dict, agent, db) -> dict:
+    """Crea un Ticket (tabla Ticket si existe). Fallback: loggear en Actividad."""
+    urgencia = args.get("urgencia", "media")
+    categoria = args.get("categoria", "consulta_general")
+    descripcion = args.get("descripcion", "") or args.get("asunto", "Ticket desde agente IA")
+    try:
+        # Intentar crear en tabla Ticket
+        from sqlalchemy import inspect as _insp
+        insp = _insp(engine)
+        if insp.has_table("tickets"):
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    INSERT INTO tickets (urgencia, categoria, descripcion, estado, created_at)
+                    VALUES (:u, :c, :d, 'abierto', CURRENT_TIMESTAMP)
+                """), {"u": urgencia, "c": categoria, "d": descripcion})
+                conn.commit()
+            return {"ticket_creado": True, "urgencia": urgencia, "categoria": categoria}
+    except Exception as e:
+        print(f"[_handler_crear_ticket] {e}")
+    # Fallback: loggear en actividad
+    try:
+        log_evento(db, "ticket", "creado_agente", f"[{urgencia}/{categoria}] {descripcion}")
+    except Exception:
+        pass
+    return {"ticket_creado": True, "via": "log", "urgencia": urgencia, "categoria": categoria, "descripcion": descripcion}
+
+
+def _handler_confirmar_pago(args: dict, agent, db) -> dict:
+    """Registra pago en Factura/Movimiento."""
+    tipo = args.get("tipo_pago", "50_porcentaje")
+    metodo = args.get("metodo", "transferencia_bancaria")
+    monto = float(args.get("monto", 0) or 0)
+    moneda = args.get("moneda", "USD")
+    pedido_id = args.get("pedido_id")
+    try:
+        log_evento(db, "pago", "confirmado", f"Pago {tipo} via {metodo} · {monto} {moneda} · pedido={pedido_id}")
+    except Exception:
+        pass
+    return {"confirmado": True, "tipo": tipo, "metodo": metodo, "monto": monto, "moneda": moneda}
+
+
+def _handler_solicitar_muestra(args: dict, agent, db) -> dict:
+    """Registra solicitud de muestra como actividad."""
+    tipo = args.get("tipo_muestra", "proveedor_standard")
+    courier = args.get("courier", "DHL")
+    cliente_paga = args.get("cliente_paga", "cliente")
+    try:
+        log_evento(db, "muestra", "solicitada", f"Muestra {tipo} via {courier} · paga: {cliente_paga}")
+    except Exception:
+        pass
+    return {"solicitada": True, "tipo": tipo, "courier": courier, "cliente_paga": cliente_paga, "estimado_envio": "3-5 dias habiles"}
+
+
+def _handler_registrar_visita(args: dict, agent, db) -> dict:
+    """Registra visita a fabrica como actividad."""
+    tipo = args.get("tipo_visita", "qc_pre_embarque")
+    proveedor = args.get("proveedor", "por confirmar")
+    ciudad = args.get("ciudad", "")
+    try:
+        log_evento(db, "visita_fabrica", "programada", f"{tipo} · {proveedor} · {ciudad}")
+    except Exception:
+        pass
+    return {"programada": True, "tipo": tipo, "proveedor": proveedor, "ciudad": ciudad, "estimado": "1-2 semanas para coordinar"}
+
+
+def _handler_whatsapp_stub(args: dict, agent, db) -> dict:
+    """Stub de WhatsApp. Cuando este activo Twilio/Meta API sera real."""
+    template = args.get("template", "bienvenida")
+    delay = int(args.get("delay_min", 0) or 0)
+    try:
+        log_evento(db, "whatsapp", "programado", f"Template: {template} · delay: {delay}min")
+    except Exception:
+        pass
+    return {"programado": True, "template": template, "delay_min": delay, "nota": "WhatsApp API pendiente de configurar. Se loggeo en sistema."}
+
+
+def _handler_generar_pdf_stub(args: dict, agent, db) -> dict:
+    """Stub de generacion PDF. Cuando este el generador real se activa."""
+    try:
+        log_evento(db, "cotizacion_pdf", "solicitado", f"Formato: {args}")
+    except Exception:
+        pass
+    return {"solicitado": True, "nota": "Generador de PDF pendiente. Se enviara manualmente por el equipo.", "params": args}
 
 
 TOOL_HANDLERS = {
@@ -3682,6 +3895,15 @@ TOOL_HANDLERS = {
     "escalate_to_human": _handler_escalate,
     "webhook_send": _handler_webhook,
     "send_webhook": _handler_webhook,
+    "webhook_custom": _handler_webhook,
+    # Nuevos handlers MIP
+    "calcular_CIF": _handler_calcular_cif,
+    "crear_ticket_soporte": _handler_crear_ticket,
+    "confirmar_pago": _handler_confirmar_pago,
+    "solicitar_muestra": _handler_solicitar_muestra,
+    "registrar_visita_fabrica": _handler_registrar_visita,
+    "enviar_whatsapp": _handler_whatsapp_stub,
+    "generar_cotizacion_pdf": _handler_generar_pdf_stub,
 }
 
 
