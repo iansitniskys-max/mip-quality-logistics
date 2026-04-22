@@ -5989,6 +5989,19 @@ GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
 GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "")
 
 
+@app.get("/api/integrations/google-calendar/diagnostic")
+def gcal_oauth_diagnostic():
+    """Devuelve si las env vars de OAuth Google Calendar estan configuradas."""
+    return {
+        "client_id_configured": bool(GOOGLE_OAUTH_CLIENT_ID),
+        "client_secret_configured": bool(GOOGLE_OAUTH_CLIENT_SECRET),
+        "redirect_uri_configured": bool(GOOGLE_OAUTH_REDIRECT_URI),
+        "redirect_uri": GOOGLE_OAUTH_REDIRECT_URI or "",
+        "ready": bool(GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET and GOOGLE_OAUTH_REDIRECT_URI),
+        "setup_url": "https://console.cloud.google.com/apis/credentials",
+    }
+
+
 @app.get("/api/integrations/google-calendar/oauth/start")
 def gcal_oauth_start(agent_id: int):
     """Inicia el flujo OAuth2 de Google Calendar para un agente."""

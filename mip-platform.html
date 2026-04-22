@@ -7232,13 +7232,22 @@ setInterval(pollHandoffsBadge, 60000);
 async function loadAgentIntegrations() {
   if (!_currentAgentId) { toast('error','Error','Selecciona un agente primero'); return; }
   try {
-    const integs = await api('/api/agents/' + _currentAgentId + '/integrations');
+    const [integs, gcalDiag] = await Promise.all([
+      api('/api/agents/' + _currentAgentId + '/integrations'),
+      api('/api/integrations/google-calendar/diagnostic').catch(() => ({ ready: false })),
+    ]);
     const extras = document.getElementById('agent-extras');
     const hasGcal = integs.find(i => i.tipo === 'google_calendar' && i.has_credentials);
     const hasWebhook = integs.find(i => i.tipo === 'custom_webhook');
+    const gcalBanner = !gcalDiag.ready ? `<div style="padding:10px 14px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:var(--radius);margin-bottom:12px;font-size:12px">
+      <b style="color:#92400e"><i class="fas fa-exclamation-triangle"></i> Google Calendar OAuth no configurado en el servidor</b><br>
+      <span style="color:#92400e">Falta ${!gcalDiag.client_id_configured?'CLIENT_ID ':''}${!gcalDiag.client_secret_configured?'CLIENT_SECRET ':''}${!gcalDiag.redirect_uri_configured?'REDIRECT_URI ':''}</span>
+      <button class="btn btn-outline btn-sm" onclick="showGoogleCalendarSetupModal('')" style="font-size:10px;margin-left:8px"><i class="fas fa-cog"></i> Ver instrucciones</button>
+    </div>` : '';
     extras.innerHTML = `<div class="card" style="padding:20px;margin-top:16px">
       <h4 style="font-size:14px;margin-bottom:12px"><i class="fas fa-plug" style="margin-right:6px;color:var(--info)"></i>Integraciones del agente</h4>
       <p style="font-size:11px;color:var(--text-muted);margin-bottom:16px">Conecta este agente a servicios externos. Cada agente tiene sus propias credenciales (ej: un agente usa la agenda del socio A, otro usa Slack del socio B).</p>
+      ${gcalBanner}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
         <div style="padding:14px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid #4285F4">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
