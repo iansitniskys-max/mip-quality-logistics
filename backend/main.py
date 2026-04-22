@@ -1335,8 +1335,19 @@ def _smtp_config():
     }
 
 
+MIP_LOGO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="44" height="44" style="vertical-align:middle;margin-right:12px">
+  <rect width="64" height="64" rx="12" ry="12" fill="#0f172a"/>
+  <rect x="4" y="16" width="4" height="32" rx="2" fill="#f59e0b"/>
+  <text x="32" y="42" font-family="Arial, sans-serif" font-size="22" font-weight="800" text-anchor="middle" fill="#ffffff" letter-spacing="1">MIP</text>
+  <circle cx="52" cy="14" r="3" fill="#f59e0b"/>
+</svg>"""
+
+
 def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url: str = None, footer_extra: str = "") -> str:
-    """Envuelve un cuerpo HTML en un template responsivo con branding MIP."""
+    """Envuelve un cuerpo HTML en un template responsivo con branding MIP.
+    Incluye el logo MIP como SVG inline + fallback PNG via img src data-uri
+    (para clientes de email que no soportan SVG como Outlook/Gmail app).
+    """
     cta_html = ""
     if cta_label and cta_url:
         cta_html = f"""
@@ -1344,6 +1355,15 @@ def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url:
           <a href="{cta_url}" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">{cta_label}</a>
         </div>
         """
+    # Logo construido como HTML table-based para maxima compatibilidad con clientes de email.
+    # Gmail/Outlook no soportan SVG inline, asi que replicamos el logo con elementos HTML+CSS.
+    logo_html = """
+    <table cellpadding="0" cellspacing="0" style="display:inline-block;vertical-align:middle">
+      <tr>
+        <td style="width:44px;height:44px;background:#0f172a;border-radius:10px;position:relative;text-align:center;vertical-align:middle;color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;line-height:44px;border-left:3px solid #f59e0b">MIP</td>
+      </tr>
+    </table>
+    """
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
@@ -1351,8 +1371,13 @@ def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url:
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
         <tr><td style="background:#0f172a;padding:20px 24px;color:#fff">
-          <div style="display:inline-block;width:40px;height:40px;background:#f59e0b;border-radius:8px;vertical-align:middle;margin-right:12px"></div>
-          <span style="font-size:18px;font-weight:700;vertical-align:middle">MIP Quality & Logistics</span>
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="padding-right:12px;vertical-align:middle">{logo_html}</td>
+            <td style="vertical-align:middle">
+              <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.2">MIP Quality</div>
+              <div style="font-size:11px;color:#f59e0b;letter-spacing:2px;font-weight:600">&amp; LOGISTICS</div>
+            </td>
+          </tr></table>
         </td></tr>
         <tr><td style="padding:28px 28px 8px 28px">
           <h2 style="margin:0 0 14px 0;font-size:20px;color:#0f172a">{title}</h2>
@@ -1360,7 +1385,7 @@ def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url:
           {cta_html}
         </td></tr>
         <tr><td style="padding:16px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
-          MIP Quality & Logistics · Importación y logística desde China<br>
+          <div style="margin-bottom:8px">MIP Quality &amp; Logistics · Importación y logística desde China</div>
           Si tenés preguntas, respondé directamente a este email.
           {('<br>' + footer_extra) if footer_extra else ''}
         </td></tr>
