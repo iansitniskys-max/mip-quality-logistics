@@ -2007,6 +2007,16 @@ html,body{overflow-x:hidden;max-width:100vw}
               <div class="switch-wrap"><div class="switch on" onclick="this.classList.toggle('on')"></div><span style="font-size:13px">Resumen semanal</span></div>
             </div>
           </div>
+          <div class="card" style="padding:24px;margin-bottom:16px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:8px"><i class="fas fa-envelope" style="color:var(--text-muted);margin-right:6px"></i>Email (SMTP)</h3>
+            <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">Verificá que el envío de emails esté funcionando.</p>
+            <div id="email-diag-status" style="padding:10px;background:var(--bg-subtle);border-radius:var(--radius);font-size:12px;margin-bottom:10px">Cargando estado…</div>
+            <div class="form-group"><label class="form-label">Email de prueba</label><input type="email" class="form-input" id="email-test-to" placeholder="tu@email.com"></div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-sm" onclick="loadEmailDiagnostic()"><i class="fas fa-sync"></i> Refrescar</button>
+              <button class="btn btn-dark btn-sm" onclick="sendTestEmail()"><i class="fas fa-paper-plane"></i> Enviar prueba</button>
+            </div>
+          </div>
           <div class="card" style="padding:24px">
             <h3 style="font-size:14px;font-weight:600;margin-bottom:16px"><i class="fas fa-sliders-h" style="color:var(--text-muted);margin-right:6px"></i>Preferencias</h3>
             <div class="form-group"><label class="form-label">Moneda predeterminada</label><select class="form-input"><option>USD — Dólar americano</option><option>CLP — Peso chileno</option></select></div>
@@ -3380,7 +3390,7 @@ function aView(id) {
   links.forEach(l => { const oc = l.getAttribute('onclick') || ''; if (oc.includes("'"+id+"'")) l.classList.add('active'); });
   if (id === 'a-acc') { loadContabilidad(); loadContabilidadDynamic(); }
   if (id === 'a-clients') loadAdminClients();
-  if (id === 'a-config') { loadAdminUsers(); if (typeof loadFeatures === 'function') loadFeatures(); }
+  if (id === 'a-config') { loadAdminUsers(); if (typeof loadFeatures === 'function') loadFeatures(); if (typeof loadEmailDiagnostic === 'function') loadEmailDiagnostic(); }
   if (id === 'a-reports') { loadAdminReports(); loadAdminReportsKPIs(); }
   if (id === 'a-history') loadAdminHistory();
   if (id === 'a-tickets') loadAdminTickets();
@@ -4356,6 +4366,44 @@ async function submitAdminUpload(e) {
 }
 
 // ─── Admin: Role Management ───
+// ─── Email Diagnostic & Test ───
+async function loadEmailDiagnostic() {
+  const el = document.getElementById('email-diag-status');
+  if (!el) return;
+  el.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando…';
+  try {
+    const d = await api('/api/admin/email/diagnostic');
+    if (d.configured) {
+      el.style.background = '#ecfdf5';
+      el.style.color = '#065f46';
+      el.innerHTML = `<i class="fas fa-check-circle"></i> <strong>SMTP configurado</strong><br>
+        <span style="font-size:11px;opacity:.85">Host: ${d.host}:${d.port} · Usuario: ${d.user} · Desde: ${d.from_name} &lt;${d.from_email}&gt;</span>`;
+    } else {
+      el.style.background = '#fef2f2';
+      el.style.color = '#991b1b';
+      el.innerHTML = `<i class="fas fa-times-circle"></i> <strong>SMTP no configurado</strong><br>
+        <span style="font-size:11px;opacity:.85">Agregá estas variables en Cloud Run:<br><code style="font-size:10px">${(d.env_vars_needed||[]).join(', ')}</code></span>`;
+    }
+  } catch (err) {
+    el.style.background = '#fef2f2';
+    el.style.color = '#991b1b';
+    el.innerHTML = `<i class="fas fa-times-circle"></i> Error: ${err.message}`;
+  }
+}
+
+async function sendTestEmail() {
+  const to = (document.getElementById('email-test-to')?.value || '').trim();
+  if (!to || !to.includes('@')) { toast('error', 'Error', 'Email inválido'); return; }
+  try {
+    const r = await api('/api/admin/email/test', { method: 'POST', body: JSON.stringify({ to }) });
+    if (r.sent) {
+      toast('success', '✉️ Email enviado', 'Revisá tu bandeja (también spam)');
+    } else {
+      toast('error', 'Error envío', r.reason || 'SMTP no configurado');
+    }
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
 async function loadAdminUsers() {
   try {
     const users = await api('/api/admin/users');

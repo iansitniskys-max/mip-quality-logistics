@@ -382,35 +382,19 @@ def admin_invite(data: dict, db: Session = Depends(get_db)):
     body = (
         f"Hola {nombre or email},\n\n"
         f"Has sido invitado/a como administrador en la plataforma MIP Quality & Logistics.\n\n"
-        f"Para acceder, ingresa con tu cuenta de Google o reg\u00edstrate en el siguiente enlace:\n"
+        f"Para acceder, ingresa con tu cuenta de Google o regístrate en el siguiente enlace:\n"
         f"{invite_link}\n\n"
-        f"Tu rol de administrador ya est\u00e1 activo.\n\n"
-        f"\u2014 MIP Quality & Logistics Platform"
+        f"Tu rol de administrador ya está activo.\n\n"
+        f"— MIP Quality & Logistics Platform"
     )
-    email_sent = False
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-        SMTP_USER = os.getenv("SMTP_USER", "")
-        SMTP_PASS = os.getenv("SMTP_PASS", "")
-        if SMTP_USER and SMTP_PASS:
-            msg = MIMEText(body, "plain", "utf-8")
-            msg["Subject"] = subject
-            msg["From"] = SMTP_USER
-            msg["To"] = email
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-                s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_USER, [email], msg.as_string())
-            email_sent = True
-        else:
-            print(f"ADMIN INVITE (SMTP not configured):\nTo: {email}\n{body}")
-    except Exception as e:
-        print(f"Invite email error: {e}")
-
-    return {"action": action, "email": email, "role": "admin", "email_sent": email_sent, "invite_link": invite_link}
+    html = _wrap_html_email(
+        title=f"Bienvenido al equipo MIP, {email.split('@')[0]}",
+        body_html=f"<p>Se te ha otorgado acceso de <strong>administrador</strong> a la plataforma MIP Quality & Logistics.</p><p>Con tu cuenta podrás gestionar clientes, cotizaciones, proyectos, facturación y más.</p>",
+        cta_label="Acceder a la plataforma",
+        cta_url=invite_link,
+    )
+    r = _send_email(to=email, subject=subject, body=body, html=html, db=db, tipo="admin_invite")
+    return {"action": action, "email": email, "role": "admin", "email_sent": r["sent"], "invite_link": invite_link, "email_error": r.get("reason")}
 
 
 # ─── Admin: Invite Client to Platform ───
@@ -422,31 +406,31 @@ def admin_invite_client(data: dict, db: Session = Depends(get_db)):
     message = data.get("message", "")
     if not email:
         raise HTTPException(400, "Email requerido")
-    subject = "Invitación — MIP Quality & Logistics"
-    body = message or f"Hola {nombre},\n\nTe invitamos a la plataforma MIP Quality & Logistics.\n\n— MIP Q&L"
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-        SMTP_USER = os.getenv("SMTP_USER", "")
-        SMTP_PASS = os.getenv("SMTP_PASS", "")
-        if SMTP_USER and SMTP_PASS:
-            msg = MIMEText(body, "plain", "utf-8")
-            msg["Subject"] = subject
-            msg["From"] = SMTP_USER
-            msg["To"] = email
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-                s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_USER, [email], msg.as_string())
-            return {"sent": True, "email": email}
-        else:
-            print(f"CLIENT INVITE (SMTP not configured):\nTo: {email}\n{body}")
-            return {"sent": False, "reason": "SMTP no configurado"}
-    except Exception as e:
-        print(f"Client invite email error: {e}")
-        raise HTTPException(500, f"Error enviando email: {str(e)}")
+    app_url = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    subject = f"Bienvenido a MIP Quality & Logistics, {nombre or 'amigo/a'}"
+    body = message or (
+        f"Hola {nombre},\n\n"
+        f"Te invitamos a acceder a tu portal en MIP Quality & Logistics.\n"
+        f"Ahí vas a poder ver el avance de tus proyectos, descargar cotizaciones y hablar con nuestro equipo.\n\n"
+        f"Ingresá en: {app_url}\n\n"
+        f"— Equipo MIP"
+    )
+    html = _wrap_html_email(
+        title=f"Hola {nombre or 'amigo/a'}, bienvenido a MIP",
+        body_html=(message.replace("\n", "<br>") if message else
+                   "<p>Te invitamos a acceder a tu portal en MIP Quality & Logistics.</p>"
+                   "<p>Desde ahí vas a poder:</p>"
+                   "<ul><li>Ver el avance de tus cotizaciones y pedidos</li>"
+                   "<li>Descargar facturas, cotizaciones formales y archivos</li>"
+                   "<li>Solicitar nuevos productos</li>"
+                   "<li>Hablar con nuestro equipo en cualquier momento</li></ul>"),
+        cta_label="Acceder al portal",
+        cta_url=app_url,
+    )
+    r = _send_email(to=email, subject=subject, body=body, html=html, db=db, tipo="client_invite")
+    if not r["sent"]:
+        raise HTTPException(500, r.get("reason") or "Error enviando email")
+    return {"sent": True, "email": email}
 
 
 # ─── Admin: Create Project for Client ───
@@ -623,7 +607,10 @@ def crear_cotizacion(data: CotizacionCreate, db: Session = Depends(get_db)):
 
 @app.post("/api/cotizaciones/notify")
 def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
-    """Send email notification for new quotation"""
+    """Dispara dos emails cuando se crea una cotizacion:
+      1) Notificacion al equipo MIP (admin + cc a fundador)
+      2) Confirmacion al cliente de que recibimos su solicitud
+    """
     cot_id = data.get("cotizacion_id")
     cliente_nombre = data.get("cliente_nombre", "Cliente")
     cliente_email = data.get("cliente_email", "")
@@ -631,46 +618,92 @@ def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
     if not cot:
         return {"sent": False, "reason": "Cotización no encontrada"}
 
-    subject = f"Nueva cotización #{cot.id} — {cot.producto} — {cliente_nombre}"
-    body = (
+    ADMIN_TO = os.getenv("ADMIN_NOTIFY_EMAIL", "Paul@emonkonline.com")
+    ADMIN_CC = os.getenv("ADMIN_NOTIFY_CC", "iansitniskys@gmail.com")
+    app_url = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+
+    # 1) Email al equipo MIP
+    subject_team = f"🔔 Nueva cotización #{cot.id} — {cot.producto} — {cliente_nombre}"
+    body_team = (
         f"Nueva solicitud de cotización recibida:\n\n"
         f"Cliente: {cliente_nombre} ({cliente_email})\n"
         f"Producto: {cot.producto}\n"
-        f"Especificaciones: {cot.descripcion}\n"
-        f"Cantidad: {cot.cantidad}\n"
-        f"Precio objetivo: {cot.precio_objetivo}\n"
-        f"Plazo: {cot.plazo}\n"
-        f"Uso final: {cot.uso_final}\n"
+        f"Especificaciones: {cot.descripcion or '-'}\n"
+        f"Cantidad: {cot.cantidad or '-'}\n"
+        f"Precio objetivo: {cot.precio_objetivo or '-'}\n"
+        f"Plazo: {cot.plazo or '-'}\n"
+        f"Uso final: {cot.uso_final or '-'}\n"
         f"Personalización: {cot.personalizacion or 'No'}\n\n"
+        f"Ver en plataforma: {app_url}\n\n"
         f"— MIP Quality & Logistics Platform"
     )
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-        SMTP_USER = os.getenv("SMTP_USER", "")
-        SMTP_PASS = os.getenv("SMTP_PASS", "")
-        TO_EMAIL = "Paul@emonkonline.com"
-        CC_EMAIL = "iansitniskys@gmail.com"
+    html_team = _wrap_html_email(
+        title=f"Nueva cotización #{cot.id}",
+        body_html=(
+            f"<p><strong>Cliente:</strong> {cliente_nombre} &lt;{cliente_email}&gt;</p>"
+            f"<table cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%;font-size:13px'>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Producto</td><td>{cot.producto}</td></tr>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Especificaciones</td><td>{cot.descripcion or '-'}</td></tr>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Cantidad</td><td>{cot.cantidad or '-'}</td></tr>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Precio objetivo</td><td>{cot.precio_objetivo or '-'}</td></tr>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Plazo</td><td>{cot.plazo or '-'}</td></tr>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Uso final</td><td>{cot.uso_final or '-'}</td></tr>"
+            f"<tr><td style='background:#f3f4f6;font-weight:600'>Personalización</td><td>{cot.personalizacion or 'No'}</td></tr>"
+            f"</table>"
+        ),
+        cta_label="Ver en plataforma",
+        cta_url=f"{app_url}#cot-{cot.id}",
+    )
+    r_team = _send_email(
+        to=ADMIN_TO, subject=subject_team, body=body_team, html=html_team,
+        cc=[ADMIN_CC] if ADMIN_CC else None,
+        db=db, cotizacion_id=cot.id, tipo="cotizacion_nueva_admin",
+    )
 
-        if SMTP_USER and SMTP_PASS:
-            msg = MIMEText(body, "plain", "utf-8")
-            msg["Subject"] = subject
-            msg["From"] = SMTP_USER
-            msg["To"] = TO_EMAIL
-            msg["Cc"] = CC_EMAIL
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-                s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_USER, [TO_EMAIL, CC_EMAIL], msg.as_string())
-            return {"sent": True}
-        else:
-            print(f"EMAIL NOTIFICATION (SMTP not configured):\nTo: {TO_EMAIL}\nCc: {CC_EMAIL}\nSubject: {subject}\n{body}")
-            return {"sent": False, "reason": "SMTP no configurado, email logged en consola"}
-    except Exception as e:
-        print(f"Email send error: {e}")
-        return {"sent": False, "reason": str(e)}
+    # 2) Email al cliente (confirmacion)
+    r_client = {"sent": False, "reason": "Sin email del cliente"}
+    if cliente_email and "@" in cliente_email:
+        subject_client = f"✅ Recibimos tu solicitud #{cot.id} — MIP"
+        body_client = (
+            f"Hola {cliente_nombre},\n\n"
+            f"Recibimos tu solicitud de cotización para '{cot.producto}'. Ya la estamos revisando y te vamos a contactar dentro de las próximas 24 hs con una propuesta.\n\n"
+            f"Resumen:\n"
+            f"- Producto: {cot.producto}\n"
+            f"- Cantidad: {cot.cantidad or 'por confirmar'}\n"
+            f"- Plazo: {cot.plazo or 'por confirmar'}\n\n"
+            f"Podés ver el estado en vivo en: {app_url}\n\n"
+            f"Gracias por confiar en nosotros.\n\n"
+            f"— Equipo MIP Quality & Logistics"
+        )
+        html_client = _wrap_html_email(
+            title=f"Recibimos tu solicitud, {cliente_nombre}",
+            body_html=(
+                f"<p>Gracias por tu interés en MIP Quality & Logistics. Recibimos tu solicitud de cotización y ya estamos trabajando en ella.</p>"
+                f"<p><strong>Número de solicitud:</strong> #SOL-{str(cot.id).zfill(3)}</p>"
+                f"<p><strong>¿Qué sigue?</strong></p>"
+                f"<ol><li>Nuestro equipo revisa tu solicitud (hoy)</li>"
+                f"<li>Cotizamos con nuestros proveedores en China (24-48hs)</li>"
+                f"<li>Te enviamos propuesta formal con precios y plazos</li>"
+                f"<li>Si aceptás, arrancamos producción</li></ol>"
+                f"<p>Resumen de tu solicitud:</p>"
+                f"<table cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%;font-size:13px;background:#f9fafb;border:1px solid #e5e7eb'>"
+                f"<tr><td style='font-weight:600'>Producto</td><td>{cot.producto}</td></tr>"
+                f"<tr><td style='font-weight:600'>Cantidad</td><td>{cot.cantidad or 'por confirmar'}</td></tr>"
+                f"<tr><td style='font-weight:600'>Plazo buscado</td><td>{cot.plazo or 'por confirmar'}</td></tr>"
+                f"</table>"
+                f"<p style='margin-top:16px'>Si tenés alguna urgencia o querés agregar información, respondé directamente a este email.</p>"
+            ),
+            cta_label="Ver estado del pedido",
+            cta_url=f"{app_url}",
+        )
+        r_client = _send_email(
+            to=cliente_email, subject=subject_client, body=body_client, html=html_client,
+            db=db, cotizacion_id=cot.id, tipo="cotizacion_confirmacion_cliente",
+        )
+    return {
+        "team_notified": r_team["sent"], "team_reason": r_team.get("reason"),
+        "client_notified": r_client["sent"], "client_reason": r_client.get("reason"),
+    }
 
 
 @app.get("/api/cotizaciones/{id}", response_model=CotizacionOut)
@@ -1286,6 +1319,276 @@ def log_evento(db: Session, tipo: str, accion: str, descripcion: str, usuario: s
     evento = HistorialEvento(tipo=tipo, accion=accion, descripcion=descripcion, usuario=usuario, entidad_id=entidad_id, cliente_id=cliente_id)
     db.add(evento)
     db.commit()
+
+
+# ─── Email helper centralizado ───
+def _smtp_config():
+    """Lee config SMTP del entorno. Devuelve dict con host, port, user, pass, from_name."""
+    return {
+        "host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+        "port": int(os.getenv("SMTP_PORT", "587")),
+        "user": os.getenv("SMTP_USER", ""),
+        "password": os.getenv("SMTP_PASS", ""),
+        "from_name": os.getenv("SMTP_FROM_NAME", "MIP Quality & Logistics"),
+        "from_email": os.getenv("SMTP_FROM_EMAIL", "") or os.getenv("SMTP_USER", ""),
+        "reply_to": os.getenv("SMTP_REPLY_TO", ""),
+    }
+
+
+def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url: str = None, footer_extra: str = "") -> str:
+    """Envuelve un cuerpo HTML en un template responsivo con branding MIP."""
+    cta_html = ""
+    if cta_label and cta_url:
+        cta_html = f"""
+        <div style="text-align:center;margin:28px 0">
+          <a href="{cta_url}" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">{cta_label}</a>
+        </div>
+        """
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+        <tr><td style="background:#0f172a;padding:20px 24px;color:#fff">
+          <div style="display:inline-block;width:40px;height:40px;background:#f59e0b;border-radius:8px;vertical-align:middle;margin-right:12px"></div>
+          <span style="font-size:18px;font-weight:700;vertical-align:middle">MIP Quality & Logistics</span>
+        </td></tr>
+        <tr><td style="padding:28px 28px 8px 28px">
+          <h2 style="margin:0 0 14px 0;font-size:20px;color:#0f172a">{title}</h2>
+          <div style="color:#374151;font-size:14px;line-height:1.6">{body_html}</div>
+          {cta_html}
+        </td></tr>
+        <tr><td style="padding:16px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
+          MIP Quality & Logistics · Importación y logística desde China<br>
+          Si tenés preguntas, respondé directamente a este email.
+          {('<br>' + footer_extra) if footer_extra else ''}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+def _send_email(to: str, subject: str, body: str = "", html: str = None, cc: list = None, reply_to: str = None, log_to_db: bool = True, db: Session = None, cotizacion_id: int = None, cliente_id: int = None, tipo: str = "general") -> dict:
+    """Helper centralizado de envio de email.
+
+    Args:
+        to: email destinatario
+        subject: asunto
+        body: cuerpo texto plano (fallback)
+        html: cuerpo HTML (si se pasa, se usa con body como fallback)
+        cc: lista de emails cc
+        reply_to: email para responder (si distinto al sender)
+        log_to_db: si True, crea registro en EmailLog
+        cotizacion_id, cliente_id: para asociar al log
+
+    Returns:
+        {sent: bool, reason: str, log_id: int|None}
+    """
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    cfg = _smtp_config()
+    result = {"sent": False, "reason": "", "log_id": None}
+
+    # Validacion basica
+    if not to or "@" not in to:
+        result["reason"] = "Email destinatario invalido"
+        return result
+
+    # Crear log en DB primero (estado pendiente)
+    log = None
+    if log_to_db and db is not None:
+        try:
+            log = EmailLog(
+                cotizacion_id=cotizacion_id,
+                destinatario=to,
+                asunto=subject,
+                cuerpo=body or (html or "")[:2000],
+                estado="pendiente",
+                programado_para=datetime.now(),
+            )
+            db.add(log)
+            db.commit()
+            db.refresh(log)
+            result["log_id"] = log.id
+        except Exception as e:
+            print(f"[_send_email] no se pudo crear log: {e}")
+
+    if not (cfg["user"] and cfg["password"]):
+        msg = "SMTP no configurado (SMTP_USER/SMTP_PASS vacios en env)"
+        print(f"[_send_email] {msg} | would send to={to} subject={subject}")
+        if log:
+            log.estado = "error"
+            log.error_msg = msg
+            try: db.commit()
+            except Exception: pass
+        result["reason"] = msg
+        return result
+
+    try:
+        # Si hay HTML, enviar multipart
+        if html:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{cfg['from_name']} <{cfg['from_email']}>"
+            msg["To"] = to
+            if cc:
+                msg["Cc"] = ", ".join(cc)
+            if reply_to or cfg["reply_to"]:
+                msg["Reply-To"] = reply_to or cfg["reply_to"]
+            msg.attach(MIMEText(body or "Ver email en version HTML", "plain", "utf-8"))
+            msg.attach(MIMEText(html, "html", "utf-8"))
+        else:
+            msg = MIMEText(body or "", "plain", "utf-8")
+            msg["Subject"] = subject
+            msg["From"] = f"{cfg['from_name']} <{cfg['from_email']}>"
+            msg["To"] = to
+            if cc:
+                msg["Cc"] = ", ".join(cc)
+            if reply_to or cfg["reply_to"]:
+                msg["Reply-To"] = reply_to or cfg["reply_to"]
+
+        recipients = [to] + (cc or [])
+        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=20) as s:
+            s.starttls()
+            s.login(cfg["user"], cfg["password"])
+            s.sendmail(cfg["from_email"], recipients, msg.as_string())
+
+        result["sent"] = True
+        if log:
+            log.estado = "enviado"
+            log.enviado_at = datetime.now()
+            log.error_msg = None
+            try: db.commit()
+            except Exception: pass
+        # Log event to historial
+        if db is not None:
+            try:
+                log_evento(db, "email", "enviado", f"[{tipo}] To: {to} | Asunto: {subject}", cliente_id=cliente_id, entidad_id=cotizacion_id)
+            except Exception: pass
+        return result
+
+    except Exception as e:
+        err = str(e)[:500]
+        print(f"[_send_email] error enviando a {to}: {err}")
+        if log:
+            log.estado = "error"
+            log.error_msg = err
+            try: db.commit()
+            except Exception: pass
+        if db is not None:
+            try:
+                log_evento(db, "email", "error", f"[{tipo}] Error envio a {to}: {err}", cliente_id=cliente_id, entidad_id=cotizacion_id)
+            except Exception: pass
+        result["reason"] = err
+        return result
+
+
+def _notify_client_estado_change(cliente, cot, estado_anterior: str, nuevo_estado: str, db: Session):
+    """Envia email transaccional al cliente cuando cambia el estado de su cotizacion.
+    Un email distinto y tono distinto para cada estado.
+    """
+    app_url = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    producto = (cot.proyecto_nombre or cot.producto or "tu proyecto").strip()
+    nombre = cliente.nombre or "amigo/a"
+    sol_id = f"#SOL-{str(cot.id).zfill(3)}"
+
+    templates = {
+        "cotizado": {
+            "subject": f"💰 {sol_id} — Tu cotización de '{producto}' está lista",
+            "title": f"Tu cotización está lista, {nombre}",
+            "body_html": (
+                f"<p>Buenas noticias: ya tenemos la cotización para <strong>{producto}</strong>.</p>"
+                f"<p>Entrá a la plataforma para ver los detalles (precios, plazos, condiciones) y confirmar si querés avanzar.</p>"
+                f"<p style='background:#fef3c7;padding:12px;border-left:3px solid #f59e0b;border-radius:4px;font-size:13px'>💡 La cotización tiene una vigencia aproximada de 7 días. Si tenés dudas, respondé a este email y te respondemos.</p>"
+            ),
+            "cta_label": "Ver cotización",
+        },
+        "produccion": {
+            "subject": f"🏭 {sol_id} — Producción de '{producto}' en marcha",
+            "title": f"¡Arrancamos producción!",
+            "body_html": (
+                f"<p>Hola {nombre},</p>"
+                f"<p>Ya confirmamos el pedido con el proveedor y <strong>{producto}</strong> está en producción.</p>"
+                f"<p>Te vamos a ir avisando de cada hito:</p>"
+                f"<ul><li>✅ Producción iniciada (hoy)</li>"
+                f"<li>⏳ Quality check en fábrica</li>"
+                f"<li>⏳ Embarque marítimo</li>"
+                f"<li>⏳ Arribo a Chile + despacho a domicilio</li></ul>"
+                f"<p>Podés seguir el avance en la plataforma en cualquier momento.</p>"
+            ),
+            "cta_label": "Ver estado del pedido",
+        },
+        "entregado": {
+            "subject": f"📦 {sol_id} — '{producto}' entregado",
+            "title": f"Entregado con éxito",
+            "body_html": (
+                f"<p>¡{nombre}, tu pedido de <strong>{producto}</strong> fue entregado!</p>"
+                f"<p>Esperamos que todo esté en orden. Si algo no es como esperabas, respondé a este email y lo resolvemos.</p>"
+                f"<p style='background:#ecfdf5;padding:12px;border-left:3px solid #10b981;border-radius:4px;font-size:13px'>🙏 <strong>¿Nos dejás un feedback?</strong> Tu opinión nos ayuda a mejorar. Podés contarnos cómo fue la experiencia respondiendo este email.</p>"
+                f"<p>Tu factura ya está disponible en la plataforma.</p>"
+            ),
+            "cta_label": "Ver factura",
+        },
+    }
+    tpl = templates.get(nuevo_estado)
+    if not tpl:
+        return  # pendiente no dispara email transaccional al cliente
+    html = _wrap_html_email(
+        title=tpl["title"],
+        body_html=tpl["body_html"],
+        cta_label=tpl["cta_label"],
+        cta_url=app_url,
+    )
+    body_plain = f"Hola {nombre},\n\n{tpl['title']}.\n\nVer en: {app_url}\n\n— Equipo MIP"
+    _send_email(
+        to=cliente.email, subject=tpl["subject"],
+        body=body_plain, html=html,
+        db=db, cotizacion_id=cot.id, cliente_id=cliente.id,
+        tipo=f"estado_{nuevo_estado}",
+    )
+
+
+@app.get("/api/admin/email/diagnostic")
+def email_diagnostic():
+    """Chequea si SMTP esta configurado. Util para debug."""
+    cfg = _smtp_config()
+    return {
+        "configured": bool(cfg["user"] and cfg["password"]),
+        "host": cfg["host"],
+        "port": cfg["port"],
+        "user": cfg["user"] if cfg["user"] else "(no configurado)",
+        "from_name": cfg["from_name"],
+        "from_email": cfg["from_email"] if cfg["from_email"] else "(no configurado)",
+        "reply_to": cfg["reply_to"] or "(mismo que from)",
+        "env_vars_needed": ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM_NAME", "SMTP_FROM_EMAIL", "SMTP_REPLY_TO"],
+    }
+
+
+@app.post("/api/admin/email/test")
+def email_test(data: dict, db: Session = Depends(get_db)):
+    """Envia un email de prueba al admin para verificar que SMTP funciona."""
+    to = data.get("to", "").strip()
+    if not to:
+        raise HTTPException(400, "Parametro 'to' requerido")
+    html = _wrap_html_email(
+        title="Email de prueba — MIP",
+        body_html="<p>Este email confirma que tu configuración SMTP está funcionando correctamente.</p><p>Si lo estás viendo, los siguientes triggers también van a funcionar:</p><ul><li>✅ Notificaciones de nuevas cotizaciones</li><li>✅ Invitaciones a clientes</li><li>✅ Secuencias de email automatizadas</li><li>✅ Alertas de cambios de estado</li></ul>",
+        cta_label="Ir a la plataforma",
+        cta_url=os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app"),
+    )
+    result = _send_email(
+        to=to,
+        subject="✅ Test de email — MIP Quality & Logistics",
+        body="Este email confirma que tu configuración SMTP está funcionando correctamente.",
+        html=html,
+        db=db,
+        tipo="test",
+    )
+    return result
 
 
 # ─── Clientes: Update + Bulk + Export ───
@@ -6153,26 +6456,41 @@ def _trigger_email_automation(nueva_etapa: str, cot: Cotizacion, db: Session):
 
 
 def _send_email_log_now(log: EmailLog) -> bool:
-    """Physically send via SMTP. Returns True on success."""
+    """Envia un EmailLog via SMTP usando el helper centralizado.
+    Si el cuerpo parece HTML (tiene <html o <body), lo manda como HTML.
+    """
+    cfg = _smtp_config()
+    if not (cfg["user"] and cfg["password"]):
+        log.estado = "error"
+        log.error_msg = "SMTP no configurado (SMTP_USER/SMTP_PASS vacios)"
+        return False
     try:
         import smtplib
+        from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
-        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-        SMTP_USER = os.getenv("SMTP_USER", "")
-        SMTP_PASS = os.getenv("SMTP_PASS", "")
-        if not (SMTP_USER and SMTP_PASS):
-            log.estado = "error"
-            log.error_msg = "SMTP no configurado (SMTP_USER/SMTP_PASS vacíos)"
-            return False
-        msg = MIMEText(log.cuerpo or "", "plain", "utf-8")
-        msg["Subject"] = log.asunto or "MIP Quality & Logistics"
-        msg["From"] = SMTP_USER
-        msg["To"] = log.destinatario
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+        body = log.cuerpo or ""
+        is_html = "<html" in body.lower() or "<body" in body.lower() or "<table" in body.lower()
+        if is_html:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = log.asunto or "MIP Quality & Logistics"
+            msg["From"] = f"{cfg['from_name']} <{cfg['from_email']}>"
+            msg["To"] = log.destinatario
+            if cfg["reply_to"]: msg["Reply-To"] = cfg["reply_to"]
+            # Genera version texto plano rudimentaria
+            import re as _re
+            plain = _re.sub(r'<[^>]+>', '', body)
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
+            msg.attach(MIMEText(body, "html", "utf-8"))
+        else:
+            msg = MIMEText(body, "plain", "utf-8")
+            msg["Subject"] = log.asunto or "MIP Quality & Logistics"
+            msg["From"] = f"{cfg['from_name']} <{cfg['from_email']}>"
+            msg["To"] = log.destinatario
+            if cfg["reply_to"]: msg["Reply-To"] = cfg["reply_to"]
+        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=20) as s:
             s.starttls()
-            s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(SMTP_USER, [log.destinatario], msg.as_string())
+            s.login(cfg["user"], cfg["password"])
+            s.sendmail(cfg["from_email"], [log.destinatario], msg.as_string())
         log.estado = "enviado"
         log.enviado_at = datetime.now()
         log.error_msg = None
@@ -6228,6 +6546,7 @@ def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)
     """Quick state change for pipeline drag & drop"""
     nuevo_estado = data.get("estado")
     autor = data.get("autor", "admin")
+    notify_client = data.get("notify_client", True)  # por default notificar al cliente
     valid_estados = ["pendiente", "cotizado", "produccion", "entregado"]
     if nuevo_estado not in valid_estados:
         raise HTTPException(400, f"Estado inválido. Usar: {valid_estados}")
@@ -6235,6 +6554,8 @@ def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)
     if not cot:
         raise HTTPException(404, "Cotización no encontrada")
     estado_anterior = cot.estado
+    if estado_anterior == nuevo_estado:
+        return {"id": cot.id, "estado": nuevo_estado, "skipped": True, "reason": "Mismo estado"}
     cot.estado = nuevo_estado
     db.commit()
     # Auto-log as activity
@@ -6250,12 +6571,22 @@ def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)
     )
     db.add(act)
     db.commit()
-    # AUTO-TRIGGER EMAIL AUTOMATION para la nueva etapa
+    # AUTO-TRIGGER EMAIL AUTOMATION para la nueva etapa (secuencias configuradas)
     try:
         logs_created = _trigger_email_automation(nuevo_estado, cot, db)
     except Exception as e:
         print(f"[email-automation] error trigger: {e}")
         logs_created = 0
+    # ENVIO TRANSACCIONAL al cliente (independiente de secuencias)
+    client_email_sent = False
+    if notify_client:
+        try:
+            cliente = db.query(Cliente).get(cot.cliente_id) if cot.cliente_id else None
+            if cliente and cliente.email and "@" in cliente.email:
+                _notify_client_estado_change(cliente, cot, estado_anterior, nuevo_estado, db)
+                client_email_sent = True
+        except Exception as e:
+            print(f"[estado-notify] error: {e}")
     return {
         "id": cot.id,
         "estado": nuevo_estado,
@@ -6631,38 +6962,15 @@ def listar_email_logs(estado: Optional[str] = None, limit: int = 100, db: Sessio
 
 @app.post("/api/email-logs/{id}/enviar")
 def enviar_email_log(id: int, db: Session = Depends(get_db)):
-    """Manually send a pending email"""
+    """Manually send a pending email (delega al helper centralizado)."""
     log = db.query(EmailLog).get(id)
     if not log:
         raise HTTPException(404, "Email log no encontrado")
     if log.estado == "enviado":
-        return {"status": "already_sent"}
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-        SMTP_USER = os.getenv("SMTP_USER", "")
-        SMTP_PASS = os.getenv("SMTP_PASS", "")
-        if SMTP_USER and SMTP_PASS:
-            msg = MIMEText(log.cuerpo or "", "plain", "utf-8")
-            msg["Subject"] = log.asunto or "MIP Quality & Logistics"
-            msg["From"] = SMTP_USER
-            msg["To"] = log.destinatario
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-                s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
-                s.sendmail(SMTP_USER, [log.destinatario], msg.as_string())
-            log.estado = "enviado"
-            log.enviado_at = datetime.now()
-        else:
-            log.estado = "error"
-            log.error_msg = "SMTP no configurado"
-    except Exception as e:
-        log.estado = "error"
-        log.error_msg = str(e)
+        return {"status": "already_sent", "id": log.id, "estado": log.estado}
+    _send_email_log_now(log)
     db.commit()
-    return {"id": log.id, "estado": log.estado}
+    return {"id": log.id, "estado": log.estado, "error": log.error_msg}
 
 
 @app.post("/api/email-logs/crear-manual")
