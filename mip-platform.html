@@ -2914,6 +2914,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="ch-name">Mateo</div>
       <div class="ch-status"><span class="dot-online"></span> Asesor de importaciones MIP</div>
     </div>
+    <button class="ch-close" onclick="resetChat()" title="Borrar conversación" style="margin-right:4px;background:none;border:none;color:inherit;cursor:pointer;padding:6px 8px;font-size:13px;opacity:.7" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'"><i class="fas fa-redo"></i></button>
     <button class="ch-close" onclick="toggleChat()"><i class="fas fa-times"></i></button>
   </div>
   <div class="chat-body" id="chatBody">
@@ -5818,7 +5819,54 @@ async function generarPDF(cotId) {
 // ═══════════════════════════════════════════════════
 
 // ─── Chatbot Mateo ───
-let chatHistory = [];
+// Historial persistente en localStorage (mantiene contexto cuando cierra el widget)
+const CHAT_STORAGE_KEY = 'mip_mateo_chat_v1';
+const CHAT_MAX_HISTORY = 50; // ultimos 50 turnos
+const CHAT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+
+function _loadChatFromStorage() {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return { history: [], session_id: null, html: '' };
+    const data = JSON.parse(raw);
+    // Expirar despues de 7 dias
+    if (data.ts && (Date.now() - data.ts) > CHAT_EXPIRY_MS) {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+      return { history: [], session_id: null, html: '' };
+    }
+    return {
+      history: Array.isArray(data.history) ? data.history : [],
+      session_id: data.session_id || null,
+      html: data.html || '',
+    };
+  } catch (e) {
+    return { history: [], session_id: null, html: '' };
+  }
+}
+
+function _saveChatToStorage() {
+  try {
+    const body = document.getElementById('chatBody');
+    const html = body ? body.innerHTML : '';
+    const payload = {
+      history: chatHistory.slice(-CHAT_MAX_HISTORY),
+      session_id: window._mateoSessionId || null,
+      html,
+      ts: Date.now(),
+    };
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) { /* localStorage full or disabled */ }
+}
+
+function _clearChatStorage() {
+  try { localStorage.removeItem(CHAT_STORAGE_KEY); } catch (e) {}
+}
+
+// Restaurar al cargar pagina
+const _stored = _loadChatFromStorage();
+let chatHistory = _stored.history || [];
+if (_stored.session_id) window._mateoSessionId = _stored.session_id;
+
 let chatGreetingDismissed = false;
 
 function closeChatGreeting() {
@@ -5853,11 +5901,33 @@ function toggleChat() {
     fab.style.display = 'none';
     if (greeting) greeting.classList.remove('show');
     document.getElementById('chatInput').focus();
-    // Personalized greeting for logged-in users
-    if (currentUser && chatHistory.length === 0) {
-      const body = document.getElementById('chatBody');
+    const body = document.getElementById('chatBody');
+    // Restaurar conversacion previa si existe
+    if (body && chatHistory.length > 0 && body.innerHTML.trim() === '') {
+      const stored = _loadChatFromStorage();
+      if (stored.html) {
+        body.innerHTML = stored.html +
+          `<div style="text-align:center;margin:12px 0;font-size:10px;color:var(--text-muted)"><i class="fas fa-history"></i> Retomando conversacion anterior</div>`;
+        body.scrollTop = body.scrollHeight;
+        // Reanudar polling si hay session activa
+        if (window._mateoSessionId && !window._chatPollInterval) _startChatPolling();
+      }
+    } else if (currentUser && chatHistory.length === 0 && body) {
       body.innerHTML = `<div class="chat-msg bot">Hola ${currentUser.nombre.split(' ')[0]}, soy Mateo de MIP Quality & Logistics. ¿En qué te puedo ayudar hoy?</div>`;
     }
+  }
+}
+
+function resetChat() {
+  if (!confirm('¿Estás seguro de borrar esta conversación? Esto no se puede deshacer.')) return;
+  chatHistory = [];
+  window._mateoSessionId = null;
+  _clearChatStorage();
+  const body = document.getElementById('chatBody');
+  if (body) {
+    body.innerHTML = currentUser
+      ? `<div class="chat-msg bot">Hola ${(currentUser.nombre||'').split(' ')[0]}, soy Mateo. ¿En qué te puedo ayudar hoy?</div>`
+      : `<div class="chat-msg bot">Hola! Soy Mateo de MIP Quality & Logistics. ¿En qué te puedo ayudar?</div>`;
   }
 }
 
@@ -5950,6 +6020,7 @@ async function sendChat() {
 
   btn.disabled = false;
   body.scrollTop = body.scrollHeight;
+  _saveChatToStorage();
 }
 
 // ═══════════════════════════════════════════════════
