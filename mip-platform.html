@@ -6458,7 +6458,7 @@ async function openAddFunctionModal(blockId) {
         <div style="margin-bottom:14px">
           <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:${(catMap[cat]||{}).color||'var(--text-muted)'};margin-bottom:6px">${((catMap[cat]||{}).label||cat).toUpperCase()}</div>
           ${grouped[cat].map(fn => `
-            <div onclick="selectFunctionForBlock('${fn.name}','${(fn.label||'').replace(/'/g,"\\'")}')" style="padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='${(catMap[cat]||{}).color||'var(--accent)'}'" onmouseout="this.style.borderColor='var(--border)'">
+            <div onclick="selectFunctionForBlock('${fn.name}')" style="padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='${(catMap[cat]||{}).color||'var(--accent)'}'" onmouseout="this.style.borderColor='var(--border)'">
               <div style="display:flex;align-items:center;gap:8px">
                 <i class="fas fa-${fn.icon||'cog'}" style="color:${(catMap[cat]||{}).color||'var(--text-muted)'};width:16px;text-align:center"></i>
                 <div style="flex:1">
@@ -6472,8 +6472,9 @@ async function openAddFunctionModal(blockId) {
       `).join('')}
     </div>
     <div id="fn-when-wrap" style="display:none;padding:12px;background:var(--bg-subtle);border-radius:var(--radius);margin-top:8px">
-      <div style="font-weight:500;font-size:13px;margin-bottom:4px">Seleccionado: <span id="fn-selected-label" style="color:var(--accent)"></span></div>
-      <label class="form-label" style="margin-top:6px">Cuando ejecutar (opcional — instruccion en lenguaje natural)</label>
+      <div style="font-weight:500;font-size:13px;margin-bottom:8px">Configurar: <span id="fn-selected-label" style="color:var(--accent)"></span></div>
+      <div id="fn-params-area"></div>
+      <label class="form-label" style="margin-top:10px;font-size:11px">Cuándo ejecutar (opcional — instrucción en lenguaje natural)</label>
       <input type="text" class="form-input" id="fn-when" placeholder="ej: cuando el cliente comparta su email">
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px">
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('addFunctionModal').classList.remove('open')">Cancelar</button>
@@ -6486,23 +6487,65 @@ async function openAddFunctionModal(blockId) {
 }
 
 let _pendingFn = null;
-function selectFunctionForBlock(name, label) {
-  _pendingFn = { name, label };
-  document.getElementById('fn-selected-label').textContent = label || name;
+function selectFunctionForBlock(name) {
+  // Lookup desde el catalogo ya cargado
+  const fn = (_functionCatalog || []).find(f => f.name === name);
+  if (!fn) return;
+  _pendingFn = fn;
+  document.getElementById('fn-selected-label').textContent = fn.label || name;
+  // Renderizar params segun schema
+  const paramsEl = document.getElementById('fn-params-area');
+  if (paramsEl) {
+    const params = fn.params || [];
+    if (!params.length) {
+      paramsEl.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-style:italic">Esta funcion no requiere parametros adicionales.</div>';
+    } else {
+      paramsEl.innerHTML = params.map(p => {
+        const id = 'fnp-' + p.key;
+        const req = p.required ? ' <span style="color:var(--danger)">*</span>' : '';
+        const ph = p.placeholder || '';
+        if (p.type === 'select') {
+          const opts = (p.options || []).map(o => `<option value="${o}" ${o===p.default?'selected':''}>${o}</option>`).join('');
+          return `<div class="form-group" style="margin-bottom:8px"><label class="form-label" style="font-size:11px">${p.label}${req}</label><select class="form-input" id="${id}" data-param-key="${p.key}" style="font-size:12px">${!p.required?'<option value="">—</option>':''}${opts}</select></div>`;
+        }
+        if (p.type === 'number') {
+          return `<div class="form-group" style="margin-bottom:8px"><label class="form-label" style="font-size:11px">${p.label}${req}</label><input type="number" class="form-input" id="${id}" data-param-key="${p.key}" value="${p.default || ''}" placeholder="${ph}" style="font-size:12px"></div>`;
+        }
+        // default text
+        return `<div class="form-group" style="margin-bottom:8px"><label class="form-label" style="font-size:11px">${p.label}${req}</label><input type="text" class="form-input" id="${id}" data-param-key="${p.key}" value="${p.default || ''}" placeholder="${ph}" style="font-size:12px"></div>`;
+      }).join('');
+    }
+  }
   document.getElementById('fn-when-wrap').style.display = 'block';
 }
 
 async function saveFunctionToBlock() {
   if (!_pendingFn || !_currentFnBlockId) return;
   const when = (document.getElementById('fn-when')?.value || '').trim();
+  // Leer params desde los inputs generados
+  const params = {};
+  const missing = [];
+  for (const p of (_pendingFn.params || [])) {
+    const el = document.getElementById('fnp-' + p.key);
+    if (!el) continue;
+    let val = el.value;
+    if (p.type === 'number') val = val ? parseFloat(val) : null;
+    if (p.required && (val === '' || val === null || val === undefined)) {
+      missing.push(p.label);
+    }
+    if (val !== '' && val !== null) params[p.key] = val;
+  }
+  if (missing.length) {
+    toast('error', 'Faltan parametros requeridos', missing.join(', '));
+    return;
+  }
   try {
-    // Get current block to preserve existing functions
     const all = await api('/api/agents/' + _currentAgentId);
     const block = (all.blocks || []).find(b => b.id === _currentFnBlockId);
     if (!block) { toast('error', 'Error', 'Bloque no encontrado'); return; }
     let fns = [];
     try { fns = JSON.parse(block.functions || '[]'); } catch(e) { fns = []; }
-    fns.push({ name: _pendingFn.name, label: _pendingFn.label, when, params: {} });
+    fns.push({ name: _pendingFn.name, label: _pendingFn.label, when, params });
     await api('/api/blocks/' + _currentFnBlockId, { method: 'PUT', body: JSON.stringify({ functions: JSON.stringify(fns) }) });
     toast('success', 'Funcion agregada', _pendingFn.label);
     document.getElementById('addFunctionModal').classList.remove('open');

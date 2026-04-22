@@ -3081,9 +3081,13 @@ def _compose_agent_prompt(agent: "AgentConfig", db, extra_context: str = "") -> 
                     fn_name = fn.get("name", "")
                     fn_label = fn.get("label", fn_name)
                     fn_when = fn.get("when", "")
+                    fn_params = fn.get("params") or {}
                     line = f"\n- `{fn_name}` — {fn_label}"
                     if fn_when:
                         line += f" · Cuando: {fn_when}"
+                    if fn_params:
+                        params_str = ", ".join(f"{k}={v}" for k, v in fn_params.items())
+                        line += f" · Params pre-configurados: {params_str}"
                     parts.append(line)
         except Exception:
             pass
@@ -3302,29 +3306,78 @@ def create_tool(data: dict, db: Session = Depends(get_db)):
 AGENT_FUNCTION_CATALOG = [
     # Pipeline & CRM
     {"name": "create_prospect", "label": "Registrar prospect", "icon": "user-plus", "categoria": "crm",
-     "description": "Guarda el cliente en el CRM con nombre/email/telefono."},
+     "description": "Guarda el cliente en el CRM con nombre/email/telefono.",
+     "params": [
+         {"key": "fuente", "label": "Fuente del lead", "type": "select",
+          "options": ["chatbot_mateo", "landing", "whatsapp", "email", "referido"], "default": "chatbot_mateo"},
+         {"key": "estado", "label": "Estado inicial", "type": "select",
+          "options": ["nuevo", "calificado", "caliente"], "default": "nuevo"},
+     ]},
     {"name": "move_pipeline_stage", "label": "Cambiar etapa en pipeline", "icon": "exchange-alt", "categoria": "crm",
-     "description": "Mueve la conversacion a otra etapa (calificando, cotizando, cerrando, etc)."},
+     "description": "Mueve la conversacion a otra etapa (calificando, cotizando, cerrando, etc).",
+     "params": [
+         {"key": "target_stage", "label": "Etapa destino", "type": "select", "required": True,
+          "options": ["lead_inicial", "calificando", "cotizando", "cerrando", "cliente_activo", "soporte_post_venta", "cliente_perdido"]},
+     ]},
     {"name": "tag_prospect", "label": "Etiquetar prospect", "icon": "tag", "categoria": "crm",
-     "description": "Agrega una etiqueta o nota al prospect (ej: 'interesado en SKU X')."},
+     "description": "Agrega una etiqueta o nota al prospect (ej: 'interesado en SKU X').",
+     "params": [
+         {"key": "tag", "label": "Etiqueta", "type": "text", "required": True,
+          "placeholder": "ej: interesado-en-tshirts"},
+     ]},
     # Calendar
     {"name": "check_calendar_availability", "label": "Consultar disponibilidad calendario", "icon": "calendar-check", "categoria": "calendar",
-     "description": "Chequea slots libres en el calendario del equipo."},
+     "description": "Chequea slots libres en el calendario del equipo.",
+     "params": [
+         {"key": "duration_min", "label": "Duracion reunion (min)", "type": "number", "default": 30},
+         {"key": "buffer_hours", "label": "Proximos N horas a buscar", "type": "number", "default": 72},
+     ]},
     {"name": "calendar_create_event", "label": "Agendar reunion", "icon": "calendar-plus", "categoria": "calendar",
-     "description": "Crea un evento en Google Calendar con invitacion al cliente."},
+     "description": "Crea un evento en Google Calendar con invitacion al cliente.",
+     "params": [
+         {"key": "titulo_base", "label": "Titulo del evento", "type": "text",
+          "default": "Reunion MIP Quality", "placeholder": "ej: Cotizacion con {cliente}"},
+         {"key": "duration_min", "label": "Duracion (min)", "type": "number", "default": 30},
+         {"key": "meet_link", "label": "Crear Google Meet", "type": "select",
+          "options": ["si", "no"], "default": "si"},
+     ]},
     # Data
     {"name": "search_kb", "label": "Buscar en base de conocimiento", "icon": "search", "categoria": "data",
-     "description": "Busca info en la KB (precios, plazos, politicas)."},
+     "description": "Busca info en la KB (precios, plazos, politicas).",
+     "params": [
+         {"key": "folder_filter", "label": "Carpeta especifica (opcional)", "type": "text",
+          "placeholder": "ej: precios, o vacio para todas"},
+         {"key": "max_results", "label": "Max resultados", "type": "number", "default": 3},
+     ]},
     # Handoff
     {"name": "escalate_to_human", "label": "Derivar a humano", "icon": "user-friends", "categoria": "handoff",
-     "description": "Crea un handoff para que un humano tome la conversacion."},
+     "description": "Crea un handoff para que un humano tome la conversacion.",
+     "params": [
+         {"key": "prioridad", "label": "Prioridad", "type": "select",
+          "options": ["baja", "media", "alta", "critica"], "default": "media"},
+         {"key": "notify_whatsapp", "label": "Avisar por WhatsApp", "type": "select",
+          "options": ["si", "no"], "default": "si"},
+     ]},
     {"name": "switch_agent", "label": "Cambiar de agente", "icon": "random", "categoria": "handoff",
-     "description": "Pasa la conversacion a otro agente IA (ej: Mateo -> Carla)."},
+     "description": "Pasa la conversacion a otro agente IA (ej: Mateo -> Carla).",
+     "params": [
+         {"key": "target_agent", "label": "Agente destino", "type": "text", "required": True,
+          "placeholder": "ej: carla-soporte, paula-cotizaciones"},
+     ]},
     # Email
     {"name": "send_templated_email", "label": "Enviar email con template", "icon": "envelope", "categoria": "email",
-     "description": "Dispara un envio de email usando un template predefinido."},
+     "description": "Dispara un envio de email usando un template predefinido.",
+     "params": [
+         {"key": "template_id", "label": "Template", "type": "select", "required": True,
+          "options": ["bienvenida", "cotizacion_lista", "seguimiento_24h", "nurturing_7d", "recuperacion_lead_frio"]},
+         {"key": "delay_horas", "label": "Delay (horas)", "type": "number", "default": 0},
+     ]},
     {"name": "trigger_email_sequence", "label": "Activar secuencia de emails", "icon": "paper-plane", "categoria": "email",
-     "description": "Inicia una secuencia automatizada de follow-up."},
+     "description": "Inicia una secuencia automatizada de follow-up.",
+     "params": [
+         {"key": "secuencia_id", "label": "Secuencia", "type": "select", "required": True,
+          "options": ["onboarding_cliente", "nurturing_lead_frio", "seguimiento_post_cotizacion", "bienvenida_portal"]},
+     ]},
 ]
 
 
