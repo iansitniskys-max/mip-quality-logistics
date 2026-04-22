@@ -1213,21 +1213,73 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="sb-footer"><div class="sb-user"><div class="av">--</div><div><div class="name">Cliente</div><div class="email">email</div></div></div></div>
   </aside>
   <div class="main">
-    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('cSb')"><i class="fas fa-bars"></i></button><h1 id="cTitle">Dashboard</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif" onclick="cView('c-dash'); setTimeout(() => document.getElementById('c-notif-list')?.scrollIntoView({behavior:'smooth', block:'center'}), 100)" style="position:relative"><i class="fas fa-bell"></i><span id="c-topbar-notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;border-radius:10px;padding:1px 5px;font-size:9px;font-weight:600;min-width:16px;text-align:center">0</span></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
 
     <div class="page-body" id="c-dash">
+      <!-- Bienvenida personalizada -->
+      <div id="c-welcome-banner" style="background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;padding:20px 24px;border-radius:var(--radius);margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;letter-spacing:2px;color:#f59e0b;font-weight:600;margin-bottom:4px">PORTAL CLIENTE</div>
+          <h2 id="c-welcome-title" style="margin:0;font-size:22px;font-weight:600">Hola</h2>
+          <p id="c-welcome-sub" style="margin:6px 0 0 0;font-size:13px;opacity:.8">Esto es lo que está pasando con tus pedidos hoy.</p>
+        </div>
+        <button class="btn btn-dark" onclick="cView('c-quote')" style="background:#f59e0b;border-color:#f59e0b;color:#0f172a;font-weight:600"><i class="fas fa-plus"></i> Nueva cotización</button>
+      </div>
+      <!-- KPIs -->
       <div class="stat-grid">
         <div class="stat-card"><div class="s-label">Cotizaciones activas</div><div class="s-val">0</div><div class="s-sub"></div></div>
         <div class="stat-card"><div class="s-label">Pedidos en curso</div><div class="s-val">0</div><div class="s-sub"></div></div>
         <div class="stat-card"><div class="s-label">Completados</div><div class="s-val">0</div><div class="s-sub"></div></div>
         <div class="stat-card"><div class="s-label">Total importado (USD)</div><div class="s-val">$0</div><div class="s-sub"></div></div>
       </div>
-      <div style="margin-bottom:20px"><button class="btn btn-dark" onclick="cView('c-quote')"><i class="fas fa-plus"></i> Nueva solicitud de cotización</button></div>
-      <div class="dtable-wrap">
-        <div class="dtable-header"><h3>Solicitudes recientes</h3><div class="filters"><button class="chip active">Todas</button><button class="chip">En revisión</button><button class="chip">Cotizado</button><button class="chip">Producción</button></div></div>
-        <table class="dtable"><thead><tr><th>ID</th><th>Producto</th><th>Fecha</th><th>Cantidad</th><th>Estado</th><th></th></tr></thead>
-        <tbody></tbody></table>
-        <div class="table-pg"></div>
+      <!-- Layout 2 columnas: activo + notificaciones -->
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-top:4px">
+        <!-- Col izquierda: pedido activo + solicitudes -->
+        <div>
+          <!-- Pedido activo destacado -->
+          <div id="c-active-order" style="display:none;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+              <div>
+                <div style="font-size:10px;letter-spacing:1.5px;color:var(--text-muted);font-weight:600">PEDIDO ACTIVO</div>
+                <h3 id="c-active-title" style="margin:4px 0 2px 0;font-size:16px;font-weight:600"></h3>
+                <div id="c-active-sub" style="font-size:12px;color:var(--text-muted)"></div>
+              </div>
+              <div id="c-active-badge"></div>
+            </div>
+            <div id="c-active-timeline-mini"></div>
+            <div style="margin-top:12px;text-align:right">
+              <button class="btn btn-outline btn-sm" onclick="loadClientTimeline(_activePedidoId, _activeEtapa)">Ver timeline completo <i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+          <!-- Tabla solicitudes -->
+          <div class="dtable-wrap">
+            <div class="dtable-header"><h3>Tus solicitudes</h3><div class="filters"><button class="chip active" onclick="filterClientCots('all', this)">Todas</button><button class="chip" onclick="filterClientCots('pendiente', this)">En revisión</button><button class="chip" onclick="filterClientCots('cotizado', this)">Cotizado</button><button class="chip" onclick="filterClientCots('produccion', this)">Producción</button></div></div>
+            <table class="dtable"><thead><tr><th>ID</th><th>Producto</th><th>Fecha</th><th>Cantidad</th><th>Estado</th><th></th></tr></thead>
+            <tbody></tbody></table>
+            <div class="table-pg"></div>
+          </div>
+        </div>
+        <!-- Col derecha: notificaciones + accesos rápidos -->
+        <div>
+          <!-- Centro de notificaciones -->
+          <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <h3 style="font-size:13px;font-weight:600;margin:0"><i class="fas fa-bell" style="color:var(--warning);margin-right:6px"></i>Novedades</h3>
+              <span id="c-notif-count" style="font-size:10px;color:var(--text-muted)">—</span>
+            </div>
+            <div id="c-notif-list" style="max-height:280px;overflow-y:auto"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Cargando…</div></div>
+          </div>
+          <!-- Accesos rápidos -->
+          <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px">
+            <h3 style="font-size:13px;font-weight:600;margin:0 0 10px 0"><i class="fas fa-bolt" style="color:var(--accent,#0f172a);margin-right:6px"></i>Accesos rápidos</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button class="btn btn-outline btn-sm" style="justify-content:flex-start;text-align:left;padding:10px" onclick="cView('c-quote')"><i class="fas fa-plus-circle" style="margin-right:4px"></i><br><span style="font-size:11px">Nueva cotización</span></button>
+              <button class="btn btn-outline btn-sm" style="justify-content:flex-start;text-align:left;padding:10px" onclick="cView('c-orders')"><i class="fas fa-box" style="margin-right:4px"></i><br><span style="font-size:11px">Mis pedidos</span></button>
+              <button class="btn btn-outline btn-sm" style="justify-content:flex-start;text-align:left;padding:10px" onclick="cView('c-invoices')"><i class="fas fa-file-invoice" style="margin-right:4px"></i><br><span style="font-size:11px">Facturas</span></button>
+              <button class="btn btn-outline btn-sm" style="justify-content:flex-start;text-align:left;padding:10px" onclick="cView('c-support')"><i class="fas fa-headset" style="margin-right:4px"></i><br><span style="font-size:11px">Soporte</span></button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3007,8 +3059,20 @@ function logout() {
 }
 
 // ─── Client Dashboard ───
+let _clientCotsCache = [];
+let _activePedidoId = null;
+let _activeEtapa = 1;
+
 async function loadClientDashboard() {
   if (!currentUser) return;
+  // Bienvenida personalizada
+  const nombre = (currentUser.nombre || '').split(' ')[0] || 'amigo/a';
+  const wTitle = document.getElementById('c-welcome-title');
+  if (wTitle) wTitle.textContent = `Hola, ${nombre} 👋`;
+  const hora = new Date().getHours();
+  const saludo = hora < 12 ? 'Buen día' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const wSub = document.getElementById('c-welcome-sub');
+  if (wSub) wSub.textContent = `${saludo}. Esto es lo que está pasando con tus pedidos hoy.`;
   try {
     const stats = await api(`/api/dashboard/stats?cliente_id=${currentUser.id}`);
     const cards = document.querySelectorAll('#c-dash .stat-card');
@@ -3016,19 +3080,187 @@ async function loadClientDashboard() {
     if (cards[1]) cards[1].querySelector('.s-val').textContent = stats.pedidos_en_curso;
     if (cards[2]) cards[2].querySelector('.s-val').textContent = stats.completados;
     if (cards[3]) cards[3].querySelector('.s-val').textContent = '$' + (stats.total_importado / 1000).toFixed(0) + 'K';
-
+    // Cargar solicitudes
     const cots = await api(`/api/cotizaciones?cliente_id=${currentUser.id}`);
-    const tbody = document.querySelector('#c-dash .dtable tbody');
-    if (tbody && cots.length > 0) {
-      tbody.innerHTML = cots.map((c, i) => {
-        const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
-        const icons = { pendiente: 'fa-clock', cotizado: 'fa-dollar-sign', produccion: 'fa-cog', entregado: 'fa-check' };
-        const labels = { pendiente: 'En revisión', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
-        const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
-        return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td>${c.producto}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad}</td><td><span class="badge ${badges[c.estado] || 'badge-neutral'}"><i class="fas ${icons[c.estado] || 'fa-circle'}"></i> ${labels[c.estado] || c.estado}</span></td><td><button class="btn btn-outline btn-sm">Ver</button></td></tr>`;
-      }).join('');
-    }
+    _clientCotsCache = cots;
+    renderClientCotsTable(cots);
+    // Cargar pedido activo mas reciente (si hay pedidos)
+    try {
+      const pedidos = await api(`/api/pedidos?cliente_id=${currentUser.id}`);
+      const active = pedidos.find(p => p.estado === 'activo') || pedidos[0];
+      if (active) {
+        _activePedidoId = active.id;
+        _activeEtapa = active.etapa_actual || 1;
+        renderActiveOrderMini(active);
+      }
+    } catch(e) { /* no pedidos */ }
+    // Cargar notificaciones
+    loadClientNotifications();
   } catch (err) { console.error('Dashboard load error:', err); }
+}
+
+function renderClientCotsTable(cots) {
+  const tbody = document.querySelector('#c-dash .dtable tbody');
+  if (!tbody) return;
+  if (!cots.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted)"><i class="fas fa-inbox" style="font-size:24px;display:block;margin-bottom:8px"></i>Aún no tenés solicitudes. <a onclick="cView(\'c-quote\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Crear la primera</a></td></tr>';
+    return;
+  }
+  tbody.innerHTML = cots.map(c => {
+    const badges = { pendiente: 'badge-warning', cotizado: 'badge-info', produccion: 'badge-success', entregado: 'badge-neutral' };
+    const icons = { pendiente: 'fa-clock', cotizado: 'fa-dollar-sign', produccion: 'fa-cog', entregado: 'fa-check' };
+    const labels = { pendiente: 'En revisión', cotizado: 'Cotizado', produccion: 'Producción', entregado: 'Entregado' };
+    const date = new Date(c.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+    const displayName = c.proyecto_nombre && c.proyecto_nombre.trim() ? c.proyecto_nombre : c.producto;
+    return `<tr><td style="font-weight:600">#SOL-${String(c.id).padStart(3,'0')}</td><td>${displayName}</td><td style="color:var(--text-muted)">${date}</td><td>${c.cantidad||'—'}</td><td><span class="badge ${badges[c.estado] || 'badge-neutral'}"><i class="fas ${icons[c.estado] || 'fa-circle'}"></i> ${labels[c.estado] || c.estado}</span></td><td><button class="btn btn-outline btn-sm" onclick="openClientCotDetail(${c.id})">Ver</button></td></tr>`;
+  }).join('');
+}
+
+function filterClientCots(estado, btn) {
+  document.querySelectorAll('#c-dash .chip').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (estado === 'all') {
+    renderClientCotsTable(_clientCotsCache);
+  } else {
+    renderClientCotsTable(_clientCotsCache.filter(c => c.estado === estado));
+  }
+}
+
+function renderActiveOrderMini(pedido) {
+  const el = document.getElementById('c-active-order');
+  if (!el) return;
+  el.style.display = 'block';
+  const titleEl = document.getElementById('c-active-title');
+  const subEl = document.getElementById('c-active-sub');
+  const badgeEl = document.getElementById('c-active-badge');
+  if (titleEl) titleEl.textContent = `Pedido #PED-${String(pedido.id).padStart(3,'0')}`;
+  if (subEl) subEl.textContent = `Monto: ${pedido.monto_total ? '$'+pedido.monto_total.toLocaleString() : 'por confirmar'}`;
+  const estadoBadges = { activo: 'badge-success', completado: 'badge-neutral', cancelado: 'badge-danger' };
+  if (badgeEl) badgeEl.innerHTML = `<span class="badge ${estadoBadges[pedido.estado]||'badge-neutral'}" style="font-size:11px"><i class="fas fa-${pedido.estado==='activo'?'cog fa-spin':pedido.estado==='completado'?'check':'times'}" style="margin-right:3px"></i> ${pedido.estado}</span>`;
+  // Timeline mini (9 etapas)
+  const etapas = ['Solicitud','Cotización','Muestra','Pago 50%','Producción','QC China','Embarque','Entrega','Pago final'];
+  const current = pedido.etapa_actual || 1;
+  const mini = document.getElementById('c-active-timeline-mini');
+  if (mini) {
+    mini.innerHTML = `
+      <div style="display:flex;align-items:center;gap:0;padding:8px 0">
+        ${etapas.map((e, i) => {
+          const step = i + 1;
+          const done = step < current;
+          const now = step === current;
+          const color = done ? '#10b981' : now ? '#f59e0b' : '#e5e7eb';
+          const iconColor = done ? '#fff' : now ? '#fff' : '#9ca3af';
+          const icon = done ? 'check' : now ? 'circle' : 'circle';
+          return `
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative">
+              ${i > 0 ? `<div style="position:absolute;left:-50%;top:10px;width:100%;height:3px;background:${step<=current?'#10b981':'#e5e7eb'};z-index:0"></div>` : ''}
+              <div style="width:22px;height:22px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:${iconColor};font-size:10px;position:relative;z-index:1;${now?'box-shadow:0 0 0 4px rgba(245,158,11,.2)':''}"><i class="fas fa-${icon}"></i></div>
+              <div style="font-size:9px;color:${done||now?'var(--text-secondary)':'var(--text-muted)'};margin-top:4px;text-align:center;max-width:56px;line-height:1.2;font-weight:${now?'600':'400'}">${e}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+}
+
+async function loadClientNotifications() {
+  if (!currentUser) return;
+  const list = document.getElementById('c-notif-list');
+  const count = document.getElementById('c-notif-count');
+  if (!list) return;
+  try {
+    const r = await api(`/api/clientes/${currentUser.id}/notifications?limit=10`);
+    const notifs = r.notifications || [];
+    const unread = r.unread_count || 0;
+    if (count) count.textContent = unread > 0 ? `${unread} nuevas` : 'al día';
+    // Badge topbar
+    const topBadge = document.getElementById('c-topbar-notif-badge');
+    if (topBadge) {
+      if (unread > 0) { topBadge.textContent = unread > 9 ? '9+' : unread; topBadge.style.display = 'inline-block'; }
+      else { topBadge.style.display = 'none'; }
+    }
+    if (!notifs.length) {
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px"><i class="fas fa-check-circle" style="font-size:20px;display:block;margin-bottom:6px;color:var(--success)"></i>Todo al día</div>';
+      return;
+    }
+    list.innerHTML = notifs.map(n => {
+      const icon = n.icon || 'info-circle';
+      const color = n.color || 'var(--info)';
+      const when = n.created_at ? _relativeTime(n.created_at) : '';
+      return `<div style="display:flex;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);cursor:${n.link?'pointer':'default'}" ${n.link ? `onclick="handleNotifClick('${n.link}', ${n.cotizacion_id||'null'})"` : ''}>
+        <div style="width:28px;height:28px;border-radius:50%;background:${color}22;color:${color};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-${icon}" style="font-size:12px"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:${n.unread?'600':'400'};line-height:1.4">${n.title || n.message || ''}</div>
+          ${n.message && n.title ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${n.message}</div>` : ''}
+          <div style="font-size:10px;color:var(--text-muted);margin-top:3px">${when}</div>
+        </div>
+        ${n.unread ? '<div style="width:8px;height:8px;border-radius:50%;background:var(--warning);flex-shrink:0;margin-top:10px"></div>' : ''}
+      </div>`;
+    }).join('');
+  } catch (err) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Sin novedades</div>';
+  }
+}
+
+function handleNotifClick(link, cotId) {
+  if (link === 'cotizacion' && cotId) {
+    openClientCotDetail(cotId);
+  } else if (link === 'pedido') {
+    cView('c-orders');
+  } else if (link === 'factura') {
+    cView('c-invoices');
+  }
+}
+
+function _relativeTime(isoStr) {
+  try {
+    const d = new Date(isoStr);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return 'hace segundos';
+    if (diff < 3600) return `hace ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `hace ${Math.floor(diff/3600)} h`;
+    if (diff < 604800) return `hace ${Math.floor(diff/86400)} d`;
+    return d.toLocaleDateString('es-CL', {day:'2-digit', month:'short'});
+  } catch { return ''; }
+}
+
+function openClientCotDetail(id) {
+  const cot = _clientCotsCache.find(c => c.id === id);
+  if (!cot) { toast('error', 'Error', 'Solicitud no encontrada'); return; }
+  const displayName = cot.proyecto_nombre && cot.proyecto_nombre.trim() ? cot.proyecto_nombre : cot.producto;
+  const date = new Date(cot.created_at).toLocaleDateString('es-CL', {day:'2-digit', month:'long', year:'numeric'});
+  const labels = { pendiente: 'En revisión', cotizado: 'Cotizado', produccion: 'En producción', entregado: 'Entregado' };
+  // Modal lightweight inline
+  let modal = document.getElementById('clientCotDetailModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'clientCotDetailModal';
+    modal.className = 'modal-bg';
+    modal.innerHTML = '<div class="modal-box" style="max-width:540px"><div id="ccdm-content"></div></div>';
+    document.body.appendChild(modal);
+  }
+  document.getElementById('ccdm-content').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;font-size:16px;font-weight:600">#SOL-${String(cot.id).padStart(3,'0')}</h3>
+      <button onclick="document.getElementById('clientCotDetailModal').classList.remove('open')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>
+    </div>
+    <div style="padding:14px;background:var(--bg-subtle);border-radius:var(--radius);margin-bottom:14px">
+      <div style="font-weight:600;font-size:15px">${displayName}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Creado el ${date}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+      <div><div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">ESTADO</div><div style="font-weight:600;margin-top:2px">${labels[cot.estado] || cot.estado}</div></div>
+      <div><div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">CANTIDAD</div><div style="font-weight:600;margin-top:2px">${cot.cantidad || '—'}</div></div>
+      <div><div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">PRECIO OBJETIVO</div><div style="font-weight:600;margin-top:2px">${cot.precio_objetivo || '—'}</div></div>
+      <div><div style="font-size:10px;color:var(--text-muted);letter-spacing:1px">PLAZO</div><div style="font-weight:600;margin-top:2px">${cot.plazo || '—'}</div></div>
+    </div>
+    ${cot.descripcion ? `<div style="margin-top:12px"><div style="font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:4px">DESCRIPCIÓN</div><div style="font-size:13px;line-height:1.5">${cot.descripcion}</div></div>` : ''}
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+      <i class="fas fa-info-circle"></i> Si tenés consultas, respondé al último email que te enviamos o usá el chat de soporte.
+    </div>
+  `;
+  modal.classList.add('open');
 }
 
 // ─── Client: Load Orders ───

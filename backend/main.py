@@ -1291,6 +1291,107 @@ def resumen_contable(
 
 
 # ─── Dashboard Stats ───
+@app.get("/api/clientes/{cliente_id}/notifications")
+def client_notifications(cliente_id: int, limit: int = 10, db: Session = Depends(get_db)):
+    """Devuelve notificaciones relevantes para el cliente logueado.
+    Combina:
+      - Cambios de estado de sus cotizaciones (ultimo mes)
+      - Facturas pendientes de pago
+      - Emails recibidos (de las secuencias + transaccionales)
+      - Actividades recientes sobre sus cotizaciones
+    """
+    from datetime import timedelta as _td
+    notifs = []
+    cutoff = datetime.now() - _td(days=30)
+    # 1) Cambios de estado (Actividad tipo='cambio_etapa')
+    try:
+        actividades = db.query(Actividad).filter(
+            Actividad.cliente_id == cliente_id,
+            Actividad.tipo == "cambio_etapa",
+            Actividad.created_at >= cutoff,
+        ).order_by(Actividad.created_at.desc()).limit(limit).all()
+        for a in actividades:
+            new_stage = (a.etapa_nueva or "").lower()
+            icon_map = {"cotizado": "dollar-sign", "produccion": "cog", "entregado": "check-circle", "pendiente": "clock"}
+            color_map = {"cotizado": "#3b82f6", "produccion": "#10b981", "entregado": "#059669", "pendiente": "#f59e0b"}
+            title_map = {
+                "cotizado": "Tu cotización está lista",
+                "produccion": "Arrancó la producción",
+                "entregado": "¡Pedido entregado!",
+                "pendiente": "Nueva solicitud recibida",
+            }
+            notifs.append({
+                "id": f"act-{a.id}",
+                "title": title_map.get(new_stage, f"Estado actualizado: {new_stage}"),
+                "message": a.descripcion or "",
+                "icon": icon_map.get(new_stage, "info-circle"),
+                "color": color_map.get(new_stage, "#6366f1"),
+                "cotizacion_id": a.cotizacion_id,
+                "link": "cotizacion",
+                "unread": (datetime.now() - a.created_at).days < 3 if a.created_at else False,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            })
+    except Exception as e:
+        print(f"[client_notifications actividades] {e}")
+    # 2) Facturas pendientes (cliente debe pagar) - join via pedido -> cotizacion
+    try:
+        facturas_pend = db.query(Factura).join(Pedido, Factura.pedido_id == Pedido.id).join(
+            Cotizacion, Pedido.cotizacion_id == Cotizacion.id
+        ).filter(
+            Cotizacion.cliente_id == cliente_id,
+            Factura.estado == "pendiente",
+            Factura.tipo == "ingreso",  # solo facturas que el cliente debe pagar
+        ).order_by(Factura.fecha.desc()).limit(5).all()
+        for f in facturas_pend:
+            notifs.append({
+                "id": f"fac-{f.id}",
+                "title": f"Factura pendiente — ${(f.monto or 0):,.0f}",
+                "message": f.descripcion or "Pago pendiente",
+                "icon": "file-invoice-dollar",
+                "color": "#ef4444",
+                "link": "factura",
+                "unread": True,
+                "created_at": f.fecha.isoformat() if f.fecha else None,
+            })
+    except Exception as e:
+        print(f"[client_notifications facturas] {e}")
+    # 3) Emails recientes enviados al cliente (transaccionales)
+    try:
+        cliente = db.query(Cliente).get(cliente_id)
+        if cliente and cliente.email:
+            emails = db.query(EmailLog).filter(
+                EmailLog.destinatario == cliente.email,
+                EmailLog.estado == "enviado",
+                EmailLog.enviado_at >= cutoff,
+            ).order_by(EmailLog.enviado_at.desc()).limit(5).all()
+            for e in emails:
+                # Evitar duplicar con cambios de estado que ya estan arriba
+                if any(n.get("cotizacion_id") == e.cotizacion_id and n["id"].startswith("act-") for n in notifs):
+                    continue
+                notifs.append({
+                    "id": f"mail-{e.id}",
+                    "title": e.asunto or "Nuevo email",
+                    "message": "Revisá tu bandeja de entrada",
+                    "icon": "envelope",
+                    "color": "#6366f1",
+                    "cotizacion_id": e.cotizacion_id,
+                    "link": "cotizacion" if e.cotizacion_id else None,
+                    "unread": (datetime.now() - e.enviado_at).days < 2 if e.enviado_at else False,
+                    "created_at": e.enviado_at.isoformat() if e.enviado_at else None,
+                })
+    except Exception as ex:
+        print(f"[client_notifications emails] {ex}")
+    # Ordenar por fecha descendente y limitar
+    notifs.sort(key=lambda n: n.get("created_at") or "", reverse=True)
+    notifs = notifs[:limit]
+    unread_count = sum(1 for n in notifs if n.get("unread"))
+    return {
+        "notifications": notifs,
+        "unread_count": unread_count,
+        "total": len(notifs),
+    }
+
+
 @app.get("/api/dashboard/stats")
 def dashboard_stats(cliente_id: Optional[int] = None, db: Session = Depends(get_db)):
     cot_q = db.query(Cotizacion)
