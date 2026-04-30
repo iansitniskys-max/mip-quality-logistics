@@ -1030,7 +1030,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="section-title">Industrias que atendemos</div>
     <div class="section-desc">Experiencia transversal en múltiples sectores del mercado.</div>
   </div>
-  <div class="sectors-grid">
+  <div class="sectors-grid" id="lp-sectors-grid">
     <div class="sector-card"><img src="/images/sector-retail.jpg" alt="Retail y Moda" loading="lazy" /><div class="sector-overlay"></div><div class="sector-content"><i class="fas fa-tshirt"></i><h4>Retail & Moda</h4><p>Ropa, calzado, accesorios</p></div></div>
     <div class="sector-card"><img src="/images/sector-industrial.jpg" alt="Industrial" loading="lazy" /><div class="sector-overlay"></div><div class="sector-content"><i class="fas fa-industry"></i><h4>Industrial</h4><p>Equipos, repuestos, herramientas</p></div></div>
     <div class="sector-card"><img src="/images/sector-hospitality.jpg" alt="Hospitality" loading="lazy" /><div class="sector-overlay"></div><div class="sector-content"><i class="fas fa-hotel"></i><h4>Hospitality</h4><p>Hotelería, restaurant, amenities</p></div></div>
@@ -1058,7 +1058,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="section-title">Lo que dicen nuestros clientes</div>
     <div class="section-desc">Resultados reales de empresas que confiaron en MIP.</div>
   </div>
-  <div class="testi-featured">
+  <div class="testi-featured" id="lp-testi-featured">
     <div class="tf-body">
       <div class="tf-quote">MIP nos permitió ingresar al mercado asiático con total confianza. Redujimos costos de importación en un 35%, mejoramos la calidad y acortamos los tiempos de entrega. Su control in-situ en fábricas es un diferenciador único.</div>
       <div class="tf-author"><img class="tf-av-img" src="/images/avatar-roberto.jpg" alt="Roberto Cifuentes" loading="lazy" /><div><div class="tf-name">Roberto Cifuentes</div><div class="tf-role">Gerente de Compras Internacionales</div><div class="tf-company">Grupo Retail — Falabella</div></div></div>
@@ -1069,7 +1069,7 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="tf-metric"><div class="val">98.5%</div><div class="label">Aprobación QC</div></div>
     </div>
   </div>
-  <div class="testi-grid">
+  <div class="testi-grid" id="lp-testi-grid">
     <div class="testi-card">
       <div class="stars"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
       <div class="quote">La transparencia en el proceso es impecable. Siempre sabemos en qué etapa va nuestro pedido. El portal de seguimiento nos ahorró cientos de horas.</div>
@@ -2393,20 +2393,20 @@ html,body{overflow-x:hidden;max-width:100vw}
       <!-- Editor: Hero -->
       <div class="card" style="padding:24px" id="ed-hero">
         <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Sección Hero</h3>
-        <div class="form-group"><label class="form-label">Overline (badge superior)</label><input class="form-input" id="ed-hero-overline" value="Broker de importación desde China"></div>
-        <div class="form-group"><label class="form-label">Headline principal</label><input class="form-input" id="ed-hero-headline" value="Tu socio estratégico en importación y logística"></div>
-        <div class="form-group"><label class="form-label">Subtítulo</label><textarea class="form-input" id="ed-hero-subtitle" style="min-height:60px">Conectamos tu negocio con los mejores fabricantes de China. Gestión integral desde la cotización hasta la entrega en tu bodega.</textarea></div>
+        <div class="form-group"><label class="form-label">Overline (badge superior)</label><input class="form-input" id="ed-hero-overline" data-content="hero.overline" value="Broker de importación desde China"></div>
+        <div class="form-group"><label class="form-label">Headline principal</label><input class="form-input" id="ed-hero-headline" data-content="hero.headline" value="Tu socio estratégico en importación y logística"></div>
+        <div class="form-group"><label class="form-label">Subtítulo</label><textarea class="form-input" id="ed-hero-subtitle" data-content="hero.subtitle" style="min-height:60px">Conectamos tu negocio con los mejores fabricantes de China. Gestión integral desde la cotización hasta la entrega en tu bodega.</textarea></div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Stat 1 — Valor</label><input class="form-input" id="ed-hero-stat1v" value="500+"></div>
-          <div class="form-group"><label class="form-label">Stat 1 — Label</label><input class="form-input" id="ed-hero-stat1l" value="Productos importados"></div>
+          <div class="form-group"><label class="form-label">Stat 1 — Valor</label><input class="form-input" id="ed-hero-stat1v" data-content="hero.stat1_value" value="500+"></div>
+          <div class="form-group"><label class="form-label">Stat 1 — Label</label><input class="form-input" id="ed-hero-stat1l" data-content="hero.stat1_label" value="Productos importados"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Stat 2 — Valor</label><input class="form-input" id="ed-hero-stat2v" value="120+"></div>
-          <div class="form-group"><label class="form-label">Stat 2 — Label</label><input class="form-input" id="ed-hero-stat2l" value="Clientes activos"></div>
+          <div class="form-group"><label class="form-label">Stat 2 — Valor</label><input class="form-input" id="ed-hero-stat2v" data-content="hero.stat2_value" value="120+"></div>
+          <div class="form-group"><label class="form-label">Stat 2 — Label</label><input class="form-input" id="ed-hero-stat2l" data-content="hero.stat2_label" value="Clientes activos"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label class="form-label">Stat 3 — Valor</label><input class="form-input" id="ed-hero-stat3v" value="98%"></div>
-          <div class="form-group"><label class="form-label">Stat 3 — Label</label><input class="form-input" id="ed-hero-stat3l" value="Tasa de satisfacción"></div>
+          <div class="form-group"><label class="form-label">Stat 3 — Valor</label><input class="form-input" id="ed-hero-stat3v" data-content="hero.stat3_value" value="98%"></div>
+          <div class="form-group"><label class="form-label">Stat 3 — Label</label><input class="form-input" id="ed-hero-stat3l" data-content="hero.stat3_label" value="Tasa de satisfacción"></div>
         </div>
         <div class="form-group"><label class="form-label">Imagen Hero</label><div class="upload-zone" onclick="simUpload('edHeroImg')" style="padding:14px"><i class="fas fa-image" style="font-size:16px"></i><h4 style="font-size:12px">Subir imagen</h4></div><div class="upload-preview" id="edHeroImg"></div></div>
         <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar cambios</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Preview en vivo</button></div>
@@ -2415,50 +2415,64 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="card" style="padding:24px;display:none" id="ed-adn">
         <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">ADN de Marca — 3 Pilares</h3>
         <div style="display:grid;gap:16px">
-          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 1 — Título</label><input class="form-input" value="Sourcing Estratégico"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input">Identificamos y validamos los mejores proveedores según tus requerimientos de calidad, precio y volumen.</textarea></div></div>
-          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 2 — Título</label><input class="form-input" value="Control de Calidad"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input">Inspecciones en fábrica, control pre-embarque y certificaciones internacionales para tu tranquilidad.</textarea></div></div>
-          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 3 — Título</label><input class="form-input" value="Logística Integral"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input">Coordinamos flete marítimo y aéreo, internación aduanera y entrega final puerta a puerta.</textarea></div></div>
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 1 — Título</label><input class="form-input" data-content="adn.pillar1_title" value="Sourcing Estratégico"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" data-content="adn.pillar1_desc">Identificamos y validamos los mejores proveedores según tus requerimientos de calidad, precio y volumen.</textarea></div></div>
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 2 — Título</label><input class="form-input" data-content="adn.pillar2_title" value="Control de Calidad"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" data-content="adn.pillar2_desc">Inspecciones en fábrica, control pre-embarque y certificaciones internacionales para tu tranquilidad.</textarea></div></div>
+          <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius)"><div class="form-group"><label class="form-label">Pilar 3 — Título</label><input class="form-input" data-content="adn.pillar3_title" value="Logística Integral"></div><div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" data-content="adn.pillar3_desc">Coordinamos flete marítimo y aéreo, internación aduanera y entrega final puerta a puerta.</textarea></div></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Preview</button></div>
       </div>
       <!-- Editor: Proceso -->
       <div class="card" style="padding:24px;display:none" id="ed-process">
         <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Proceso — 5 Pasos</h3>
-        <div class="form-row"><div class="form-group"><label class="form-label">Paso 1</label><input class="form-input" value="Solicitud"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Describe tu producto"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Paso 2</label><input class="form-input" value="Cotización"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Recibe propuestas reales"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Paso 3</label><input class="form-input" value="Muestras"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Aprueba antes de producir"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Paso 4</label><input class="form-input" value="Producción"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Fabricación con QC"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Paso 5</label><input class="form-input" value="Entrega"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Recibe en tu bodega"></div></div>
-        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 1</label><input class="form-input" data-content="process.step1_title" value="Solicitud"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" data-content="process.step1_desc" value="Describe tu producto"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 2</label><input class="form-input" data-content="process.step2_title" value="Cotización"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" data-content="process.step2_desc" value="Recibe propuestas reales"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 3</label><input class="form-input" data-content="process.step3_title" value="Muestras"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" data-content="process.step3_desc" value="Aprueba antes de producir"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 4</label><input class="form-input" data-content="process.step4_title" value="Producción"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" data-content="process.step4_desc" value="Fabricación con QC"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">Paso 5</label><input class="form-input" data-content="process.step5_title" value="Entrega"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" data-content="process.step5_desc" value="Recibe en tu bodega"></div></div>
+        <div style="margin-top:16px;display:flex;gap:8px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Aplicar en landing</button></div>
       </div>
       <!-- Editor: Sectores -->
       <div class="card" style="padding:24px;display:none" id="ed-sectors">
-        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Sectores</h3>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Edita los sectores que atiende la empresa.</p>
-        <div class="form-row"><div class="form-group"><label class="form-label">Sector 1</label><input class="form-input" value="Retail & Moda"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Ropa, calzado, accesorios"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Sector 2</label><input class="form-input" value="Industrial"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Equipos, repuestos, herramientas"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Sector 3</label><input class="form-input" value="Hospitality"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Hotelería, restaurant, amenities"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">Sector 4</label><input class="form-input" value="Salud"></div><div class="form-group"><label class="form-label">Desc.</label><input class="form-input" value="Insumos médicos, equipamiento"></div></div>
-        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <h3 style="font-size:15px;font-weight:600;margin:0">Sectores</h3>
+          <button class="btn btn-outline btn-sm" onclick="addSectorCard()"><i class="fas fa-plus"></i> Agregar sector</button>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Edita los sectores que atiende la empresa. Podés agregar y borrar sin límite.</p>
+        <div id="ed-sectors-list"></div>
+        <div style="margin-top:16px;display:flex;gap:8px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar sectores</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Aplicar en landing</button></div>
       </div>
       <!-- Editor: Testimonios -->
       <div class="card" style="padding:24px;display:none" id="ed-testimonials">
-        <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Testimonios</h3>
-        <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:16px"><h4 style="font-size:13px;font-weight:600;margin-bottom:10px">Testimonio Destacado</h4>
-          <div class="form-group"><label class="form-label">Cita</label><textarea class="form-input">MIP nos permitió ingresar al mercado asiático con total confianza. Redujimos costos de importación en un 35%.</textarea></div>
-          <div class="form-row"><div class="form-group"><label class="form-label">Nombre</label><input class="form-input" value="Roberto Cifuentes"></div><div class="form-group"><label class="form-label">Cargo</label><input class="form-input" value="Gerente de Compras"></div></div>
-          <div class="form-row"><div class="form-group"><label class="form-label">Empresa</label><input class="form-input" value="Grupo Retail — Falabella"></div><div class="form-group"><label class="form-label">Foto</label><div class="upload-zone" onclick="simUpload('edTestiImg')" style="padding:8px"><i class="fas fa-camera" style="font-size:14px"></i></div><div class="upload-preview" id="edTestiImg"></div></div></div>
-          <div class="form-row"><div class="form-group"><label class="form-label">Métrica 1</label><input class="form-input" value="-35%"></div><div class="form-group"><label class="form-label">Label 1</label><input class="form-input" value="Reducción en costos"></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <h3 style="font-size:15px;font-weight:600;margin:0">Testimonios</h3>
+          <button class="btn btn-outline btn-sm" onclick="openVisualEditor()"><i class="fas fa-eye"></i> Modo edición visual</button>
         </div>
-        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+        <div style="padding:16px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:16px;border-left:3px solid var(--brand-gold)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h4 style="font-size:13px;font-weight:600;margin:0"><i class="fas fa-star" style="color:var(--brand-gold);margin-right:4px"></i> Testimonio Destacado</h4>
+            <span style="font-size:10px;color:var(--text-muted);background:rgba(212,168,83,0.1);padding:2px 8px;border-radius:10px">único</span>
+          </div>
+          <div class="form-group"><label class="form-label">Cita</label><textarea class="form-input" data-content="testimonials.featured_quote" style="min-height:60px">MIP nos permitió ingresar al mercado asiático con total confianza. Redujimos costos de importación en un 35%, mejoramos la calidad y acortamos los tiempos de entrega. Su control in-situ en fábricas es un diferenciador único.</textarea></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Nombre</label><input class="form-input" data-content="testimonials.featured_name" value="Roberto Cifuentes"></div><div class="form-group"><label class="form-label">Cargo</label><input class="form-input" data-content="testimonials.featured_role" value="Gerente de Compras Internacionales"></div></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Empresa</label><input class="form-input" data-content="testimonials.featured_company" value="Grupo Retail — Falabella"></div><div class="form-group"><label class="form-label">URL Foto (avatar)</label><input class="form-input" data-content="testimonials.featured_avatar" value="/images/avatar-roberto.jpg"></div></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Métrica 1 — valor</label><input class="form-input" data-content="testimonials.featured_metric1_value" value="-35%"></div><div class="form-group"><label class="form-label">Métrica 1 — label</label><input class="form-input" data-content="testimonials.featured_metric1_label" value="Reducción en costos"></div></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Métrica 2 — valor</label><input class="form-input" data-content="testimonials.featured_metric2_value" value="2x"></div><div class="form-group"><label class="form-label">Métrica 2 — label</label><input class="form-input" data-content="testimonials.featured_metric2_label" value="Más rápido que antes"></div></div>
+          <div class="form-row"><div class="form-group"><label class="form-label">Métrica 3 — valor</label><input class="form-input" data-content="testimonials.featured_metric3_value" value="98.5%"></div><div class="form-group"><label class="form-label">Métrica 3 — label</label><input class="form-input" data-content="testimonials.featured_metric3_label" value="Aprobación QC"></div></div>
+        </div>
+        <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+          <h4 style="font-size:13px;font-weight:600;margin:0">Testimonios secundarios <span style="font-size:11px;color:var(--text-muted);font-weight:400">(grid)</span></h4>
+          <button class="btn btn-outline btn-sm" onclick="addTestiCard()"><i class="fas fa-plus"></i> Agregar testimonio</button>
+        </div>
+        <div id="ed-testi-cards-list"></div>
+        <div style="margin-top:16px;display:flex;gap:8px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar testimonios</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Aplicar en landing</button></div>
       </div>
       <!-- Editor: Footer -->
       <div class="card" style="padding:24px;display:none" id="ed-footer">
         <h3 style="font-size:15px;font-weight:600;margin-bottom:16px">Footer</h3>
-        <div class="form-group"><label class="form-label">Descripción empresa</label><textarea class="form-input">Tu socio estratégico en importación y logística. Conectamos tu negocio con los mejores fabricantes de China.</textarea></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">LinkedIn URL</label><input class="form-input" value="https://linkedin.com/company/mipquality"></div><div class="form-group"><label class="form-label">Instagram URL</label><input class="form-input" value="https://instagram.com/mipquality"></div></div>
-        <div class="form-row"><div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" value="+56 9 8765 4321"></div><div class="form-group"><label class="form-label">Email</label><input class="form-input" value="contacto@mipquality.com"></div></div>
-        <div style="margin-top:16px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button></div>
+        <div class="form-group"><label class="form-label">Descripción empresa</label><textarea class="form-input" data-content="footer.description">Tu socio estratégico en importación y logística. Conectamos tu negocio con los mejores fabricantes de China.</textarea></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">LinkedIn URL</label><input class="form-input" data-content="footer.linkedin" value="https://linkedin.com/company/mipquality"></div><div class="form-group"><label class="form-label">Instagram URL</label><input class="form-input" data-content="footer.instagram" value="https://instagram.com/mipquality"></div></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" data-content="footer.whatsapp" value="+56 9 8765 4321"></div><div class="form-group"><label class="form-label">Email</label><input class="form-input" data-content="footer.email" value="contacto@mipquality.com"></div></div>
+        <div style="margin-top:16px;display:flex;gap:8px"><button class="btn btn-dark" onclick="saveEditorContent()"><i class="fas fa-save"></i> Guardar</button><button class="btn btn-outline" onclick="previewEditorContent()"><i class="fas fa-eye"></i> Aplicar en landing</button></div>
       </div>
     </div>
 
@@ -3561,6 +3575,7 @@ function _relocateModalsToBody() {
   });
 }
 document.addEventListener('DOMContentLoaded', _relocateModalsToBody);
+document.addEventListener('DOMContentLoaded', () => { if (typeof loadEditorContent === 'function') loadEditorContent(); });
 // Tambien al cargar tardio (por si algun modal se agrega dinamicamente)
 setTimeout(_relocateModalsToBody, 500);
 
@@ -5042,41 +5057,341 @@ async function importBulk(entity) {
 }
 
 // ─── Editor Web ───
+const EDITOR_DEFAULTS = {
+  testi_cards: [
+    { quote: 'La transparencia en el proceso es impecable. Siempre sabemos en qué etapa va nuestro pedido. El portal de seguimiento nos ahorró cientos de horas.', name: 'María Valentina Soto', role: 'Dir. Comercial — Cencosud', avatar: '/images/avatar-maria.jpg', rating: 5 },
+    { quote: 'Llevamos 3 años trabajando con MIP. Su control de calidad en fábrica nos da la tranquilidad de recibir exactamente lo que pedimos.', name: 'Juan Pablo Méndez', role: 'CEO — Sodimac Proveedores', avatar: '/images/avatar-juan.jpg', rating: 5 },
+    { quote: 'Importar equipamiento médico es crítico. MIP manejó certificaciones, normativa y logística sin un solo error. Profesionalismo de clase mundial.', name: 'Carolina Lagos', role: 'Jefa Procurement — COPEC', avatar: '/images/avatar-carolina.jpg', rating: 4.5 }
+  ],
+  sector_list: [
+    { name: 'Retail & Moda', desc: 'Ropa, calzado, accesorios', icon: 'fa-tshirt', image: '/images/sector-retail.jpg' },
+    { name: 'Industrial', desc: 'Equipos, repuestos, herramientas', icon: 'fa-industry', image: '/images/sector-industrial.jpg' },
+    { name: 'Hospitality', desc: 'Hotelería, restaurant, amenities', icon: 'fa-hotel', image: '/images/sector-hospitality.jpg' },
+    { name: 'Salud', desc: 'Insumos médicos, equipamiento', icon: 'fa-heartbeat', image: '/images/sector-health.jpg' },
+    { name: 'Tecnología', desc: 'Electrónica, accesorios tech', icon: 'fa-laptop', image: '/images/sector-tech.jpg' },
+    { name: 'Hogar & Deco', desc: 'Mobiliario, decoración, textil', icon: 'fa-home', image: '/images/sector-home.jpg' },
+    { name: 'Deportes', desc: 'Equipamiento deportivo, outdoor', icon: 'fa-futbol', image: '/images/sector-sports.jpg' },
+    { name: 'Infantil', desc: 'Juguetes, ropa niños', icon: 'fa-baby', image: '/images/sector-kids.jpg' }
+  ]
+};
+let _testiCards = JSON.parse(JSON.stringify(EDITOR_DEFAULTS.testi_cards));
+let _sectorList = JSON.parse(JSON.stringify(EDITOR_DEFAULTS.sector_list));
+let _editorLoaded = false;
+
 function editorTab(id, btn) {
   ['ed-hero', 'ed-adn', 'ed-process', 'ed-sectors', 'ed-testimonials', 'ed-footer'].forEach(t => {
     const el = document.getElementById(t); if (el) el.style.display = t === id ? 'block' : 'none';
   });
   document.querySelectorAll('#editorTabs .chip').forEach(c => c.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  if (id === 'ed-testimonials') renderTestiCardsEditor();
+  if (id === 'ed-sectors') renderSectorListEditor();
 }
+
+function renderTestiCardsEditor() {
+  const list = document.getElementById('ed-testi-cards-list');
+  if (!list) return;
+  list.innerHTML = _testiCards.map((t, i) => `
+    <div class="ed-testi-card" data-idx="${i}" style="padding:14px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:10px;position:relative">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)"><i class="fas fa-grip-vertical" style="margin-right:4px;cursor:grab;color:var(--text-muted)"></i> Testimonio ${i + 1}</span>
+        <button class="btn btn-outline btn-sm" onclick="removeTestiCard(${i})" style="padding:4px 10px;font-size:11px;color:var(--danger);border-color:rgba(239,68,68,0.3)"><i class="fas fa-trash"></i></button>
+      </div>
+      <div class="form-group"><label class="form-label">Cita</label><textarea class="form-input" data-testi-field="quote" data-testi-idx="${i}" style="min-height:48px">${escapeHtml(t.quote || '')}</textarea></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Nombre</label><input class="form-input" data-testi-field="name" data-testi-idx="${i}" value="${escapeAttr(t.name || '')}"></div><div class="form-group"><label class="form-label">Cargo / Empresa</label><input class="form-input" data-testi-field="role" data-testi-idx="${i}" value="${escapeAttr(t.role || '')}"></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">URL Avatar</label><input class="form-input" data-testi-field="avatar" data-testi-idx="${i}" value="${escapeAttr(t.avatar || '')}"></div><div class="form-group"><label class="form-label">Rating (1-5)</label><input class="form-input" type="number" min="1" max="5" step="0.5" data-testi-field="rating" data-testi-idx="${i}" value="${t.rating || 5}"></div></div>
+    </div>
+  `).join('');
+  list.querySelectorAll('input,textarea').forEach(el => {
+    el.addEventListener('input', () => {
+      const idx = parseInt(el.dataset.testiIdx);
+      const field = el.dataset.testiField;
+      _testiCards[idx][field] = el.type === 'number' ? parseFloat(el.value) : el.value;
+    });
+  });
+}
+
+function addTestiCard() {
+  _testiCards.push({ quote: 'Nuevo testimonio. Editá esta cita.', name: 'Nombre Cliente', role: 'Cargo — Empresa', avatar: '', rating: 5 });
+  renderTestiCardsEditor();
+}
+
+function removeTestiCard(idx) {
+  if (_testiCards.length <= 1) { toast('warning', 'Mínimo 1', 'Debe haber al menos un testimonio en el grid'); return; }
+  _testiCards.splice(idx, 1);
+  renderTestiCardsEditor();
+}
+
+function renderSectorListEditor() {
+  const list = document.getElementById('ed-sectors-list');
+  if (!list) return;
+  list.innerHTML = _sectorList.map((s, i) => `
+    <div class="ed-sector-card" data-idx="${i}" style="padding:12px;background:var(--bg-surface);border-radius:var(--radius);margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-muted)"><i class="fas ${s.icon || 'fa-tag'}" style="margin-right:6px;color:var(--brand-gold)"></i> Sector ${i + 1}</span>
+        <button class="btn btn-outline btn-sm" onclick="removeSectorCard(${i})" style="padding:4px 10px;font-size:11px;color:var(--danger);border-color:rgba(239,68,68,0.3)"><i class="fas fa-trash"></i></button>
+      </div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Nombre</label><input class="form-input" data-sector-field="name" data-sector-idx="${i}" value="${escapeAttr(s.name || '')}"></div><div class="form-group"><label class="form-label">Descripción</label><input class="form-input" data-sector-field="desc" data-sector-idx="${i}" value="${escapeAttr(s.desc || '')}"></div></div>
+      <div class="form-row"><div class="form-group"><label class="form-label">Icono FA (ej: fa-tshirt)</label><input class="form-input" data-sector-field="icon" data-sector-idx="${i}" value="${escapeAttr(s.icon || '')}"></div><div class="form-group"><label class="form-label">URL Imagen</label><input class="form-input" data-sector-field="image" data-sector-idx="${i}" value="${escapeAttr(s.image || '')}"></div></div>
+    </div>
+  `).join('');
+  list.querySelectorAll('input').forEach(el => {
+    el.addEventListener('input', () => {
+      const idx = parseInt(el.dataset.sectorIdx);
+      const field = el.dataset.sectorField;
+      _sectorList[idx][field] = el.value;
+      if (field === 'icon') {
+        const i = el.closest('.ed-sector-card').querySelector('h4 + span i, span i');
+        if (i) i.className = 'fas ' + el.value;
+      }
+    });
+  });
+}
+
+function addSectorCard() {
+  _sectorList.push({ name: 'Nuevo sector', desc: 'Descripción breve', icon: 'fa-tag', image: '' });
+  renderSectorListEditor();
+}
+
+function removeSectorCard(idx) {
+  if (_sectorList.length <= 1) { toast('warning', 'Mínimo 1', 'Debe haber al menos un sector'); return; }
+  _sectorList.splice(idx, 1);
+  renderSectorListEditor();
+}
+
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function escapeAttr(s) { return escapeHtml(s); }
 
 async function saveEditorContent() {
   const items = [];
-  const fields = { 'ed-hero-overline': ['hero', 'overline'], 'ed-hero-headline': ['hero', 'headline'], 'ed-hero-subtitle': ['hero', 'subtitle'],
-    'ed-hero-stat1v': ['hero', 'stat1_value'], 'ed-hero-stat1l': ['hero', 'stat1_label'], 'ed-hero-stat2v': ['hero', 'stat2_value'],
-    'ed-hero-stat2l': ['hero', 'stat2_label'], 'ed-hero-stat3v': ['hero', 'stat3_value'], 'ed-hero-stat3l': ['hero', 'stat3_label'] };
-  for (const [elId, [section, key]] of Object.entries(fields)) {
-    const el = document.getElementById(elId);
-    if (el) items.push({ section, key, value: el.value, content_type: 'text' });
-  }
+  document.querySelectorAll('#a-editor [data-content]').forEach(el => {
+    const [section, key] = el.dataset.content.split('.');
+    if (section && key) items.push({ section, key, value: el.value, content_type: 'text' });
+  });
+  items.push({ section: 'testimonials', key: 'cards', value: JSON.stringify(_testiCards), content_type: 'json' });
+  items.push({ section: 'sectors', key: 'list', value: JSON.stringify(_sectorList), content_type: 'json' });
   try {
     await api('/api/site-content', { method: 'PUT', body: JSON.stringify(items) });
+    applyLandingContent({ items });
     toast('success', 'Guardado', 'Contenido del sitio actualizado');
-  } catch (err) { toast('error', 'Error', err.message); }
+  } catch (err) { toast('error', 'Error', err.message || 'No se pudo guardar'); }
 }
 
 function previewEditorContent() {
-  const h = document.getElementById('ed-hero-headline');
-  const s = document.getElementById('ed-hero-subtitle');
-  const o = document.getElementById('ed-hero-overline');
-  if (h) { const el = document.querySelector('.hero h1'); if (el) el.innerHTML = h.value.replace(/importación y logística/gi, '<em>$&</em>'); }
-  if (s) { const el = document.querySelector('.hero .subtitle'); if (el) el.textContent = s.value; }
-  if (o) { const el = document.querySelector('.hero .overline'); if (el) el.innerHTML = `<i class="fas fa-gem"></i> ${o.value}`; }
-  const stats = document.querySelectorAll('.hero-stat');
-  ['ed-hero-stat1v', 'ed-hero-stat2v', 'ed-hero-stat3v'].forEach((id, i) => { const el = document.getElementById(id); if (el && stats[i]) stats[i].querySelector('.num').textContent = el.value; });
-  ['ed-hero-stat1l', 'ed-hero-stat2l', 'ed-hero-stat3l'].forEach((id, i) => { const el = document.getElementById(id); if (el && stats[i]) stats[i].querySelector('.label').textContent = el.value; });
-  toast('info', 'Preview', 'Cambios aplicados en la landing (sin guardar)');
+  const items = [];
+  document.querySelectorAll('#a-editor [data-content]').forEach(el => {
+    const [section, key] = el.dataset.content.split('.');
+    if (section && key) items.push({ section, key, value: el.value, content_type: 'text' });
+  });
+  items.push({ section: 'testimonials', key: 'cards', value: JSON.stringify(_testiCards), content_type: 'json' });
+  items.push({ section: 'sectors', key: 'list', value: JSON.stringify(_sectorList), content_type: 'json' });
+  applyLandingContent({ items });
+  toast('info', 'Preview aplicado', 'Cambios visibles en landing (sin guardar)');
   go('page-landing');
+}
+
+async function loadEditorContent() {
+  try {
+    const data = await api('/api/site-content');
+    if (!Array.isArray(data)) return;
+    const map = {};
+    data.forEach(it => { map[`${it.section}.${it.key}`] = it.value; });
+    document.querySelectorAll('[data-content]').forEach(el => {
+      const v = map[el.dataset.content];
+      if (v != null) el.value = v;
+    });
+    if (map['testimonials.cards']) {
+      try { _testiCards = JSON.parse(map['testimonials.cards']); } catch (_) {}
+    }
+    if (map['sectors.list']) {
+      try { _sectorList = JSON.parse(map['sectors.list']); } catch (_) {}
+    }
+    _editorLoaded = true;
+    applyLandingContent({ items: data });
+    if (document.getElementById('ed-testimonials')?.style.display !== 'none') renderTestiCardsEditor();
+    if (document.getElementById('ed-sectors')?.style.display !== 'none') renderSectorListEditor();
+  } catch (err) { console.warn('site-content load failed', err); }
+}
+
+function applyLandingContent({ items }) {
+  const map = {};
+  (items || []).forEach(it => { map[`${it.section}.${it.key}`] = it.value; });
+
+  // Hero
+  const setIf = (sel, val, mode) => {
+    if (val == null) return;
+    const el = document.querySelector(sel);
+    if (!el) return;
+    if (mode === 'html') el.innerHTML = val;
+    else el.textContent = val;
+  };
+  if (map['hero.headline']) {
+    const el = document.querySelector('#page-landing .hero h1, .hero h1');
+    if (el) el.innerHTML = map['hero.headline'].replace(/importación y logística/gi, '<em>$&</em>');
+  }
+  setIf('#page-landing .hero .subtitle, .hero .subtitle', map['hero.subtitle']);
+  if (map['hero.overline']) {
+    const el = document.querySelector('#page-landing .hero .overline, .hero .overline');
+    if (el) el.innerHTML = `<i class="fas fa-gem"></i> ${escapeHtml(map['hero.overline'])}`;
+  }
+  const stats = document.querySelectorAll('#page-landing .hero-stat, .hero-stat');
+  [['hero.stat1_value', 'hero.stat1_label'], ['hero.stat2_value', 'hero.stat2_label'], ['hero.stat3_value', 'hero.stat3_label']]
+    .forEach((pair, i) => {
+      if (!stats[i]) return;
+      if (map[pair[0]]) { const n = stats[i].querySelector('.num'); if (n) n.textContent = map[pair[0]]; }
+      if (map[pair[1]]) { const l = stats[i].querySelector('.label'); if (l) l.textContent = map[pair[1]]; }
+    });
+
+  // Featured testimonial
+  const tf = document.getElementById('lp-testi-featured');
+  if (tf) {
+    if (map['testimonials.featured_quote']) { const q = tf.querySelector('.tf-quote'); if (q) q.textContent = map['testimonials.featured_quote']; }
+    if (map['testimonials.featured_name']) { const n = tf.querySelector('.tf-name'); if (n) n.textContent = map['testimonials.featured_name']; }
+    if (map['testimonials.featured_role']) { const r = tf.querySelector('.tf-role'); if (r) r.textContent = map['testimonials.featured_role']; }
+    if (map['testimonials.featured_company']) { const c = tf.querySelector('.tf-company'); if (c) c.textContent = map['testimonials.featured_company']; }
+    if (map['testimonials.featured_avatar']) { const a = tf.querySelector('.tf-av-img'); if (a) a.src = map['testimonials.featured_avatar']; }
+    const metrics = tf.querySelectorAll('.tf-metric');
+    [['featured_metric1_value', 'featured_metric1_label'], ['featured_metric2_value', 'featured_metric2_label'], ['featured_metric3_value', 'featured_metric3_label']]
+      .forEach((pair, i) => {
+        if (!metrics[i]) return;
+        const v = map[`testimonials.${pair[0]}`]; const l = map[`testimonials.${pair[1]}`];
+        if (v) { const el = metrics[i].querySelector('.val'); if (el) el.textContent = v; }
+        if (l) { const el = metrics[i].querySelector('.label'); if (el) el.textContent = l; }
+      });
+  }
+
+  // Testimonios cards grid
+  if (map['testimonials.cards']) {
+    let cards;
+    try { cards = JSON.parse(map['testimonials.cards']); } catch (_) { cards = null; }
+    const grid = document.getElementById('lp-testi-grid');
+    if (cards && grid) {
+      grid.innerHTML = cards.map(c => {
+        const r = parseFloat(c.rating || 5);
+        const full = Math.floor(r);
+        const half = (r - full) >= 0.5 ? 1 : 0;
+        const empty = 5 - full - half;
+        let stars = '';
+        for (let i = 0; i < full; i++) stars += '<i class="fas fa-star"></i>';
+        if (half) stars += '<i class="fas fa-star-half-alt"></i>';
+        for (let i = 0; i < empty; i++) stars += '<i class="far fa-star"></i>';
+        return `<div class="testi-card"><div class="stars">${stars}</div><div class="quote">${escapeHtml(c.quote || '')}</div><div class="author">${c.avatar ? `<img class="av-img" src="${escapeAttr(c.avatar)}" alt="${escapeAttr(c.name || '')}" loading="lazy" />` : ''}<div><div class="a-name">${escapeHtml(c.name || '')}</div><div class="a-role">${escapeHtml(c.role || '')}</div></div></div></div>`;
+      }).join('');
+    }
+  }
+
+  // Sectores
+  if (map['sectors.list']) {
+    let list;
+    try { list = JSON.parse(map['sectors.list']); } catch (_) { list = null; }
+    const grid = document.getElementById('lp-sectors-grid');
+    if (list && grid) {
+      grid.innerHTML = list.map(s => `<div class="sector-card">${s.image ? `<img src="${escapeAttr(s.image)}" alt="${escapeAttr(s.name || '')}" loading="lazy" />` : ''}<div class="sector-overlay"></div><div class="sector-content"><i class="fas ${escapeAttr(s.icon || 'fa-tag')}"></i><h4>${escapeHtml(s.name || '')}</h4><p>${escapeHtml(s.desc || '')}</p></div></div>`).join('');
+    }
+  }
+
+  // Footer
+  if (map['footer.description']) {
+    const el = document.querySelector('#page-landing footer .footer-desc, footer .footer-desc');
+    if (el) el.textContent = map['footer.description'];
+  }
+}
+
+// ─── Visual Editor (drag/drop testimonios + sectores) ───
+function openVisualEditor() {
+  let modal = document.getElementById('visualEditorModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'visualEditorModal';
+    modal.className = 'modal-bg';
+    modal.style.alignItems = 'center';
+    modal.innerHTML = `
+      <div class="modal-box" style="max-width:1100px;width:96vw;height:90vh;padding:0;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg-surface);flex-wrap:wrap;gap:8px">
+          <div>
+            <h3 style="margin:0;font-size:14px;font-weight:600"><i class="fas fa-arrows-alt" style="margin-right:6px;color:var(--brand-gold)"></i> Editor visual — arrastrá para reordenar</h3>
+            <p style="margin:2px 0 0 0;font-size:11px;color:var(--text-muted)">Tomá los testimonios o sectores y arrastrá para cambiar orden. Click en × para borrar. Doble-click para editar texto.</p>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="closeVisualEditor()"><i class="fas fa-times"></i> Cerrar</button>
+            <button class="btn btn-dark btn-sm" onclick="saveVisualEditor()"><i class="fas fa-save"></i> Guardar orden</button>
+          </div>
+        </div>
+        <div id="visualEditorBody" style="flex:1;overflow-y:auto;padding:18px 20px;background:#0f1419"></div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  const body = document.getElementById('visualEditorBody');
+  body.innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="font-size:12px;font-weight:700;color:var(--brand-gold);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">Testimonios secundarios</div>
+      <div id="ve-testi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:700;color:var(--brand-gold);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">Sectores</div>
+      <div id="ve-sectors" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px"></div>
+    </div>`;
+  renderVisualEditorBoxes();
+  modal.classList.add('open');
+}
+
+function renderVisualEditorBoxes() {
+  const tHost = document.getElementById('ve-testi');
+  const sHost = document.getElementById('ve-sectors');
+  if (!tHost || !sHost) return;
+  tHost.innerHTML = _testiCards.map((t, i) => `
+    <div class="ve-box" draggable="true" data-list="testi" data-idx="${i}" style="padding:10px;background:#161B22;border:1px dashed rgba(212,168,83,0.35);border-radius:10px;cursor:grab;position:relative;transition:transform .15s">
+      <button onclick="event.stopPropagation();_veRemove('testi',${i})" style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(239,68,68,0.18);color:#ef4444;cursor:pointer;font-size:11px">×</button>
+      <div style="font-size:11px;font-weight:700;color:var(--brand-gold);margin-bottom:4px"><i class="fas fa-grip-vertical"></i> ${i + 1}</div>
+      <div style="font-size:11px;color:#F0F6FC;font-weight:600;margin-bottom:3px">${escapeHtml(t.name || '')}</div>
+      <div style="font-size:10px;color:#8B949E;line-height:1.35">${escapeHtml((t.quote || '').slice(0, 80))}${(t.quote || '').length > 80 ? '…' : ''}</div>
+    </div>`).join('');
+  sHost.innerHTML = _sectorList.map((s, i) => `
+    <div class="ve-box" draggable="true" data-list="sectors" data-idx="${i}" style="padding:10px;background:#161B22;border:1px dashed rgba(212,168,83,0.35);border-radius:10px;cursor:grab;position:relative">
+      <button onclick="event.stopPropagation();_veRemove('sectors',${i})" style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(239,68,68,0.18);color:#ef4444;cursor:pointer;font-size:11px">×</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><i class="fas ${escapeAttr(s.icon || 'fa-tag')}" style="color:var(--brand-gold);font-size:14px"></i><span style="font-size:11px;font-weight:700;color:#F0F6FC">${escapeHtml(s.name || '')}</span></div>
+      <div style="font-size:10px;color:#8B949E">${escapeHtml(s.desc || '')}</div>
+    </div>`).join('');
+  document.querySelectorAll('#visualEditorBody .ve-box').forEach(el => {
+    el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ list: el.dataset.list, idx: el.dataset.idx })); el.style.opacity = '.4'; });
+    el.addEventListener('dragend', () => { el.style.opacity = '1'; });
+    el.addEventListener('dragover', e => { e.preventDefault(); el.style.transform = 'scale(1.03)'; });
+    el.addEventListener('dragleave', () => { el.style.transform = 'scale(1)'; });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      el.style.transform = 'scale(1)';
+      try {
+        const src = JSON.parse(e.dataTransfer.getData('text/plain'));
+        if (src.list !== el.dataset.list) return;
+        const arr = src.list === 'testi' ? _testiCards : _sectorList;
+        const fromIdx = parseInt(src.idx);
+        const toIdx = parseInt(el.dataset.idx);
+        if (fromIdx === toIdx) return;
+        const moved = arr.splice(fromIdx, 1)[0];
+        arr.splice(toIdx, 0, moved);
+        renderVisualEditorBoxes();
+      } catch (_) {}
+    });
+  });
+}
+
+function _veRemove(list, idx) {
+  const arr = list === 'testi' ? _testiCards : _sectorList;
+  if (arr.length <= 1) { toast('warning', 'Mínimo 1', 'Debe quedar al menos un elemento'); return; }
+  arr.splice(idx, 1);
+  renderVisualEditorBoxes();
+}
+
+function closeVisualEditor() {
+  const m = document.getElementById('visualEditorModal');
+  if (m) m.classList.remove('open');
+}
+
+async function saveVisualEditor() {
+  renderTestiCardsEditor();
+  renderSectorListEditor();
+  await saveEditorContent();
+  closeVisualEditor();
 }
 
 // ─── Integraciones ───
