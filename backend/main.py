@@ -374,7 +374,7 @@ def admin_invite(data: dict, db: Session = Depends(get_db)):
     # Generate invite link
     import hashlib
     token = hashlib.sha256(f"{email}:{cliente.id}:mip-admin-invite".encode()).hexdigest()[:32]
-    APP_URL = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    APP_URL = os.getenv("APP_URL", "https://miptrust.cl")
     invite_link = f"{APP_URL}#invite={token}&email={email}"
 
     # Send invitation email
@@ -406,7 +406,7 @@ def admin_invite_client(data: dict, db: Session = Depends(get_db)):
     message = data.get("message", "")
     if not email:
         raise HTTPException(400, "Email requerido")
-    app_url = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    app_url = os.getenv("APP_URL", "https://miptrust.cl")
     subject = f"Bienvenido a MIP Quality & Logistics, {nombre or 'amigo/a'}"
     body = message or (
         f"Hola {nombre},\n\n"
@@ -620,7 +620,7 @@ def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
 
     ADMIN_TO = os.getenv("ADMIN_NOTIFY_EMAIL", "Paul@emonkonline.com")
     ADMIN_CC = os.getenv("ADMIN_NOTIFY_CC", "iansitniskys@gmail.com")
-    app_url = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    app_url = os.getenv("APP_URL", "https://miptrust.cl")
 
     # 1) Email al equipo MIP
     subject_team = f"🔔 Nueva cotización #{cot.id} — {cot.producto} — {cliente_nombre}"
@@ -1592,7 +1592,7 @@ def _notify_client_estado_change(cliente, cot, estado_anterior: str, nuevo_estad
     """Envia email transaccional al cliente cuando cambia el estado de su cotizacion.
     Un email distinto y tono distinto para cada estado.
     """
-    app_url = os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app")
+    app_url = os.getenv("APP_URL", "https://miptrust.cl")
     producto = (cot.proyecto_nombre or cot.producto or "tu proyecto").strip()
     nombre = cliente.nombre or "amigo/a"
     sol_id = f"#SOL-{str(cot.id).zfill(3)}"
@@ -1679,7 +1679,7 @@ def email_test(data: dict, db: Session = Depends(get_db)):
         title="Email de prueba — MIP",
         body_html="<p>Este email confirma que tu configuración SMTP está funcionando correctamente.</p><p>Si lo estás viendo, los siguientes triggers también van a funcionar:</p><ul><li>✅ Notificaciones de nuevas cotizaciones</li><li>✅ Invitaciones a clientes</li><li>✅ Secuencias de email automatizadas</li><li>✅ Alertas de cambios de estado</li></ul>",
         cta_label="Ir a la plataforma",
-        cta_url=os.getenv("APP_URL", "https://mip-quality-platform-750756373393.us-central1.run.app"),
+        cta_url=os.getenv("APP_URL", "https://miptrust.cl"),
     )
     result = _send_email(
         to=to,
