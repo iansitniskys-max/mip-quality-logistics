@@ -763,3 +763,81 @@ class AgentAutoRule(Base):
     last_triggered_at = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+# ═══════════════════════════════════════════════════
+# WHATSAPP - canal de mensajeria via Kapso
+# ═══════════════════════════════════════════════════
+
+class WhatsAppConversation(Base):
+    """Una conversacion de WhatsApp, vinculada opcionalmente a un cliente.
+
+    Si el numero matchea con clientes.telefono, se vincula. Sino, queda
+    huerfana hasta que el agente o admin la asocie.
+    """
+    __tablename__ = "whatsapp_conversations"
+    id = Column(Integer, primary_key=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True, index=True)
+    phone_number = Column(String(30), nullable=False, index=True)  # E.164: +56912345678
+    nombre_contacto = Column(String(200))  # nombre del WhatsApp profile
+    agente_id = Column(Integer, ForeignKey("agent_configs.id", ondelete="SET NULL"), nullable=True)
+    takeover = Column(Boolean, default=False)  # admin tomo control, IA pausada
+    takeover_by = Column(String(200))  # email del admin que tomo control
+    takeover_at = Column(DateTime)
+    last_message_at = Column(DateTime)
+    last_message_preview = Column(String(500))  # ultimos 500 chars para listing
+    unread_count = Column(Integer, default=0)  # mensajes inbound sin leer por admin
+    status = Column(String(20), default="active")  # active, archived
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    messages = relationship("WhatsAppMessage", back_populates="conversation", cascade="all, delete-orphan")
+    mockups = relationship("WhatsAppMockup", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class WhatsAppMessage(Base):
+    """Cada mensaje individual de WhatsApp (inbound u outbound)."""
+    __tablename__ = "whatsapp_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("whatsapp_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    direction = Column(String(10), nullable=False)  # inbound, outbound
+    type = Column(String(20), nullable=False)  # text, image, document, audio, video, template, mockup, system
+    content = Column(Text)  # texto o caption
+    media_url = Column(String(500))  # URL en Cloud Storage (audios, imagenes, docs)
+    media_kapso_id = Column(String(100))  # id de Kapso/Meta para descargar el media original
+    media_mime_type = Column(String(100))
+    kapso_message_id = Column(String(100), unique=True, index=True)  # idempotencia webhooks
+    # Audio-specific
+    audio_duration_sec = Column(Integer)
+    transcription = Column(Text)  # texto transcrito por Gemini
+    transcription_confidence = Column(Float)
+    transcription_lang = Column(String(10), default="es-CL")
+    transcription_cost_usd = Column(Float, default=0.0)
+    # Outbound metadata
+    sent_by_agent_id = Column(Integer, ForeignKey("agent_configs.id", ondelete="SET NULL"), nullable=True)
+    sent_by_admin = Column(String(200))  # email si lo mando un humano via takeover
+    cost_usd = Column(Float, default=0.0)  # costo Kapso/Meta + LLM si aplica
+    status = Column(String(20), default="pending")  # pending, sent, delivered, read, failed
+    error_message = Column(Text)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+    conversation = relationship("WhatsAppConversation", back_populates="messages")
+
+
+class WhatsAppMockup(Base):
+    """Imagenes generadas con Nano Banana (Gemini 2.5 Flash Image) para clientes."""
+    __tablename__ = "whatsapp_mockups"
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("whatsapp_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True)
+    source_image_url = Column(String(500))  # imagen base que mando el cliente
+    prompt_user = Column(Text)  # lo que pidio el cliente literalmente
+    prompt_enriched = Column(Text)  # lo que finalmente le mandamos a Gemini
+    output_image_url = Column(String(500))  # resultado en Cloud Storage
+    output_message_id = Column(Integer, ForeignKey("whatsapp_messages.id", ondelete="SET NULL"), nullable=True)
+    gemini_cost_usd = Column(Float, default=0.0)
+    sent_to_client = Column(Boolean, default=False)
+    cliente_feedback = Column(String(20))  # liked, disliked, requested_change, no_response
+    created_at = Column(DateTime, server_default=func.now())
+
+    conversation = relationship("WhatsAppConversation", back_populates="mockups")

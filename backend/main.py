@@ -21,6 +21,7 @@ from models import (
     AgentConfig, AgentBlock, Tool, KnowledgeFolder, KnowledgeDoc, KnowledgeChunk, AgentTrace,
     ConversationPipeline, PipelineStageLog, AgentIntegration, HumanHandoff,
     StageAssignment, AgentAutoRule,
+    WhatsAppConversation, WhatsAppMessage, WhatsAppMockup,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -7643,6 +7644,39 @@ def listar_cotizaciones_formales(cotizacion_id: Optional[int] = None, db: Sessio
     if cotizacion_id:
         q = q.filter(CotizacionFormal.cotizacion_id == cotizacion_id)
     return q.order_by(CotizacionFormal.created_at.desc()).all()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# WHATSAPP / KAPSO - canal de mensajeria + transcripcion + mockups
+# ═══════════════════════════════════════════════════════════════════
+
+KAPSO_BASE_URL = os.getenv("KAPSO_BASE_URL", "https://api.kapso.ai/meta/whatsapp")
+KAPSO_API_KEY = os.getenv("KAPSO_API_KEY", "")
+KAPSO_PHONE_NUMBER_ID = os.getenv("KAPSO_PHONE_NUMBER_ID", "")
+KAPSO_WEBHOOK_SECRET = os.getenv("KAPSO_WEBHOOK_SECRET", "")
+KAPSO_API_VERSION = os.getenv("KAPSO_API_VERSION", "v24.0")
+WHATSAPP_ENABLED = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
+NANO_BANANA_ENABLED = os.getenv("NANO_BANANA_ENABLED", "false").lower() == "true"
+WHATSAPP_BUCKET = os.getenv("WHATSAPP_BUCKET", "mip-quality-whatsapp-media")
+
+
+@app.get("/api/whatsapp/diagnostic")
+def whatsapp_diagnostic():
+    """Verifica que las env vars de Kapso esten configuradas y reporta estado."""
+    return {
+        "enabled": WHATSAPP_ENABLED,
+        "kapso_base_url": KAPSO_BASE_URL,
+        "kapso_api_key_configured": bool(KAPSO_API_KEY),
+        "kapso_phone_number_id_configured": bool(KAPSO_PHONE_NUMBER_ID),
+        "kapso_webhook_secret_configured": bool(KAPSO_WEBHOOK_SECRET),
+        "nano_banana_enabled": NANO_BANANA_ENABLED,
+        "storage_bucket": WHATSAPP_BUCKET,
+        "ready": bool(
+            WHATSAPP_ENABLED and KAPSO_API_KEY and KAPSO_PHONE_NUMBER_ID
+        ),
+        "webhook_url": f"{os.getenv('APP_URL', 'https://miptrust.cl')}/api/whatsapp/incoming",
+        "setup_url": "https://app.kapso.ai/",
+    }
 
 
 # ─── Serve Frontend ───
