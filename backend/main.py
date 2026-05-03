@@ -7795,6 +7795,217 @@ def _get_or_create_conversation(phone: str, profile_name: str, db: Session) -> W
     return conv
 
 
+# ─── WhatsApp media: download from Kapso + upload to GCS ───
+
+def _download_kapso_media(media_id: str) -> tuple[bytes, str]:
+    """Descarga un media (audio/imagen/doc) desde Kapso usando su ID.
+
+    Flow Meta-compatible:
+    1. GET /v24.0/{media_id} -> retorna { url, mime_type, ... }
+    2. GET <url> con auth header -> bytes binarios
+
+    Returns (bytes, mime_type). En stub mode, devuelve bytes vacios.
+    """
+    if not WHATSAPP_ENABLED or not KAPSO_API_KEY:
+        return b"", "application/octet-stream"
+    import requests as _req
+    headers = {"X-API-Key": KAPSO_API_KEY}
+    # Step 1: get media metadata
+    meta_url = f"{KAPSO_BASE_URL}/{KAPSO_API_VERSION}/{media_id}"
+    r = _req.get(meta_url, headers=headers, timeout=15)
+    r.raise_for_status()
+    meta = r.json()
+    media_url = meta.get("url")
+    mime = meta.get("mime_type", "application/octet-stream")
+    if not media_url:
+        return b"", mime
+    # Step 2: download bytes
+    r2 = _req.get(media_url, headers=headers, timeout=30)
+    r2.raise_for_status()
+    return r2.content, mime
+
+
+def _upload_to_gcs(content: bytes, dest_path: str, mime_type: str) -> str:
+    """Sube bytes a Google Cloud Storage y devuelve URL publica.
+
+    Si el bucket no esta configurado o falla la subida, devuelve "" y
+    el caller debe manejarlo (ej: dejar media_url vacio en DB).
+    """
+    if not content or not WHATSAPP_BUCKET:
+        return ""
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(WHATSAPP_BUCKET)
+        blob = bucket.blob(dest_path)
+        blob.upload_from_string(content, content_type=mime_type)
+        # Public URL (bucket tiene uniform access, requiere allUsers viewer
+        # o usar signed URLs para acceso privado)
+        return f"https://storage.googleapis.com/{WHATSAPP_BUCKET}/{dest_path}"
+    except Exception as e:
+        print(f"[gcs upload] error: {e}")
+        return ""
+
+
+def _transcribe_audio_gemini(audio_bytes: bytes, mime_type: str) -> dict:
+    """Transcribe audio usando Gemini 2.5 Flash multimodal.
+
+    Returns: { text, confidence, cost_usd, raw_response, error }
+    Si Gemini no esta configurado o falla, devuelve text="" y error.
+    """
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    if not GEMINI_API_KEY or not audio_bytes:
+        return {"text": "", "confidence": 0.0, "cost_usd": 0.0,
+                "error": "GEMINI_API_KEY no configurado o audio vacio"}
+    import base64 as _b64
+    import requests as _req
+    audio_b64 = _b64.b64encode(audio_bytes).decode("ascii")
+    # Usamos gemini-2.5-flash que soporta audio nativamente
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-2.5-flash:generateContent"
+    )
+    body = {
+        "contents": [{
+            "parts": [
+                {
+                    "text": (
+                        "Transcribe este audio de WhatsApp en español de Chile. "
+                        "Devuelve SOLO la transcripción exacta, sin agregar comentarios "
+                        "ni descripciones. Si el audio es ininteligible o muy corto, "
+                        "responde con la palabra: INAUDIBLE"
+                    ),
+                },
+                {
+                    "inline_data": {
+                        "mime_type": mime_type or "audio/ogg",
+                        "data": audio_b64,
+                    }
+                },
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 1024,
+        },
+    }
+    try:
+        r = _req.post(
+            url,
+            params={"key": GEMINI_API_KEY},
+            json=body,
+            timeout=30,
+        )
+        if r.status_code >= 400:
+            return {"text": "", "confidence": 0.0, "cost_usd": 0.0,
+                    "error": f"Gemini HTTP {r.status_code}: {r.text[:300]}"}
+        data = r.json()
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return {"text": "", "confidence": 0.0, "cost_usd": 0.0,
+                    "error": "Sin candidates en respuesta Gemini"}
+        parts = (candidates[0].get("content", {}) or {}).get("parts", [])
+        text = ""
+        for p in parts:
+            if "text" in p:
+                text = (p["text"] or "").strip()
+                break
+        # Heuristica de confidence: INAUDIBLE = 0, texto corto < 5 chars = 0.4,
+        # finishReason=STOP normal = 0.85+, hay alguna palabra de incertidumbre = 0.6
+        finish = candidates[0].get("finishReason", "")
+        confidence = 0.85
+        if not text or text.upper() == "INAUDIBLE":
+            confidence = 0.0
+            text = ""
+        elif len(text) < 5:
+            confidence = 0.4
+        elif finish != "STOP":
+            confidence = 0.6
+        # Cost estimation: input ~32 tokens/s de audio + output text
+        usage = data.get("usageMetadata", {}) or {}
+        input_tokens = usage.get("promptTokenCount", 0)
+        output_tokens = usage.get("candidatesTokenCount", 0)
+        # Gemini 2.5 Flash: $0.075/1M input, $0.30/1M output (audio counted as input)
+        cost = (input_tokens * 0.075 + output_tokens * 0.30) / 1_000_000
+        return {
+            "text": text,
+            "confidence": confidence,
+            "cost_usd": round(cost, 6),
+            "raw_response": data,
+            "error": None,
+        }
+    except Exception as e:
+        return {"text": "", "confidence": 0.0, "cost_usd": 0.0,
+                "error": f"Excepcion transcribiendo: {e}"}
+
+
+def _process_audio_message(message_record: WhatsAppMessage, conv: WhatsAppConversation, db: Session) -> dict:
+    """Pipeline completo de audio: download Kapso -> upload GCS -> transcribir Gemini.
+    Actualiza el WhatsAppMessage in-place con media_url y transcription.
+
+    Si la confianza es baja, dispara mensaje de fallback pidiendo texto.
+    Returns dict con {transcription, confidence, gcs_url, error}.
+    """
+    media_id = message_record.media_kapso_id
+    if not media_id:
+        return {"error": "Sin media_kapso_id"}
+
+    # 1. Descargar de Kapso
+    try:
+        audio_bytes, mime = _download_kapso_media(media_id)
+    except Exception as e:
+        message_record.error_message = f"Download Kapso fallo: {e}"
+        db.commit()
+        return {"error": f"Download fallo: {e}"}
+
+    if not audio_bytes:
+        return {"error": "Audio vacio o stub mode"}
+
+    # 2. Upload a GCS para persistencia
+    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ext = "ogg" if "ogg" in (mime or "") else "mp4" if "mp4" in (mime or "") else "bin"
+    gcs_path = f"audios/{conv.id}/{message_record.id}_{ts}.{ext}"
+    gcs_url = _upload_to_gcs(audio_bytes, gcs_path, mime or "audio/ogg")
+    if gcs_url:
+        message_record.media_url = gcs_url
+    if not message_record.media_mime_type:
+        message_record.media_mime_type = mime
+
+    # 3. Transcribir con Gemini
+    result = _transcribe_audio_gemini(audio_bytes, mime)
+    message_record.transcription = result.get("text", "")
+    message_record.transcription_confidence = result.get("confidence", 0.0)
+    message_record.transcription_cost_usd = result.get("cost_usd", 0.0)
+    message_record.cost_usd = (message_record.cost_usd or 0.0) + (result.get("cost_usd", 0.0))
+    db.commit()
+
+    # 4. Si confidence baja, pedir al cliente que escriba
+    if result.get("confidence", 0.0) < 0.7 and not result.get("error"):
+        fallback_text = (
+            "Disculpa, no te entendí muy bien por el audio 😅 "
+            "¿Me lo podés escribir en un mensaje? Así no me pierdo ningún detalle."
+        )
+        send_result = _send_text(conv.phone_number, fallback_text)
+        # Persistir el mensaje de fallback
+        fallback = WhatsAppMessage(
+            conversation_id=conv.id,
+            direction="outbound",
+            type="text",
+            content=fallback_text,
+            sent_by_admin="system-low-confidence",
+            status=send_result.get("status", "pending"),
+        )
+        db.add(fallback)
+        db.commit()
+
+    return {
+        "transcription": message_record.transcription,
+        "confidence": message_record.transcription_confidence,
+        "gcs_url": gcs_url,
+        "error": result.get("error"),
+    }
+
+
 @app.post("/api/whatsapp/incoming")
 async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     """Webhook receptor de Kapso. Persiste mensajes inbound y matchea cliente.
@@ -7887,11 +8098,26 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
                     if profile_name and not conv.nombre_contacto:
                         conv.nombre_contacto = profile_name
                     db.commit()
+                    db.refresh(record)
+                    # Si es audio: descargar + subir a GCS + transcribir con Gemini
+                    audio_result = None
+                    if msg_type == "audio" and media_id:
+                        try:
+                            audio_result = _process_audio_message(record, conv, db)
+                            # Update preview con transcripcion
+                            if audio_result and audio_result.get("transcription"):
+                                conv.last_message_preview = (
+                                    f"🎙️ {audio_result['transcription'][:480]}"
+                                )
+                                db.commit()
+                        except Exception as e:
+                            print(f"[audio process] error msg {record.id}: {e}")
                     processed.append({
                         "id": record.id,
                         "type": msg_type,
                         "from": from_phone,
                         "conversation_id": conv.id,
+                        "audio_result": audio_result,
                     })
                 # Statuses (delivery receipts)
                 for st in value.get("statuses", []) or []:
@@ -8099,6 +8325,31 @@ def test_send_whatsapp(payload: dict):
     if not to:
         raise HTTPException(400, "to requerido (numero E.164 con +)")
     return {"to": to, "message": msg, "result": _send_text(to, msg)}
+
+
+@app.post("/api/whatsapp/messages/{msg_id}/retranscribe")
+def retranscribir_audio(msg_id: int, db: Session = Depends(get_db)):
+    """Re-procesa la transcripcion de un audio existente.
+    Util si fallo originalmente o se quiere reintentar tras configurar Gemini.
+    """
+    msg = db.query(WhatsAppMessage).filter(WhatsAppMessage.id == msg_id).first()
+    if not msg:
+        raise HTTPException(404, "Mensaje no encontrado")
+    if msg.type != "audio":
+        raise HTTPException(400, "Solo audios pueden re-transcribirse")
+    conv = db.query(WhatsAppConversation).filter(
+        WhatsAppConversation.id == msg.conversation_id
+    ).first()
+    if not conv:
+        raise HTTPException(404, "Conversacion no encontrada")
+    result = _process_audio_message(msg, conv, db)
+    return {
+        "id": msg.id,
+        "transcription": msg.transcription,
+        "confidence": msg.transcription_confidence,
+        "media_url": msg.media_url,
+        "result": result,
+    }
 
 
 # ─── Serve Frontend ───
