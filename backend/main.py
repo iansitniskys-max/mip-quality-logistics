@@ -2755,6 +2755,81 @@ DEFAULT_TOOLS = [
         "handler": "check_order_status",
         "peligroso": False,
     },
+    # ─── WhatsApp tools (solo se invocan en webhook /api/whatsapp/incoming) ───
+    {
+        "name": "send_whatsapp_text",
+        "description": "Envia un texto adicional al cliente actual de WhatsApp (extra al reply principal). Ejemplo: cuando ya respondiste y quieres mandar otra info por separado.",
+        "categoria": "messaging",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Texto a enviar"},
+            },
+            "required": ["text"],
+        }),
+        "handler": "send_whatsapp_text",
+        "peligroso": False,
+    },
+    {
+        "name": "send_whatsapp_image",
+        "description": "Envia una imagen al cliente WhatsApp por URL publica con caption opcional. Util para enviar fotos de productos del catalogo.",
+        "categoria": "messaging",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "image_url": {"type": "string", "description": "URL HTTPS publica de la imagen"},
+                "caption": {"type": "string", "description": "Texto debajo de la imagen"},
+            },
+            "required": ["image_url"],
+        }),
+        "handler": "send_whatsapp_image",
+        "peligroso": False,
+    },
+    {
+        "name": "send_whatsapp_pdf",
+        "description": "Envia un documento PDF al cliente WhatsApp. Util para cotizaciones formales o fichas tecnicas.",
+        "categoria": "messaging",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "pdf_url": {"type": "string", "description": "URL HTTPS publica del PDF"},
+                "filename": {"type": "string", "description": "Nombre del archivo (ej: cotizacion-001.pdf)"},
+                "caption": {"type": "string", "description": "Mensaje opcional"},
+            },
+            "required": ["pdf_url"],
+        }),
+        "handler": "send_whatsapp_pdf",
+        "peligroso": False,
+    },
+    {
+        "name": "escalate_to_human_whatsapp",
+        "description": "Escala la conversacion WhatsApp a un humano (activa takeover + notifica al admin). Usar SOLO cuando el cliente pide hablar con humano explicitamente o el caso es muy complejo.",
+        "categoria": "support",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "razon": {"type": "string", "description": "Por que se escala"},
+                "prioridad": {"type": "string", "enum": ["baja", "media", "alta", "urgente"], "default": "normal"},
+            },
+            "required": ["razon"],
+        }),
+        "handler": "escalate_to_human_whatsapp",
+        "peligroso": False,
+    },
+    {
+        "name": "generar_mockup_nanobanana",
+        "description": "Genera un mockup/variacion de un producto usando Gemini 2.5 Flash Image (Nano Banana). Toma la ULTIMA imagen que envio el cliente y la modifica segun el prompt. Usar cuando el cliente envia foto y pide variacion (color, material, logo, etc).",
+        "categoria": "advanced",
+        "schema_input": json.dumps({
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "Descripcion de la variacion deseada (ej: 'el mismo producto pero en color azul marino con logo central'"},
+            },
+            "required": ["prompt"],
+        }),
+        "handler": "generar_mockup_nanobanana",
+        "peligroso": False,
+    },
 ]
 
 
@@ -2828,6 +2903,23 @@ def _seed_agent_builder(db):
     # Seed Mateo as first agent (solo si no existe). Si ya existe, saltar Mateo pero seguir con los demas.
     existing_mateo = db.query(AgentConfig).filter(AgentConfig.agent_type == "mateo-sdr").first()
     if existing_mateo:
+        # Backfill de tools WhatsApp (idempotente): agregar si faltan
+        try:
+            current_tools = json.loads(existing_mateo.tools_allowed or "[]")
+        except Exception:
+            current_tools = []
+        wa_tools = [
+            "send_whatsapp_text", "send_whatsapp_image", "send_whatsapp_pdf",
+            "escalate_to_human_whatsapp", "generar_mockup_nanobanana",
+        ]
+        added = [t for t in wa_tools if t not in current_tools]
+        if added:
+            existing_mateo.tools_allowed = json.dumps(current_tools + wa_tools)
+            # Opcional: poner channel='both' para que sirva web y WhatsApp
+            if not getattr(existing_mateo, "channel", None):
+                existing_mateo.channel = "both"
+            db.commit()
+            print(f"[agent-builder] Mateo: agregadas tools WhatsApp: {added}")
         # Seed solo los adicionales si aun no estan
         _seed_additional_agents(db)
         return
