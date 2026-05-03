@@ -487,6 +487,7 @@ class AgentConfig(Base):
     avatar = Column(String(500))  # emoji o URL
     modelo = Column(String(100), default="gemini-2.5-flash")
     activo = Column(Boolean, default=True)
+    channel = Column(String(20), default="web")  # web, whatsapp, both
     tools_allowed = Column(Text, default="[]")  # JSON array de tool names
     max_tool_calls = Column(Integer, default=8)
     kb_folder_ids = Column(Text, default="[]")  # JSON array de folder ids

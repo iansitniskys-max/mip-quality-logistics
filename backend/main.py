@@ -135,6 +135,16 @@ def on_startup():
                     print(f"Added column agent_blocks.{col}")
                 except Exception:
                     conn.rollback()
+            # Migrate agent_configs: agregar columna channel (web/whatsapp/both)
+            for col, col_type in [
+                ("channel", "VARCHAR(20) DEFAULT 'web'"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE agent_configs ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column agent_configs.{col}")
+                except Exception:
+                    conn.rollback()
             # Crear tabla cost_limits (spending caps por proveedor) si no existe
             try:
                 conn.execute(text("""
@@ -7785,6 +7795,541 @@ def _send_document(to: str, doc_url: str, filename: str, caption: Optional[str] 
     return _send_whatsapp_kapso(to, {"type": "document", "document": doc})
 
 
+# ─── Bridge Mateo (Agent Builder) + WhatsApp ───
+# Context global por session_id que los handlers pueden leer cuando
+# el agente fue invocado desde un webhook WhatsApp.
+WHATSAPP_TOOL_CONTEXT: dict[str, dict] = {}
+
+
+def _set_whatsapp_context(session_id: str, ctx: dict) -> None:
+    WHATSAPP_TOOL_CONTEXT[session_id] = ctx
+
+
+def _get_whatsapp_context(session_id: str) -> dict:
+    return WHATSAPP_TOOL_CONTEXT.get(session_id, {})
+
+
+def _clear_whatsapp_context(session_id: str) -> None:
+    WHATSAPP_TOOL_CONTEXT.pop(session_id, None)
+
+
+def _persist_outbound_message(
+    conv_id: int,
+    type_: str,
+    content: str,
+    media_url: Optional[str],
+    agent_id: Optional[int],
+    kapso_response: dict,
+    db: Session,
+) -> WhatsAppMessage:
+    """Helper para guardar mensaje outbound en DB con kapso_message_id si vino."""
+    record = WhatsAppMessage(
+        conversation_id=conv_id,
+        direction="outbound",
+        type=type_,
+        content=content,
+        media_url=media_url,
+        sent_by_agent_id=agent_id,
+        status=kapso_response.get("status", "pending"),
+    )
+    response_data = kapso_response.get("response") or {}
+    if isinstance(response_data, dict):
+        msgs = response_data.get("messages") or []
+        if msgs and isinstance(msgs[0], dict):
+            kid = msgs[0].get("id")
+            if kid:
+                record.kapso_message_id = kid
+    if kapso_response.get("status") == "failed":
+        record.error_message = json.dumps(kapso_response, default=str)[:1000]
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def _get_whatsapp_history(conv: WhatsAppConversation, db: Session, limit: int = 12) -> list:
+    """Construye historial en formato OpenAI para pasar al agente."""
+    msgs = (
+        db.query(WhatsAppMessage)
+        .filter(WhatsAppMessage.conversation_id == conv.id)
+        .order_by(WhatsAppMessage.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    msgs = list(reversed(msgs))
+    history = []
+    for m in msgs:
+        role = "user" if m.direction == "inbound" else "assistant"
+        text = m.transcription or m.content or f"[{m.type}]"
+        history.append({"role": role, "content": text})
+    return history
+
+
+def _get_default_whatsapp_agent(db: Session) -> Optional["AgentConfig"]:
+    """Devuelve el agente que va a atender WhatsApp por default.
+    Prioridad: agente con channel_whatsapp=true, sino primer activo (Mateo).
+    """
+    # Primero busca agente con flag explicito en config
+    a = (
+        db.query(AgentConfig)
+        .filter(AgentConfig.activo == True)
+        .filter(AgentConfig.channel == "whatsapp")
+        .first()
+    )
+    if a:
+        return a
+    # Fallback: el primer agente activo (suele ser Mateo)
+    return (
+        db.query(AgentConfig)
+        .filter(AgentConfig.activo == True)
+        .order_by(AgentConfig.id.asc())
+        .first()
+    )
+
+
+def _invoke_agent_for_whatsapp(
+    conv: WhatsAppConversation,
+    user_message: str,
+    db: Session,
+) -> Optional[dict]:
+    """Invoca al agente IA para responder a un mensaje WhatsApp inbound.
+
+    Reutiliza la infra de _agent_chat_gemini_with_tools (tools, RAG, etc).
+    Si la conversacion tiene takeover activo, no hace nada (admin tiene control).
+    Devuelve dict con resultado o None si no se respondio.
+    """
+    if conv.takeover:
+        print(f"[wa-mateo] conv {conv.id} en takeover, no respondemos")
+        return None
+
+    # Determinar agente
+    agent = None
+    if conv.agente_id:
+        agent = db.query(AgentConfig).get(conv.agente_id)
+    if not agent or not agent.activo:
+        agent = _get_default_whatsapp_agent(db)
+    if not agent:
+        print("[wa-mateo] no hay agente activo")
+        return None
+    # Auto-asignar al primer encuentro
+    if not conv.agente_id:
+        conv.agente_id = agent.id
+        db.commit()
+
+    # Cost guard
+    try:
+        _check_cost_limit("gemini", db)
+    except HTTPException as e:
+        # Hard-block: avisamos al cliente que estamos al limite
+        _send_text(
+            conv.phone_number,
+            "Disculpa, en este momento estamos teniendo un volumen muy alto de consultas. "
+            "Un asesor humano te respondera lo antes posible 🙏",
+        )
+        return {"error": "cost_limit", "detail": str(e.detail)}
+
+    session_id = f"whatsapp:{conv.phone_number}"
+    history = _get_whatsapp_history(conv, db, limit=10)
+    # Removemos el ultimo mensaje user porque va aparte
+    if history and history[-1]["role"] == "user":
+        history = history[:-1]
+
+    # Enriquecer contexto con info del cliente vinculado
+    cliente = (
+        db.query(Cliente).filter(Cliente.id == conv.cliente_id).first()
+        if conv.cliente_id else None
+    )
+    extra_lines = ["[CANAL WHATSAPP]", f"Telefono: +{conv.phone_number}"]
+    if conv.nombre_contacto:
+        extra_lines.append(f"Nombre WhatsApp: {conv.nombre_contacto}")
+    if cliente:
+        extra_lines.append(
+            f"Cliente CRM: {cliente.nombre} ({cliente.empresa or 'sin empresa'})"
+        )
+        if cliente.email:
+            extra_lines.append(f"Email: {cliente.email}")
+        if cliente.rubro:
+            extra_lines.append(f"Rubro: {cliente.rubro}")
+    else:
+        extra_lines.append("Cliente CRM: NO vinculado todavia (cliente nuevo)")
+    extra_context = "\n".join(extra_lines)
+
+    # Setear contexto WhatsApp para que tools puedan usarlo
+    _set_whatsapp_context(session_id, {
+        "conv_id": conv.id,
+        "phone_number": conv.phone_number,
+        "cliente_id": conv.cliente_id,
+        "agent_id": agent.id,
+    })
+
+    try:
+        system = _compose_agent_prompt(agent, db, extra_context)
+        messages = []
+        for h in history:
+            messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append({"role": "user", "content": user_message})
+
+        try:
+            allowed_tools = json.loads(agent.tools_allowed or "[]")
+        except Exception:
+            allowed_tools = []
+        has_tools = bool(allowed_tools)
+
+        reply_text = None
+        provider_used = "fallback"
+        tokens_in = 0
+        tokens_out = 0
+        tool_calls_executed = []
+
+        if GEMINI_API_KEY:
+            try:
+                if has_tools:
+                    reply_text, provider_used, tokens_in, tokens_out, tool_calls_executed = (
+                        _agent_chat_gemini_with_tools(
+                            agent, system, messages, user_message, db,
+                            max_iterations=agent.max_tool_calls or 6,
+                        )
+                    )
+                else:
+                    import google.generativeai as genai
+                    genai.configure(api_key=GEMINI_API_KEY)
+                    model = genai.GenerativeModel(
+                        agent.modelo or "gemini-2.5-flash",
+                        system_instruction=system,
+                    )
+                    gemini_history = [
+                        {
+                            "role": "model" if m["role"] == "assistant" else "user",
+                            "parts": [m["content"]],
+                        }
+                        for m in messages[:-1]
+                    ]
+                    chat = model.start_chat(history=gemini_history)
+                    response = chat.send_message(user_message)
+                    reply_text = response.text
+                    provider_used = "gemini"
+                    if hasattr(response, "usage_metadata") and response.usage_metadata:
+                        tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
+                        tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+            except Exception as e:
+                print(f"[wa-mateo gemini] error: {e}")
+
+        if not reply_text:
+            reply_text = (
+                "Hola, soy el asistente de MIP Quality & Logistics. "
+                "Te respondemos a la brevedad. Si es urgente escribinos a contacto@mipquality.com 🙏"
+            )
+
+        # Enviar respuesta al cliente
+        send_result = _send_text(conv.phone_number, reply_text)
+        outbound = _persist_outbound_message(
+            conv.id, "text", reply_text, None, agent.id, send_result, db
+        )
+
+        # Cost tracking via AgentTrace (igual al endpoint web)
+        cost = (tokens_in * 0.075 / 1_000_000) + (tokens_out * 0.30 / 1_000_000)
+        try:
+            trace = AgentTrace(
+                session_id=session_id,
+                agent_id=agent.id,
+                prompt_tokens=tokens_in,
+                output_tokens=tokens_out,
+                cost_usd=cost,
+                latency_ms=0,
+                tool_calls=json.dumps(tool_calls_executed) if tool_calls_executed else "[]",
+                input_summary=user_message[:200],
+                output_summary=(reply_text[:200] if reply_text else ""),
+                provider=provider_used,
+            )
+            db.add(trace)
+            agent.total_conversations = (agent.total_conversations or 0) + 1
+            agent.total_tokens_in = (agent.total_tokens_in or 0) + tokens_in
+            agent.total_tokens_out = (agent.total_tokens_out or 0) + tokens_out
+            agent.total_cost_usd = (agent.total_cost_usd or 0) + cost
+            db.commit()
+        except Exception as e:
+            print(f"[wa-mateo trace] {e}")
+
+        return {
+            "reply": reply_text,
+            "outbound_msg_id": outbound.id,
+            "provider": provider_used,
+            "tokens": {"input": tokens_in, "output": tokens_out},
+            "cost_usd": round(cost, 6),
+            "tool_calls": tool_calls_executed,
+            "agent_id": agent.id,
+        }
+    finally:
+        _clear_whatsapp_context(session_id)
+
+
+# ─── Tools WhatsApp-aware ───
+# Estos handlers leen WHATSAPP_TOOL_CONTEXT para obtener el phone_number
+# del cliente actual cuando el agente fue invocado desde un webhook.
+
+def _handler_send_whatsapp_text(args: dict, agent, db) -> dict:
+    """Envia un texto adicional al cliente actual de WhatsApp.
+    El agente puede usar esto para mensajes complementarios al reply principal.
+    """
+    # Buscar contexto del session_id activo
+    ctx = None
+    for sid, c in WHATSAPP_TOOL_CONTEXT.items():
+        if c.get("agent_id") == getattr(agent, "id", None):
+            ctx = c
+            break
+    if not ctx:
+        return {"error": "No hay contexto WhatsApp activo. Esta tool solo se invoca desde el webhook WA."}
+    text = (args.get("text") or args.get("message") or "").strip()
+    if not text:
+        return {"error": "Falta 'text' o 'message'"}
+    result = _send_text(ctx["phone_number"], text)
+    if ctx.get("conv_id"):
+        _persist_outbound_message(
+            ctx["conv_id"], "text", text, None, agent.id if agent else None, result, db
+        )
+    return {"sent": result.get("status") == "sent", "result": result}
+
+
+def _handler_send_whatsapp_image(args: dict, agent, db) -> dict:
+    """Envia una imagen al cliente WhatsApp por URL."""
+    ctx = None
+    for sid, c in WHATSAPP_TOOL_CONTEXT.items():
+        if c.get("agent_id") == getattr(agent, "id", None):
+            ctx = c
+            break
+    if not ctx:
+        return {"error": "Sin contexto WhatsApp activo"}
+    url = args.get("image_url") or args.get("url")
+    caption = args.get("caption") or ""
+    if not url:
+        return {"error": "Falta image_url"}
+    result = _send_image(ctx["phone_number"], url, caption)
+    if ctx.get("conv_id"):
+        _persist_outbound_message(
+            ctx["conv_id"], "image", caption, url, agent.id if agent else None, result, db
+        )
+    return {"sent": result.get("status") == "sent", "result": result}
+
+
+def _handler_send_whatsapp_pdf(args: dict, agent, db) -> dict:
+    """Envia un documento PDF al cliente WhatsApp."""
+    ctx = None
+    for sid, c in WHATSAPP_TOOL_CONTEXT.items():
+        if c.get("agent_id") == getattr(agent, "id", None):
+            ctx = c
+            break
+    if not ctx:
+        return {"error": "Sin contexto WhatsApp activo"}
+    url = args.get("pdf_url") or args.get("doc_url") or args.get("url")
+    filename = args.get("filename") or "documento.pdf"
+    caption = args.get("caption") or ""
+    if not url:
+        return {"error": "Falta pdf_url"}
+    result = _send_document(ctx["phone_number"], url, filename, caption)
+    if ctx.get("conv_id"):
+        _persist_outbound_message(
+            ctx["conv_id"], "document", caption or filename, url,
+            agent.id if agent else None, result, db,
+        )
+    return {"sent": result.get("status") == "sent", "result": result}
+
+
+def _handler_escalate_whatsapp(args: dict, agent, db) -> dict:
+    """Activa takeover en la conversacion WhatsApp actual + notifica al admin."""
+    ctx = None
+    for sid, c in WHATSAPP_TOOL_CONTEXT.items():
+        if c.get("agent_id") == getattr(agent, "id", None):
+            ctx = c
+            break
+    if not ctx or not ctx.get("conv_id"):
+        # Fallback al handler generico (notifica admin sin takeover)
+        return _handler_escalate(args, agent, db)
+    conv = db.query(WhatsAppConversation).get(ctx["conv_id"])
+    if not conv:
+        return {"error": f"Conv {ctx['conv_id']} no encontrada"}
+    conv.takeover = True
+    conv.takeover_by = "agent-escalation"
+    conv.takeover_at = datetime.utcnow()
+    db.commit()
+    # Notificar a admin via email (reusa _send_email helper si existe)
+    razon = args.get("razon") or args.get("reason") or "El agente IA escalo la conversacion."
+    prioridad = args.get("prioridad") or args.get("priority") or "normal"
+    try:
+        admin_email = os.getenv("ADMIN_NOTIFY_EMAIL", "")
+        if admin_email:
+            cliente_label = (
+                f"+{conv.phone_number}"
+                + (f" ({conv.nombre_contacto})" if conv.nombre_contacto else "")
+            )
+            _send_email(
+                to=admin_email,
+                subject=f"[WhatsApp] Escalado a humano: {cliente_label}",
+                html=(
+                    f"<p>Conversacion WhatsApp <b>#{conv.id}</b> escalada por agente IA.</p>"
+                    f"<p><b>Cliente:</b> {cliente_label}</p>"
+                    f"<p><b>Prioridad:</b> {prioridad}</p>"
+                    f"<p><b>Razon:</b> {razon}</p>"
+                    f'<p><a href="https://miptrust.cl/#whatsapp-conv-{conv.id}">Ir a la conversacion</a></p>'
+                ),
+                tipo="whatsapp_escalation",
+                cliente_id=conv.cliente_id,
+                db=db,
+            )
+    except Exception as e:
+        print(f"[wa-escalate email] {e}")
+    return {
+        "escalated": True,
+        "conv_id": conv.id,
+        "takeover": True,
+        "razon": razon,
+        "prioridad": prioridad,
+    }
+
+
+def _handler_generar_mockup_nanobanana(args: dict, agent, db) -> dict:
+    """Genera un mockup con Gemini 2.5 Flash Image (Nano Banana) usando la
+    ultima imagen recibida del cliente como base + prompt del usuario.
+    """
+    ctx = None
+    for sid, c in WHATSAPP_TOOL_CONTEXT.items():
+        if c.get("agent_id") == getattr(agent, "id", None):
+            ctx = c
+            break
+    if not ctx or not ctx.get("conv_id"):
+        return {"error": "Sin contexto WhatsApp activo - solo funciona en webhook WA"}
+    if not NANO_BANANA_ENABLED:
+        return {
+            "error": "NANO_BANANA_ENABLED=false",
+            "nota": "Activa NANO_BANANA_ENABLED=true en Cloud Run para usar generacion de imagenes",
+        }
+    if not GEMINI_API_KEY:
+        return {"error": "GEMINI_API_KEY no configurado"}
+
+    prompt = args.get("prompt") or args.get("descripcion") or ""
+    if not prompt:
+        return {"error": "Falta prompt describiendo la variacion deseada"}
+
+    # Buscar la ultima imagen recibida del cliente en la conversacion
+    last_img = (
+        db.query(WhatsAppMessage)
+        .filter(WhatsAppMessage.conversation_id == ctx["conv_id"])
+        .filter(WhatsAppMessage.direction == "inbound")
+        .filter(WhatsAppMessage.type == "image")
+        .order_by(WhatsAppMessage.created_at.desc())
+        .first()
+    )
+    if not last_img or not last_img.media_url:
+        return {
+            "error": "Cliente todavia no envio una imagen base",
+            "instruccion_para_agente": "Pide al cliente que envie una foto del producto que quiere modificar.",
+        }
+
+    import base64 as _b64
+    import requests as _req
+    try:
+        # Bajar imagen base
+        r = _req.get(last_img.media_url, timeout=20)
+        r.raise_for_status()
+        img_bytes = r.content
+        img_b64 = _b64.b64encode(img_bytes).decode("ascii")
+
+        # Llamar a Gemini 2.5 Flash Image
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-2.5-flash-image:generateContent"
+        )
+        body = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {
+                        "mime_type": last_img.media_mime_type or "image/jpeg",
+                        "data": img_b64,
+                    }},
+                ]
+            }],
+            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+        }
+        resp = _req.post(
+            url, params={"key": GEMINI_API_KEY}, json=body, timeout=60
+        )
+        if resp.status_code >= 400:
+            return {"error": f"Gemini HTTP {resp.status_code}: {resp.text[:300]}"}
+        data = resp.json()
+        candidates = data.get("candidates", [])
+        out_bytes = None
+        out_mime = "image/png"
+        out_text = ""
+        for cand in candidates:
+            for part in (cand.get("content", {}) or {}).get("parts", []):
+                if "inline_data" in part:
+                    out_bytes = _b64.b64decode(part["inline_data"]["data"])
+                    out_mime = part["inline_data"].get("mime_type", "image/png")
+                elif "text" in part:
+                    out_text = part["text"] or out_text
+        if not out_bytes:
+            return {"error": "Gemini no devolvio imagen, solo texto: " + out_text[:200]}
+
+        # Subir a GCS
+        ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        ext = "png" if "png" in out_mime else "jpg"
+        gcs_path = f"mockups/{ctx['conv_id']}/{ts}.{ext}"
+        gcs_url = _upload_to_gcs(out_bytes, gcs_path, out_mime)
+
+        # Calcular cost (Gemini 2.5 Flash Image: ~$0.039/imagen)
+        cost = 0.039
+        # Persistir mockup en DB
+        mockup = WhatsAppMockup(
+            conversation_id=ctx["conv_id"],
+            cliente_id=ctx.get("cliente_id"),
+            source_image_url=last_img.media_url,
+            prompt_user=prompt,
+            prompt_enriched=prompt,
+            output_image_url=gcs_url,
+            gemini_cost_usd=cost,
+            sent_to_client=False,
+        )
+        db.add(mockup)
+        db.commit()
+        db.refresh(mockup)
+
+        # Enviar la imagen al cliente
+        if gcs_url:
+            send_result = _send_image(
+                ctx["phone_number"], gcs_url,
+                caption=out_text[:1024] if out_text else "Aca tu mockup, ¿que te parece?",
+            )
+            persisted = _persist_outbound_message(
+                ctx["conv_id"], "mockup", prompt, gcs_url,
+                agent.id if agent else None, send_result, db,
+            )
+            mockup.sent_to_client = (send_result.get("status") == "sent")
+            mockup.output_message_id = persisted.id
+            db.commit()
+
+        return {
+            "generated": True,
+            "mockup_id": mockup.id,
+            "image_url": gcs_url,
+            "cost_usd": cost,
+            "model_text": out_text[:300],
+        }
+    except Exception as e:
+        print(f"[nano-banana] {e}")
+        return {"error": str(e)}
+
+
+# Registrar handlers WhatsApp en TOOL_HANDLERS (override stub generico de WhatsApp)
+TOOL_HANDLERS["send_whatsapp_text"] = _handler_send_whatsapp_text
+TOOL_HANDLERS["send_whatsapp_image"] = _handler_send_whatsapp_image
+TOOL_HANDLERS["send_whatsapp_pdf"] = _handler_send_whatsapp_pdf
+TOOL_HANDLERS["send_whatsapp_document"] = _handler_send_whatsapp_pdf
+TOOL_HANDLERS["enviar_whatsapp"] = _handler_send_whatsapp_text  # override stub
+TOOL_HANDLERS["escalate_to_human_whatsapp"] = _handler_escalate_whatsapp
+TOOL_HANDLERS["generar_mockup_nanobanana"] = _handler_generar_mockup_nanobanana
+TOOL_HANDLERS["generar_mockup"] = _handler_generar_mockup_nanobanana
+
+
 def _get_or_create_conversation(phone: str, profile_name: str, db: Session) -> WhatsAppConversation:
     phone_norm = _normalize_phone(phone)
     conv = (
@@ -8218,12 +8763,29 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
                             print(f"[audio process fallback] error msg {record.id}: {e}")
                     elif msg_type == "audio" and kapso_transcript:
                         print(f"[whatsapp] usando transcripcion Kapso (free): '{kapso_transcript[:80]}'")
+                    # Auto-respuesta del agente IA (Mateo) a mensajes inbound
+                    # Skipea: takeover activo, mensajes de status, batch de statuses, audios sin transcripcion
+                    agent_result = None
+                    if msg_type in ("text", "audio", "image"):
+                        user_input = kapso_transcript or text_content
+                        if not user_input and msg_type == "image":
+                            user_input = "[el cliente envio una imagen]"
+                        if user_input and not conv.takeover:
+                            try:
+                                agent_result = _invoke_agent_for_whatsapp(conv, user_input, db)
+                                if agent_result and not agent_result.get("error"):
+                                    # Marcar como leido (la IA ya proceso)
+                                    conv.unread_count = 0
+                                    db.commit()
+                            except Exception as e:
+                                print(f"[wa-agent invoke] error msg {record.id}: {e}")
                     processed.append({
                         "id": record.id,
                         "type": msg_type,
                         "from": from_phone,
                         "conversation_id": conv.id,
                         "audio_result": audio_result,
+                        "agent_replied": bool(agent_result and not agent_result.get("error")),
                     })
                 # Statuses (delivery receipts)
                 for st in value.get("statuses", []) or []:
