@@ -8054,16 +8054,50 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     except Exception:
         raise HTTPException(400, "Invalid JSON payload")
 
+    # Debug: guardar payload completo para inspeccion (TEMP - remover en prod)
+    try:
+        print(f"[whatsapp_webhook RAW PAYLOAD] keys={list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
+        print(f"[whatsapp_webhook RAW PAYLOAD] body={json.dumps(payload, default=str)[:3000]}")
+    except Exception as _e:
+        print(f"[whatsapp_webhook] failed to log payload: {_e}")
+
     processed = []
-    # Normalizar payload: Kapso puede mandar formato Meta anidado (entry[].changes[].value)
-    # o formato plano normalizado ({messages, contacts, statuses} directo en root).
-    if isinstance(payload, dict) and (
-        "messages" in payload or "statuses" in payload or "contacts" in payload
-    ) and "entry" not in payload:
-        # Plano: lo envolvemos en estructura compatible
-        entries = [{"changes": [{"value": payload}]}]
-    else:
-        entries = payload.get("entry", []) or []
+    # Normalizar payload: Kapso V2 puede mandar varios formatos:
+    # 1. Meta anidado: entry[].changes[].value.messages[]
+    # 2. Plano: { messages, contacts, statuses }
+    # 3. Wrapper Kapso: { event, data: {...}, conversation: {...} }
+    # 4. Single message: { id, from, type, text/audio/... }
+    entries = []
+    if isinstance(payload, dict):
+        # Caso 3: wrapper con event + data
+        if "data" in payload and isinstance(payload["data"], dict):
+            inner = payload["data"]
+            # data puede tener message + conversation o ser el message directo
+            if "message" in inner or "conversation" in inner:
+                msg = inner.get("message") or {}
+                conv_info = inner.get("conversation") or {}
+                contact_info = inner.get("contact") or inner.get("from") or {}
+                value = {
+                    "messages": [msg] if msg else [],
+                    "contacts": [contact_info] if contact_info else [],
+                }
+                entries = [{"changes": [{"value": value}]}]
+            elif "messages" in inner or "statuses" in inner:
+                entries = [{"changes": [{"value": inner}]}]
+            elif inner.get("id") and (inner.get("from") or inner.get("type")):
+                # data es el mensaje en si
+                entries = [{"changes": [{"value": {"messages": [inner]}}]}]
+        # Caso 1: Meta anidado
+        elif "entry" in payload:
+            entries = payload.get("entry") or []
+        # Caso 2: plano
+        elif "messages" in payload or "statuses" in payload or "contacts" in payload:
+            entries = [{"changes": [{"value": payload}]}]
+        # Caso 4: single message en root
+        elif payload.get("id") and (payload.get("from") or payload.get("type")):
+            entries = [{"changes": [{"value": {"messages": [payload]}}]}]
+    if not entries:
+        print(f"[whatsapp_webhook] no se pudo extraer messages del payload, formato desconocido")
     try:
         for entry in entries:
             for change in entry.get("changes", []) or []:
