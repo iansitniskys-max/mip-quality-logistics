@@ -3835,6 +3835,28 @@ def _handler_escalate(args: dict, agent, db) -> dict:
     db.add(t)
     db.commit()
     db.refresh(t)
+    # Notificar al admin por email
+    try:
+        admin_to = os.getenv("ADMIN_NOTIFY_EMAIL", "")
+        admin_cc = os.getenv("ADMIN_NOTIFY_CC", "")
+        if admin_to:
+            html = (
+                f"<h3>Escalacion desde {agent.display_name}</h3>"
+                f"<p><b>Urgencia:</b> {urgencia}</p>"
+                f"<p><b>Motivo:</b> {motivo}</p>"
+                f"<p><b>Ticket ID:</b> #{t.id}</p>"
+                f'<p><a href="https://miptrust.cl/#a-tickets">Ver ticket</a></p>'
+            )
+            _send_email(
+                to=admin_to,
+                cc=[admin_cc] if admin_cc else None,
+                subject=f"[Escalacion {urgencia.upper()}] {agent.display_name}: {motivo[:60]}",
+                html=html,
+                tipo="agent_escalation",
+                db=db,
+            )
+    except Exception as e:
+        print(f"[escalate email] {e}")
     return {"ticket_id": t.id, "escalated": True, "urgencia": urgencia}
 
 
@@ -7979,6 +8001,70 @@ def _get_default_whatsapp_agent(db: Session) -> Optional["AgentConfig"]:
     )
 
 
+def _wa_auto_register_prospect(conv: WhatsAppConversation, message: str, db: Session) -> None:
+    """Si el mensaje del cliente WhatsApp contiene email o empresa, crea/actualiza Prospect.
+
+    Idempotente: si ya existe Prospect con ese telefono o email, solo enriquece campos vacios.
+    No hace nada si conv ya esta vinculada a un Cliente del CRM.
+    """
+    if conv.cliente_id:
+        return  # Ya es cliente del CRM, no necesita Prospect
+    if not message:
+        return
+    extracted = _extract_visitor_from_message(message, history=None) or {}
+    has_contact = bool(extracted.get("email") or extracted.get("empresa"))
+    if not has_contact:
+        return  # Sin info nueva relevante
+    phone = "+" + conv.phone_number if not conv.phone_number.startswith("+") else conv.phone_number
+    nombre = extracted.get("nombre") or conv.nombre_contacto or "Cliente WhatsApp"
+    email = extracted.get("email") or ""
+    empresa = extracted.get("empresa") or ""
+
+    # Buscar prospect existente por telefono o email
+    existing = None
+    try:
+        q = db.query(Prospect).filter(Prospect.telefono == phone)
+        existing = q.first()
+        if not existing and email:
+            existing = db.query(Prospect).filter(Prospect.email == email).first()
+    except Exception:
+        pass
+
+    if existing:
+        # Enriquecer solo campos vacios
+        changed = False
+        if email and not (existing.email or "").strip():
+            existing.email = email; changed = True
+        if empresa and not (existing.empresa or "").strip():
+            existing.empresa = empresa; changed = True
+        if not (existing.notas or "").strip():
+            existing.notas = f"Conversacion WhatsApp #{conv.id}"; changed = True
+        if changed:
+            db.commit()
+            print(f"[wa-prospect] enriquecido prospect existente id={existing.id}")
+        return
+
+    # Crear nuevo prospect
+    try:
+        p = Prospect(
+            nombre=nombre,
+            empresa=empresa,
+            email=email,
+            telefono=phone,
+            fuente="whatsapp",
+            estado="nuevo",
+            score_ia=60,  # baseline para WA
+            notas=f"Detectado automaticamente desde conversacion WhatsApp #{conv.id}.",
+        )
+        db.add(p)
+        db.commit()
+        db.refresh(p)
+        print(f"[wa-prospect] creado nuevo prospect id={p.id} from conv={conv.id}")
+    except Exception as e:
+        db.rollback()
+        print(f"[wa-prospect] error creando: {e}")
+
+
 def _invoke_agent_for_whatsapp(
     conv: WhatsAppConversation,
     user_message: str,
@@ -7993,6 +8079,12 @@ def _invoke_agent_for_whatsapp(
     if conv.takeover:
         print(f"[wa-mateo] conv {conv.id} en takeover, no respondemos")
         return None
+
+    # Auto-detectar info de contacto en el mensaje y crear/actualizar Prospect
+    try:
+        _wa_auto_register_prospect(conv, user_message, db)
+    except Exception as e:
+        print(f"[wa-prospect auto] {e}")
 
     # Determinar agente
     agent = None
