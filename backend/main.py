@@ -8062,42 +8062,58 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
         print(f"[whatsapp_webhook] failed to log payload: {_e}")
 
     processed = []
-    # Normalizar payload: Kapso V2 puede mandar varios formatos:
-    # 1. Meta anidado: entry[].changes[].value.messages[]
-    # 2. Plano: { messages, contacts, statuses }
-    # 3. Wrapper Kapso: { event, data: {...}, conversation: {...} }
-    # 4. Single message: { id, from, type, text/audio/... }
+    # Normalizar payload: Kapso V2 manda { message, conversation, is_new_conversation, phone_number_id }.
+    # Soportamos tambien Meta anidado / plano / wrapper data como fallbacks.
     entries = []
+    kapso_conversation = None  # info enriquecida de la conversation Kapso
     if isinstance(payload, dict):
-        # Caso 3: wrapper con event + data
-        if "data" in payload and isinstance(payload["data"], dict):
+        # Caso A: formato Kapso V2 real ({ message, conversation, ... })
+        if "message" in payload and "conversation" in payload:
+            msg = payload["message"] or {}
+            kapso_conversation = payload["conversation"] or {}
+            contact_name = kapso_conversation.get("contact_name") or ""
+            phone = kapso_conversation.get("phone_number") or msg.get("from") or ""
+            value = {
+                "messages": [msg] if msg else [],
+                "contacts": [{
+                    "wa_id": phone,
+                    "profile": {"name": contact_name},
+                }] if phone else [],
+            }
+            entries = [{"changes": [{"value": value}]}]
+        # Caso B: wrapper data
+        elif "data" in payload and isinstance(payload["data"], dict):
             inner = payload["data"]
-            # data puede tener message + conversation o ser el message directo
-            if "message" in inner or "conversation" in inner:
-                msg = inner.get("message") or {}
-                conv_info = inner.get("conversation") or {}
-                contact_info = inner.get("contact") or inner.get("from") or {}
+            if "message" in inner and "conversation" in inner:
+                kapso_conversation = inner["conversation"] or {}
+                contact_name = kapso_conversation.get("contact_name") or ""
+                phone = (
+                    kapso_conversation.get("phone_number")
+                    or (inner.get("message") or {}).get("from") or ""
+                )
                 value = {
-                    "messages": [msg] if msg else [],
-                    "contacts": [contact_info] if contact_info else [],
+                    "messages": [inner["message"]] if inner.get("message") else [],
+                    "contacts": [{
+                        "wa_id": phone,
+                        "profile": {"name": contact_name},
+                    }] if phone else [],
                 }
                 entries = [{"changes": [{"value": value}]}]
             elif "messages" in inner or "statuses" in inner:
                 entries = [{"changes": [{"value": inner}]}]
             elif inner.get("id") and (inner.get("from") or inner.get("type")):
-                # data es el mensaje en si
                 entries = [{"changes": [{"value": {"messages": [inner]}}]}]
-        # Caso 1: Meta anidado
+        # Caso C: Meta anidado
         elif "entry" in payload:
             entries = payload.get("entry") or []
-        # Caso 2: plano
+        # Caso D: plano normalizado
         elif "messages" in payload or "statuses" in payload or "contacts" in payload:
             entries = [{"changes": [{"value": payload}]}]
-        # Caso 4: single message en root
+        # Caso E: single message en root
         elif payload.get("id") and (payload.get("from") or payload.get("type")):
             entries = [{"changes": [{"value": {"messages": [payload]}}]}]
     if not entries:
-        print(f"[whatsapp_webhook] no se pudo extraer messages del payload, formato desconocido")
+        print(f"[whatsapp_webhook] formato desconocido, keys={list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
     try:
         for entry in entries:
             for change in entry.get("changes", []) or []:
@@ -8145,11 +8161,23 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
                             audio_dur = int(float(dur)) if dur is not None else None
                         except (ValueError, TypeError):
                             audio_dur = None
+                        # Kapso V2 envia URL directo del audio en aud.link o
+                        # message.kapso.media_url - ahorra una llamada al API
+                        kapso_data = msg.get("kapso") or {}
+                        direct_url = aud.get("link") or kapso_data.get("media_url")
+                        if direct_url and not text_content:
+                            text_content = ""  # audio no tiene caption
                     elif msg_type == "video":
                         vid = msg.get("video") or {}
                         text_content = vid.get("caption") or ""
                         media_id = vid.get("id")
                         media_mime = vid.get("mime_type")
+                    # Kapso V2 incluye transcripcion + media_url directo en message.kapso
+                    kapso_extra = msg.get("kapso") or {}
+                    kapso_transcript = ((kapso_extra.get("transcript") or {}).get("text") or "").strip()
+                    kapso_media_url = kapso_extra.get("media_url") or ""
+                    if msg_type == "audio" and not kapso_media_url:
+                        kapso_media_url = (msg.get("audio") or {}).get("link") or ""
                     record = WhatsAppMessage(
                         conversation_id=conv.id,
                         direction="inbound",
@@ -8157,31 +8185,39 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
                         content=text_content,
                         media_kapso_id=media_id,
                         media_mime_type=media_mime,
+                        media_url=kapso_media_url or None,
                         kapso_message_id=kapso_id,
                         audio_duration_sec=audio_dur,
+                        transcription=kapso_transcript or None,
+                        transcription_confidence=0.95 if kapso_transcript else None,
+                        transcription_lang="es-CL" if kapso_transcript else None,
                         status="delivered",
                     )
                     db.add(record)
                     conv.last_message_at = datetime.utcnow()
-                    conv.last_message_preview = (text_content or f"[{msg_type}]")[:500]
+                    preview_text = kapso_transcript or text_content or f"[{msg_type}]"
+                    conv.last_message_preview = (
+                        f"🎙️ {preview_text[:480]}" if msg_type == "audio" else preview_text[:500]
+                    )
                     conv.unread_count = (conv.unread_count or 0) + 1
                     if profile_name and not conv.nombre_contacto:
                         conv.nombre_contacto = profile_name
                     db.commit()
                     db.refresh(record)
-                    # Si es audio: descargar + subir a GCS + transcribir con Gemini
+                    # Si es audio sin transcripcion de Kapso: fallback a Gemini propio
                     audio_result = None
-                    if msg_type == "audio" and media_id:
+                    if msg_type == "audio" and not kapso_transcript and media_id:
                         try:
                             audio_result = _process_audio_message(record, conv, db)
-                            # Update preview con transcripcion
                             if audio_result and audio_result.get("transcription"):
                                 conv.last_message_preview = (
                                     f"🎙️ {audio_result['transcription'][:480]}"
                                 )
                                 db.commit()
                         except Exception as e:
-                            print(f"[audio process] error msg {record.id}: {e}")
+                            print(f"[audio process fallback] error msg {record.id}: {e}")
+                    elif msg_type == "audio" and kapso_transcript:
+                        print(f"[whatsapp] usando transcripcion Kapso (free): '{kapso_transcript[:80]}'")
                     processed.append({
                         "id": record.id,
                         "type": msg_type,
