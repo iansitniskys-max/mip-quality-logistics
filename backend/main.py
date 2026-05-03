@@ -7706,18 +7706,34 @@ def _match_cliente_by_phone(phone: str, db: Session) -> Optional[Cliente]:
 
 
 def _verify_kapso_signature(raw_body: bytes, signature: Optional[str]) -> bool:
-    """Verifica firma HMAC del webhook. Si no hay secret, modo permisivo (dev)."""
+    """Verifica firma HMAC SHA256 del webhook Kapso.
+    Tolera distintos formatos: 'sha256=<hex>', solo '<hex>', o base64.
+    Si no hay KAPSO_WEBHOOK_SECRET configurado, modo permisivo (dev).
+    """
     if not KAPSO_WEBHOOK_SECRET:
         return True
     if not signature:
         return False
     import hmac
     import hashlib
-    expected = hmac.new(
+    import base64 as _b64
+
+    expected_hex = hmac.new(
         KAPSO_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256
     ).hexdigest()
-    received = signature.replace("sha256=", "").strip()
-    return hmac.compare_digest(expected, received)
+    expected_b64 = _b64.b64encode(
+        hmac.new(KAPSO_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256).digest()
+    ).decode("ascii")
+    received = signature.strip()
+    # Limpiar prefijos comunes
+    for prefix in ("sha256=", "SHA256=", "hmac-sha256=", "v1="):
+        if received.lower().startswith(prefix.lower()):
+            received = received[len(prefix):]
+            break
+    return (
+        hmac.compare_digest(expected_hex, received)
+        or hmac.compare_digest(expected_b64, received)
+    )
 
 
 def _send_whatsapp_kapso(to: str, payload_inner: dict) -> dict:
@@ -8014,10 +8030,22 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     viene en commit 4/5. La transcripcion de audios viene en commit 3/5.
     """
     raw_body = await request.body()
+    # Kapso usa X-Webhook-Signature como header oficial. Fallbacks por compatibilidad.
     signature = (
-        request.headers.get("x-hub-signature-256")
+        request.headers.get("x-webhook-signature")
+        or request.headers.get("x-hub-signature-256")
         or request.headers.get("x-kapso-signature")
     )
+    # Headers Kapso para debugging y futuro batching
+    event_type = request.headers.get("x-webhook-event") or ""
+    idempotency_key = request.headers.get("x-idempotency-key") or ""
+    is_batch = (request.headers.get("x-webhook-batch", "").lower() == "true")
+    batch_size = request.headers.get("x-batch-size") or ""
+    if event_type or idempotency_key:
+        print(
+            f"[whatsapp_webhook] event={event_type} idemp={idempotency_key} "
+            f"batch={is_batch}/{batch_size}"
+        )
     if not _verify_kapso_signature(raw_body, signature):
         raise HTTPException(401, "Invalid webhook signature")
 
@@ -8027,8 +8055,16 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(400, "Invalid JSON payload")
 
     processed = []
-    try:
+    # Normalizar payload: Kapso puede mandar formato Meta anidado (entry[].changes[].value)
+    # o formato plano normalizado ({messages, contacts, statuses} directo en root).
+    if isinstance(payload, dict) and (
+        "messages" in payload or "statuses" in payload or "contacts" in payload
+    ) and "entry" not in payload:
+        # Plano: lo envolvemos en estructura compatible
+        entries = [{"changes": [{"value": payload}]}]
+    else:
         entries = payload.get("entry", []) or []
+    try:
         for entry in entries:
             for change in entry.get("changes", []) or []:
                 value = change.get("value", {}) or {}
