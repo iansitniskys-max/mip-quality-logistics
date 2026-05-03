@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -7677,6 +7677,428 @@ def whatsapp_diagnostic():
         "webhook_url": f"{os.getenv('APP_URL', 'https://miptrust.cl')}/api/whatsapp/incoming",
         "setup_url": "https://app.kapso.ai/",
     }
+
+
+def _normalize_phone(phone: str) -> str:
+    """Normaliza un numero de telefono a digitos solo (formato Kapso/Meta)."""
+    if not phone:
+        return ""
+    return "".join(c for c in str(phone) if c.isdigit())
+
+
+def _match_cliente_by_phone(phone: str, db: Session) -> Optional[Cliente]:
+    """Matchea cliente existente por telefono, tolerando prefijos y formatos."""
+    target = _normalize_phone(phone)
+    if not target or len(target) < 8:
+        return None
+    candidates = db.query(Cliente).filter(Cliente.telefono.isnot(None)).all()
+    for c in candidates:
+        normalized = _normalize_phone(c.telefono)
+        if not normalized:
+            continue
+        if normalized == target:
+            return c
+        if len(target) >= 8 and target.endswith(normalized[-8:]):
+            return c
+        if len(normalized) >= 8 and normalized.endswith(target[-8:]):
+            return c
+    return None
+
+
+def _verify_kapso_signature(raw_body: bytes, signature: Optional[str]) -> bool:
+    """Verifica firma HMAC del webhook. Si no hay secret, modo permisivo (dev)."""
+    if not KAPSO_WEBHOOK_SECRET:
+        return True
+    if not signature:
+        return False
+    import hmac
+    import hashlib
+    expected = hmac.new(
+        KAPSO_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256
+    ).hexdigest()
+    received = signature.replace("sha256=", "").strip()
+    return hmac.compare_digest(expected, received)
+
+
+def _send_whatsapp_kapso(to: str, payload_inner: dict) -> dict:
+    """Envia mensaje via Kapso API. Stub mode si WHATSAPP_ENABLED=false."""
+    body = {
+        "messaging_product": "whatsapp",
+        "to": _normalize_phone(to),
+        **payload_inner,
+    }
+    if not WHATSAPP_ENABLED or not KAPSO_API_KEY or not KAPSO_PHONE_NUMBER_ID:
+        return {
+            "status": "stub",
+            "reason": "WHATSAPP_ENABLED=false o credenciales faltan",
+            "would_send_body": body,
+        }
+    import requests as _req
+    url = f"{KAPSO_BASE_URL}/{KAPSO_API_VERSION}/{KAPSO_PHONE_NUMBER_ID}/messages"
+    try:
+        r = _req.post(
+            url,
+            json=body,
+            headers={"X-API-Key": KAPSO_API_KEY, "Content-Type": "application/json"},
+            timeout=15,
+        )
+        return {
+            "status": "sent" if r.status_code < 400 else "failed",
+            "http_code": r.status_code,
+            "response": r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text,
+        }
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
+
+
+def _send_text(to: str, text: str) -> dict:
+    return _send_whatsapp_kapso(to, {"type": "text", "text": {"body": text}})
+
+
+def _send_image(to: str, image_url: str, caption: Optional[str] = None) -> dict:
+    img = {"link": image_url}
+    if caption:
+        img["caption"] = caption
+    return _send_whatsapp_kapso(to, {"type": "image", "image": img})
+
+
+def _send_document(to: str, doc_url: str, filename: str, caption: Optional[str] = None) -> dict:
+    doc = {"link": doc_url, "filename": filename}
+    if caption:
+        doc["caption"] = caption
+    return _send_whatsapp_kapso(to, {"type": "document", "document": doc})
+
+
+def _get_or_create_conversation(phone: str, profile_name: str, db: Session) -> WhatsAppConversation:
+    phone_norm = _normalize_phone(phone)
+    conv = (
+        db.query(WhatsAppConversation)
+        .filter(WhatsAppConversation.phone_number == phone_norm)
+        .filter(WhatsAppConversation.status == "active")
+        .first()
+    )
+    if conv:
+        return conv
+    cliente = _match_cliente_by_phone(phone_norm, db)
+    conv = WhatsAppConversation(
+        phone_number=phone_norm,
+        nombre_contacto=profile_name or "",
+        cliente_id=cliente.id if cliente else None,
+        status="active",
+        last_message_at=datetime.utcnow(),
+        last_message_preview="",
+        unread_count=0,
+    )
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+
+@app.post("/api/whatsapp/incoming")
+async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
+    """Webhook receptor de Kapso. Persiste mensajes inbound y matchea cliente.
+
+    En commit 2/5 solo persiste. La integracion con Mateo (auto-respuesta)
+    viene en commit 4/5. La transcripcion de audios viene en commit 3/5.
+    """
+    raw_body = await request.body()
+    signature = (
+        request.headers.get("x-hub-signature-256")
+        or request.headers.get("x-kapso-signature")
+    )
+    if not _verify_kapso_signature(raw_body, signature):
+        raise HTTPException(401, "Invalid webhook signature")
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except Exception:
+        raise HTTPException(400, "Invalid JSON payload")
+
+    processed = []
+    try:
+        entries = payload.get("entry", []) or []
+        for entry in entries:
+            for change in entry.get("changes", []) or []:
+                value = change.get("value", {}) or {}
+                contacts_by_id = {
+                    c.get("wa_id"): c for c in (value.get("contacts") or [])
+                }
+                for msg in value.get("messages", []) or []:
+                    kapso_id = msg.get("id")
+                    if not kapso_id:
+                        continue
+                    if (
+                        db.query(WhatsAppMessage)
+                        .filter(WhatsAppMessage.kapso_message_id == kapso_id)
+                        .first()
+                    ):
+                        continue  # idempotency
+                    from_phone = msg.get("from", "")
+                    contact = contacts_by_id.get(from_phone, {})
+                    profile_name = (contact.get("profile") or {}).get("name") or ""
+                    msg_type = msg.get("type", "unknown")
+                    conv = _get_or_create_conversation(from_phone, profile_name, db)
+                    text_content = ""
+                    media_id = None
+                    media_mime = None
+                    audio_dur = None
+                    if msg_type == "text":
+                        text_content = (msg.get("text") or {}).get("body", "")
+                    elif msg_type == "image":
+                        img = msg.get("image") or {}
+                        text_content = img.get("caption") or ""
+                        media_id = img.get("id")
+                        media_mime = img.get("mime_type")
+                    elif msg_type == "document":
+                        doc = msg.get("document") or {}
+                        text_content = doc.get("caption") or doc.get("filename", "")
+                        media_id = doc.get("id")
+                        media_mime = doc.get("mime_type")
+                    elif msg_type == "audio":
+                        aud = msg.get("audio") or {}
+                        media_id = aud.get("id")
+                        media_mime = aud.get("mime_type")
+                        dur = aud.get("duration") or aud.get("voice_duration")
+                        try:
+                            audio_dur = int(float(dur)) if dur is not None else None
+                        except (ValueError, TypeError):
+                            audio_dur = None
+                    elif msg_type == "video":
+                        vid = msg.get("video") or {}
+                        text_content = vid.get("caption") or ""
+                        media_id = vid.get("id")
+                        media_mime = vid.get("mime_type")
+                    record = WhatsAppMessage(
+                        conversation_id=conv.id,
+                        direction="inbound",
+                        type=msg_type,
+                        content=text_content,
+                        media_kapso_id=media_id,
+                        media_mime_type=media_mime,
+                        kapso_message_id=kapso_id,
+                        audio_duration_sec=audio_dur,
+                        status="delivered",
+                    )
+                    db.add(record)
+                    conv.last_message_at = datetime.utcnow()
+                    conv.last_message_preview = (text_content or f"[{msg_type}]")[:500]
+                    conv.unread_count = (conv.unread_count or 0) + 1
+                    if profile_name and not conv.nombre_contacto:
+                        conv.nombre_contacto = profile_name
+                    db.commit()
+                    processed.append({
+                        "id": record.id,
+                        "type": msg_type,
+                        "from": from_phone,
+                        "conversation_id": conv.id,
+                    })
+                # Statuses (delivery receipts)
+                for st in value.get("statuses", []) or []:
+                    msg_id = st.get("id")
+                    new_status = st.get("status")
+                    if not msg_id or not new_status:
+                        continue
+                    out_msg = (
+                        db.query(WhatsAppMessage)
+                        .filter(WhatsAppMessage.kapso_message_id == msg_id)
+                        .first()
+                    )
+                    if out_msg:
+                        out_msg.status = new_status
+                        db.commit()
+    except Exception as e:
+        print(f"[whatsapp_webhook] error: {e}")
+        return {"status": "partial", "processed": processed, "error": str(e)}
+
+    return {"status": "ok", "processed": processed}
+
+
+@app.get("/api/whatsapp/conversations")
+def listar_conversaciones_whatsapp(
+    status: str = "active",
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    q = db.query(WhatsAppConversation).filter(WhatsAppConversation.status == status)
+    items = q.order_by(WhatsAppConversation.last_message_at.desc().nullslast()).limit(limit).all()
+    out = []
+    for c in items:
+        cliente = (
+            db.query(Cliente).filter(Cliente.id == c.cliente_id).first()
+            if c.cliente_id else None
+        )
+        out.append({
+            "id": c.id,
+            "phone_number": c.phone_number,
+            "nombre_contacto": c.nombre_contacto,
+            "cliente_id": c.cliente_id,
+            "cliente_nombre": cliente.nombre if cliente else None,
+            "cliente_empresa": cliente.empresa if cliente else None,
+            "agente_id": c.agente_id,
+            "takeover": c.takeover,
+            "takeover_by": c.takeover_by,
+            "last_message_at": c.last_message_at.isoformat() if c.last_message_at else None,
+            "last_message_preview": c.last_message_preview,
+            "unread_count": c.unread_count or 0,
+            "status": c.status,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        })
+    return out
+
+
+@app.get("/api/whatsapp/conversations/{conv_id}/messages")
+def listar_mensajes_whatsapp(conv_id: int, limit: int = 100, db: Session = Depends(get_db)):
+    conv = db.query(WhatsAppConversation).filter(WhatsAppConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(404, "Conversacion no encontrada")
+    msgs = (
+        db.query(WhatsAppMessage)
+        .filter(WhatsAppMessage.conversation_id == conv_id)
+        .order_by(WhatsAppMessage.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+    if conv.unread_count:
+        conv.unread_count = 0
+        db.commit()
+    return [
+        {
+            "id": m.id,
+            "direction": m.direction,
+            "type": m.type,
+            "content": m.content,
+            "media_url": m.media_url,
+            "media_kapso_id": m.media_kapso_id,
+            "media_mime_type": m.media_mime_type,
+            "audio_duration_sec": m.audio_duration_sec,
+            "transcription": m.transcription,
+            "transcription_confidence": m.transcription_confidence,
+            "status": m.status,
+            "sent_by_admin": m.sent_by_admin,
+            "cost_usd": m.cost_usd or 0.0,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in msgs
+    ]
+
+
+@app.post("/api/whatsapp/conversations/{conv_id}/send")
+def enviar_mensaje_whatsapp(conv_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Admin envia mensaje manualmente. Soporta text, image, document.
+
+    Body: { "type": "text"|"image"|"document",
+            "text": "...", "image_url": "...", "doc_url": "...",
+            "filename": "...", "caption": "...",
+            "admin_email": "..." }
+    """
+    conv = db.query(WhatsAppConversation).filter(WhatsAppConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(404, "Conversacion no encontrada")
+    msg_type = payload.get("type", "text")
+    admin_email = payload.get("admin_email") or "admin"
+    if msg_type == "text":
+        text = (payload.get("text") or "").strip()
+        if not text:
+            raise HTTPException(400, "text requerido")
+        result = _send_text(conv.phone_number, text)
+        record = WhatsAppMessage(
+            conversation_id=conv.id, direction="outbound", type="text",
+            content=text, sent_by_admin=admin_email,
+            status=result.get("status", "pending"),
+        )
+    elif msg_type == "image":
+        url = payload.get("image_url")
+        if not url:
+            raise HTTPException(400, "image_url requerido")
+        caption = payload.get("caption") or ""
+        result = _send_image(conv.phone_number, url, caption)
+        record = WhatsAppMessage(
+            conversation_id=conv.id, direction="outbound", type="image",
+            content=caption, media_url=url, sent_by_admin=admin_email,
+            status=result.get("status", "pending"),
+        )
+    elif msg_type == "document":
+        url = payload.get("doc_url")
+        filename = payload.get("filename") or "documento.pdf"
+        if not url:
+            raise HTTPException(400, "doc_url requerido")
+        caption = payload.get("caption") or ""
+        result = _send_document(conv.phone_number, url, filename, caption)
+        record = WhatsAppMessage(
+            conversation_id=conv.id, direction="outbound", type="document",
+            content=caption or filename, media_url=url, sent_by_admin=admin_email,
+            status=result.get("status", "pending"),
+        )
+    else:
+        raise HTTPException(400, f"type '{msg_type}' no soportado")
+
+    response_data = result.get("response") or {}
+    if isinstance(response_data, dict):
+        sent_messages = response_data.get("messages") or []
+        if sent_messages and isinstance(sent_messages, list):
+            kid = sent_messages[0].get("id") if isinstance(sent_messages[0], dict) else None
+            if kid:
+                record.kapso_message_id = kid
+    if result.get("status") == "failed":
+        record.error_message = json.dumps(result, default=str)[:1000]
+
+    db.add(record)
+    conv.last_message_at = datetime.utcnow()
+    conv.last_message_preview = (record.content or f"[{record.type}]")[:500]
+    db.commit()
+    db.refresh(record)
+    return {
+        "id": record.id,
+        "status": record.status,
+        "kapso_response": result,
+    }
+
+
+@app.put("/api/whatsapp/conversations/{conv_id}/takeover")
+def toggle_takeover(conv_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Body: { "takeover": true|false, "admin_email": "..." }"""
+    conv = db.query(WhatsAppConversation).filter(WhatsAppConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(404, "Conversacion no encontrada")
+    conv.takeover = bool(payload.get("takeover", True))
+    conv.takeover_by = payload.get("admin_email") if conv.takeover else None
+    conv.takeover_at = datetime.utcnow() if conv.takeover else None
+    db.commit()
+    return {"id": conv.id, "takeover": conv.takeover, "takeover_by": conv.takeover_by}
+
+
+@app.put("/api/whatsapp/conversations/{conv_id}")
+def update_conversation(conv_id: int, payload: dict, db: Session = Depends(get_db)):
+    """Permite vincular conversacion a cliente o cambiar agente/status."""
+    conv = db.query(WhatsAppConversation).filter(WhatsAppConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(404, "Conversacion no encontrada")
+    if "cliente_id" in payload:
+        conv.cliente_id = payload["cliente_id"]
+    if "agente_id" in payload:
+        conv.agente_id = payload["agente_id"]
+    if "status" in payload and payload["status"] in ("active", "archived"):
+        conv.status = payload["status"]
+    db.commit()
+    return {
+        "id": conv.id,
+        "cliente_id": conv.cliente_id,
+        "agente_id": conv.agente_id,
+        "status": conv.status,
+    }
+
+
+@app.post("/api/whatsapp/test-send")
+def test_send_whatsapp(payload: dict):
+    """Envia mensaje de prueba sin persistir. Util para verificar Kapso.
+    Body: { "to": "+56912345678", "message": "..." }
+    """
+    to = payload.get("to", "").strip()
+    msg = payload.get("message", "Mensaje de prueba MIP Quality & Logistics")
+    if not to:
+        raise HTTPException(400, "to requerido (numero E.164 con +)")
+    return {"to": to, "message": msg, "result": _send_text(to, msg)}
 
 
 # ─── Serve Frontend ───
