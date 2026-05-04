@@ -1519,6 +1519,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" data-feature="emails" onclick="aView('a-emails')"><i class="fas fa-envelope-open-text"></i> Automatizaciones</a>
       </div>
       <div class="sb-section"><div class="sb-section-title">Sistema</div>
+        <a class="sb-link" onclick="aView('a-alerts')"><i class="fas fa-bell"></i> Alertas <span class="cnt" id="alerts-badge" style="display:none;background:#ef4444;color:#fff">0</span></a>
         <a class="sb-link" onclick="aView('a-live-chats')"><i class="fas fa-headset"></i> Chats activos <span class="cnt" id="live-chats-badge" style="display:none;background:var(--success);color:#fff">0</span></a>
         <a class="sb-link" onclick="aView('a-whatsapp')"><i class="fab fa-whatsapp"></i> WhatsApp <span class="cnt" id="whatsapp-unread-badge" style="display:none;background:#25D366;color:#fff">0</span></a>
         <a class="sb-link" onclick="aView('a-agents')"><i class="fas fa-robot"></i> Agent Builder</a>
@@ -3002,6 +3003,32 @@ html,body{overflow-x:hidden;max-width:100vw}
       </div>
     </div>
 
+    <!-- ADMIN: Alertas del Sistema -->
+    <div class="page-body" id="a-alerts" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <h2 style="font-size:18px;font-weight:600"><i class="fas fa-bell" style="margin-right:6px;color:#ef4444"></i>Alertas del sistema</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Cost limits, nuevas cotizaciones, errores de agentes y mas. Las alertas warning/critical se notifican via WhatsApp a los admins configurados.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="loadAdminAlerts()"><i class="fas fa-sync"></i> Actualizar</button>
+          <button class="btn btn-outline btn-sm" onclick="markAllAlertsRead()"><i class="fas fa-check-double"></i> Marcar todas leidas</button>
+          <button class="btn btn-dark btn-sm" onclick="testAdminAlert()" style="background:#7c3aed;border:none"><i class="fas fa-paper-plane"></i> Probar alerta</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <button class="chip alert-filter-chip active" data-status="unread" onclick="setAlertFilter('unread')">Sin leer</button>
+        <button class="chip alert-filter-chip" data-status="all" onclick="setAlertFilter('all')">Todas</button>
+        <button class="chip alert-filter-chip" data-status="dismissed" onclick="setAlertFilter('dismissed')">Descartadas</button>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-muted);align-self:center">
+          🚨 <span id="alerts-critical-count">0</span> criticas · ⚠️ <span id="alerts-warning-count">0</span> warning · ℹ️ <span id="alerts-info-count">0</span> info
+        </span>
+      </div>
+      <div id="alerts-list" style="display:flex;flex-direction:column;gap:8px">
+        <div style="padding:24px;color:var(--text-muted);font-size:12px;text-align:center">Cargando alertas...</div>
+      </div>
+    </div>
+
     <!-- ADMIN: Historial -->
     <div class="page-body" id="a-history" style="display:none">
       <h2 style="font-size:18px;font-weight:600;margin-bottom:20px">Historial del Sistema</h2>
@@ -3833,10 +3860,10 @@ async function downloadBulkCSV() {
 
 // ─── Admin ───
 function aView(id) {
-  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-live-chats','a-whatsapp','a-agents','a-config','a-integrations','a-costs','a-editor','a-history','a-tickets'];
+  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-live-chats','a-whatsapp','a-agents','a-config','a-integrations','a-costs','a-editor','a-history','a-tickets','a-alerts'];
   ALL_VIEWS.forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
   const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
-  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-whatsapp':'WhatsApp','a-agents':'Agent Builder','a-config':'Configuración','a-integrations':'Integraciones','a-costs':'Costos IA','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte' };
+  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-whatsapp':'WhatsApp','a-agents':'Agent Builder','a-config':'Configuración','a-integrations':'Integraciones','a-costs':'Costos','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte','a-alerts':'Alertas del sistema' };
   document.getElementById('aTitle').textContent = t[id] || 'Admin';
   const links = document.querySelectorAll('#page-admin .sb-link');
   links.forEach(l => l.classList.remove('active'));
@@ -3854,6 +3881,7 @@ function aView(id) {
   if (id === 'a-emails' && typeof loadEmailSequences === 'function') loadEmailSequences();
   if (id === 'a-costs' && typeof loadCosts === 'function') loadCosts();
   if (id === 'a-whatsapp' && typeof loadWhatsApp === 'function') loadWhatsApp();
+  if (id === 'a-alerts' && typeof loadAdminAlerts === 'function') loadAdminAlerts();
 }
 
 // ─── View Toggle: Pipeline / Table ───
@@ -6030,6 +6058,130 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// ═══ ADMIN ALERTS ═══
+let _alertsFilter = 'unread';
+
+async function loadAdminAlerts() {
+  try {
+    const [list, counts] = await Promise.all([
+      api(`/api/admin/alerts?status=${_alertsFilter}&limit=100`),
+      api('/api/admin/alerts/count'),
+    ]);
+    // Sidebar badge
+    const badge = document.getElementById('alerts-badge');
+    if (badge) {
+      const total = counts.total || 0;
+      if (total > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = total > 99 ? '99+' : total;
+        badge.style.background = (counts.critical || 0) > 0 ? '#dc2626' : '#f59e0b';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+    document.getElementById('alerts-critical-count').textContent = counts.critical || 0;
+    document.getElementById('alerts-warning-count').textContent = counts.warning || 0;
+    document.getElementById('alerts-info-count').textContent = counts.info || 0;
+
+    const cont = document.getElementById('alerts-list');
+    if (!cont) return;
+    if (!list.length) {
+      cont.innerHTML = '<div style="padding:32px;color:var(--text-muted);font-size:13px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius)">No hay alertas en este filtro.</div>';
+      return;
+    }
+    const sevColors = {
+      critical: { bg: '#fef2f2', border: '#dc2626', text: '#991b1b', emoji: '🚨' },
+      warning: { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', emoji: '⚠️' },
+      info: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af', emoji: 'ℹ️' },
+    };
+    cont.innerHTML = list.map(a => {
+      const sc = sevColors[a.severity] || sevColors.info;
+      const dt = a.created_at ? new Date(a.created_at).toLocaleString('es-CL', {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}) : '';
+      const isRead = !!a.read_at;
+      const isDismissed = !!a.dismissed_at;
+      return `<div style="border-left:3px solid ${sc.border};background:${isRead && !isDismissed ? 'var(--bg)' : sc.bg};padding:12px 14px;border-radius:var(--radius);${isDismissed ? 'opacity:0.55;' : ''}display:flex;gap:12px;align-items:flex-start">
+        <div style="font-size:20px;flex-shrink:0">${sc.emoji}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
+            <div style="font-weight:600;font-size:13px;color:${sc.text}">${escapeHtml(a.title)}</div>
+            <div style="font-size:10px;color:var(--text-faint);white-space:nowrap">${dt}</div>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;white-space:pre-wrap">${escapeHtml(a.message)}</div>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center;font-size:10px;color:var(--text-muted)">
+            <span style="padding:1px 6px;background:rgba(0,0,0,0.06);border-radius:8px">${a.tipo}</span>
+            ${a.source ? `<span style="opacity:0.7">${a.source}</span>` : ''}
+            ${a.sent_to_whatsapp ? '<span style="color:#25D366"><i class="fab fa-whatsapp"></i> Enviada por WhatsApp</span>' : ''}
+            ${isRead ? '<span style="color:#16a34a">✓ Leida</span>' : ''}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          ${!isRead ? `<button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px" onclick="markAlertRead(${a.id})">Marcar leida</button>` : ''}
+          ${!isDismissed ? `<button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px" onclick="dismissAlert(${a.id})">Descartar</button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.error(e);
+    if (typeof toast === 'function') toast('error', 'Alertas', e.message || 'Error cargando');
+  }
+}
+
+function setAlertFilter(filter) {
+  _alertsFilter = filter;
+  document.querySelectorAll('.alert-filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.status === filter);
+  });
+  loadAdminAlerts();
+}
+
+async function markAlertRead(id) {
+  try { await api(`/api/admin/alerts/${id}/read`, {method:'PUT'}); loadAdminAlerts(); }
+  catch (e) { toast('error', 'Error', e.message); }
+}
+
+async function dismissAlert(id) {
+  try { await api(`/api/admin/alerts/${id}/dismiss`, {method:'PUT'}); loadAdminAlerts(); }
+  catch (e) { toast('error', 'Error', e.message); }
+}
+
+async function markAllAlertsRead() {
+  if (!confirm('¿Marcar TODAS las alertas como leidas?')) return;
+  try { await api('/api/admin/alerts/mark-all-read', {method:'PUT'}); loadAdminAlerts(); toast('success', 'Listo', 'Todas marcadas como leidas'); }
+  catch (e) { toast('error', 'Error', e.message); }
+}
+
+async function testAdminAlert() {
+  try {
+    const r = await api('/api/admin/wa-users/test-alert', {
+      method: 'POST',
+      body: JSON.stringify({title: 'Prueba alerta', message: 'Esta es una alerta de prueba enviada manualmente.', severity: 'warning'}),
+    });
+    toast('success', 'Alerta enviada', `Enviada a ${(r.sent_to||[]).length} numero(s)`);
+    setTimeout(loadAdminAlerts, 800);
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+// Auto-refresh badge cada 60s mientras estes en page-admin
+setInterval(() => {
+  const adminPage = document.getElementById('page-admin');
+  if (adminPage && adminPage.style.display !== 'none') {
+    api('/api/admin/alerts/count').then(c => {
+      const badge = document.getElementById('alerts-badge');
+      if (badge) {
+        const total = c.total || 0;
+        if (total > 0) {
+          badge.style.display = 'inline-block';
+          badge.textContent = total > 99 ? '99+' : total;
+          badge.style.background = (c.critical || 0) > 0 ? '#dc2626' : '#f59e0b';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    }).catch(() => {});
+  }
+}, 60000);
+
+
 async function loadAdminTickets() {
   try {
     const tickets = await api('/api/tickets');
@@ -8029,6 +8181,12 @@ async function loadAgentIntegrations() {
       api('/api/integrations/google-calendar/diagnostic').catch(() => ({ ready: false })),
     ]);
     const extras = document.getElementById('agent-extras');
+    // Auto-scroll suave al render
+    setTimeout(() => {
+      if (extras && extras.scrollIntoView) {
+        extras.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
     const hasGcal = integs.find(i => i.tipo === 'google_calendar' && i.has_credentials);
     const hasWebhook = integs.find(i => i.tipo === 'custom_webhook');
     const gcalBanner = !gcalDiag.ready ? `<div style="padding:10px 14px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:var(--radius);margin-bottom:12px;font-size:12px">
