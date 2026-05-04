@@ -8910,21 +8910,88 @@ def _invoke_agent_for_whatsapp(
             try:
                 import anthropic
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-                # Claude no soporta function calling igual aqui, hacemos call simple
+                # IMPORTANTE: NO le pasamos las tools a Claude porque
+                # (a) las tools usan handlers especificos atados a Gemini context
+                # (b) Claude alucina sintaxis <function_calls> en texto plano
+                # En su lugar le pedimos respuesta natural sin tool calling.
+                claude_system = (
+                    system
+                    + "\n\n[SISTEMA INTERNO IMPORTANTE]\n"
+                    + "Eres un fallback temporal. NO TIENES acceso a tools/funciones en este momento. "
+                    + "NUNCA escribas etiquetas tipo <function_calls>, <invoke>, <parameter> ni JSON de funciones. "
+                    + "Si el cliente pide algo que requiere agendar / consultar disponibilidad / generar un mockup / "
+                    + "generar PDF, DICELE de forma natural que vas a coordinarlo: "
+                    + "'Dejame revisar la agenda y te confirmo en un ratito' o "
+                    + "'Te paso opciones concretas en cuanto vuelva a tener acceso al sistema'. "
+                    + "NUNCA inventes fechas, horarios, datos de calendario o stocks - es CRITICO. "
+                    + "Mantene tono cercano y mensajes cortos."
+                )
                 response = client.messages.create(
                     model=(agent.modelo if (agent.modelo or "").startswith("claude") else "claude-sonnet-4-20250514"),
                     max_tokens=agent.max_tokens or 800,
-                    system=system,
+                    system=claude_system,
                     messages=messages,
                 )
-                reply_text = response.content[0].text if response.content else None
+                _claude_text = response.content[0].text if response.content else None
+                # Sanitizar: si tiene tags de tool-call, eliminarlas o rechazar
+                if _claude_text:
+                    import re as _re
+                    has_tool_tags = bool(_re.search(r"<function_calls?>|<invoke|<parameter|</function_calls?>", _claude_text))
+                    if has_tool_tags:
+                        # Limpiar todo lo que parezca XML de tool calling
+                        cleaned = _re.sub(r"<function_calls?>.*?</function_calls?>", "", _claude_text, flags=_re.DOTALL)
+                        cleaned = _re.sub(r"<invoke.*?</invoke>", "", cleaned, flags=_re.DOTALL)
+                        cleaned = _re.sub(r"<parameter.*?</parameter>", "", cleaned, flags=_re.DOTALL)
+                        cleaned = _re.sub(r"<function_result>.*?</function_result>", "", cleaned, flags=_re.DOTALL)
+                        cleaned = _re.sub(r"\s+", " ", cleaned).strip()
+                        if cleaned and len(cleaned) > 10:
+                            reply_text = cleaned
+                            print(f"[wa-mateo claude-fallback] sanitizada respuesta con tool tags")
+                        else:
+                            # No salvable, usar mensaje seguro
+                            reply_text = "Dejame revisar la disponibilidad y te confirmo en un ratito. ¿Te parece bien?"
+                            print(f"[wa-mateo claude-fallback] respuesta tenia solo tool tags, usando fallback seguro")
+                    else:
+                        reply_text = _claude_text
                 provider_used = "claude"
                 if hasattr(response, "usage"):
                     tokens_in = response.usage.input_tokens or 0
                     tokens_out = response.usage.output_tokens or 0
-                print(f"[wa-mateo claude-fallback] OK")
+                print(f"[wa-mateo claude-fallback] OK len={len(reply_text or '')}")
             except Exception as e:
                 print(f"[wa-mateo claude-fallback] error: {e}")
+
+        # Sanitize FINAL: detectar y limpiar tool-call XML/JSON que pudo escaparse
+        # Esto es defensa de ultima linea para no enviar al cliente JSON crudo.
+        if reply_text:
+            import re as _re
+            had_tool_leak = bool(_re.search(
+                r"<function_calls?>|<invoke|<parameter|<function_result>|</function_calls?>",
+                reply_text
+            ))
+            if had_tool_leak:
+                cleaned = _re.sub(r"<function_calls?>.*?</function_calls?>", "", reply_text, flags=_re.DOTALL)
+                cleaned = _re.sub(r"<invoke.*?</invoke>", "", cleaned, flags=_re.DOTALL)
+                cleaned = _re.sub(r"<parameter.*?</parameter>", "", cleaned, flags=_re.DOTALL)
+                cleaned = _re.sub(r"<function_result>.*?</function_result>", "", cleaned, flags=_re.DOTALL)
+                cleaned = _re.sub(r"\s+", " ", cleaned).strip()
+                if cleaned and len(cleaned) > 15:
+                    reply_text = cleaned
+                else:
+                    reply_text = "Dejame revisar y te confirmo en un ratito."
+                # ALERTA: tool leak detectado a tiempo
+                try:
+                    _emit_admin_alert(
+                        tipo="tool_call_leak", severity="warning",
+                        title="Tool-call XML detectado en respuesta",
+                        message=f"El LLM ({provider_used}) genero tags <function_calls> en su respuesta. "
+                                f"Sanitizado antes de enviar al cliente. Conv #{conv.id} ({conv.phone_number}).",
+                        metadata={"conv_id": conv.id, "provider": provider_used, "original_excerpt": reply_text[:300]},
+                        source="agent_sanitize", related_id=conv.id, related_type="whatsapp_conv",
+                        db=db,
+                    )
+                except Exception:
+                    pass
 
         if not reply_text:
             # Ultimo recurso: mensaje natural y breve, sin sonar como bot generico
