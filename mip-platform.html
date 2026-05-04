@@ -6652,8 +6652,8 @@ document.addEventListener('click', (e) => {
 function chooseChatChannel(channel) {
   document.getElementById('chatFabOptions').classList.remove('open');
   if (channel === 'whatsapp') {
-    // Numero MIP - hardcoded por ahora; cuando este el numero real lo cambiamos
-    const phone = (window.MIP_WHATSAPP_NUMBER || '+56966491761').replace(/[^0-9]/g, '');
+    // Numero MIP Trust WhatsApp Business (Kapso BSP) - +1 201-510-1766
+    const phone = (window.MIP_WHATSAPP_NUMBER || '+12015101766').replace(/[^0-9]/g, '');
     const msg = encodeURIComponent('Hola, me interesa saber sobre MIP Quality & Logistics');
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
   } else {
