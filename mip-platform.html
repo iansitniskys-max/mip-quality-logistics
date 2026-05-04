@@ -1662,7 +1662,7 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="sb-footer"><div class="sb-user"><div class="av" style="background:var(--danger-bg);color:var(--danger)">A</div><div><div class="name">Admin MIP</div><div class="email">admin@mipquality.com</div></div></div></div>
   </aside>
   <div class="main">
-    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="mobile-btn" onclick="openSb('aSb')"><i class="fas fa-bars"></i></button><h1 id="aTitle">Solicitudes entrantes</h1></div><div class="topbar-right"><span id="health-pill" onclick="showHealthDetail()" style="display:none;cursor:pointer;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600" title="Click para ver detalle"></span><div class="topbar-search"><i class="fas fa-search"></i><input placeholder="Buscar..."></div><button class="topbar-notif"><i class="fas fa-bell"></i></button><button class="btn btn-outline btn-sm" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button></div></div>
 
     <!-- ADMIN: Requests -->
     <div class="page-body" id="a-req">
@@ -6384,6 +6384,85 @@ document.addEventListener('DOMContentLoaded', () => {
   if (inp) inp.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waSendCurrent(); }
   });
+});
+
+
+// ═══ HEALTH-CHECK PILL ═══
+
+let _healthCache = null;
+
+async function refreshHealthPill() {
+  try {
+    const h = await api('/api/admin/health-check');
+    _healthCache = h;
+    const pill = document.getElementById('health-pill');
+    if (!pill) return;
+    pill.style.display = 'inline-flex';
+    pill.style.alignItems = 'center';
+    pill.style.gap = '4px';
+    if (h.overall === 'ok') {
+      pill.style.background = '#dcfce7';
+      pill.style.color = '#166534';
+      pill.innerHTML = '<i class="fas fa-check-circle"></i> Sistema OK';
+    } else if (h.overall === 'degraded') {
+      pill.style.background = '#fef3c7';
+      pill.style.color = '#92400e';
+      pill.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${h.issues_count} pendiente${h.issues_count !== 1 ? 's' : ''}`;
+    } else {
+      pill.style.background = '#fee2e2';
+      pill.style.color = '#991b1b';
+      pill.innerHTML = '<i class="fas fa-times-circle"></i> Sistema con error';
+    }
+  } catch (e) { /* silent */ }
+}
+
+function showHealthDetail() {
+  if (!_healthCache) { toast('info', 'Health-check', 'Cargando...'); refreshHealthPill(); return; }
+  const services = _healthCache.services || {};
+  const colors = {ok: '#16a34a', warning: '#f59e0b', error: '#dc2626'};
+  const icons = {ok: 'check-circle', warning: 'exclamation-triangle', error: 'times-circle'};
+  const rows = Object.entries(services).map(([name, s]) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px">
+      <i class="fas fa-${icons[s.status]}" style="color:${colors[s.status]};width:14px"></i>
+      <div style="flex:1"><b>${name}</b> <span style="color:var(--text-muted)">${s.info || ''}</span></div>
+    </div>
+  `).join('');
+  const html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h3 style="font-size:16px;font-weight:600">Health-check del sistema</h3>
+      <button onclick="document.getElementById('health-modal').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">${rows}</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--text-muted)">Ultimo check: ${_healthCache.timestamp}</div>
+    <div style="margin-top:10px;text-align:right"><button class="btn btn-outline btn-sm" onclick="refreshHealthPill();showHealthDetail()"><i class="fas fa-sync"></i> Re-check</button></div>
+  `;
+  let modal = document.getElementById('health-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'health-modal';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;display:flex;justify-content:center;align-items:center';
+    modal.innerHTML = '<div style="background:var(--bg);border-radius:var(--radius);max-width:560px;width:92%;max-height:90vh;overflow-y:auto;padding:24px" id="health-modal-body"></div>';
+    document.body.appendChild(modal);
+  }
+  document.getElementById('health-modal-body').innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+// Auto-refresh cada 5 min cuando estes en panel admin
+setInterval(() => {
+  const adminPage = document.getElementById('page-admin');
+  if (adminPage && adminPage.style.display !== 'none') {
+    refreshHealthPill();
+  }
+}, 5 * 60 * 1000);
+
+// First check al cargar admin
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const adminPage = document.getElementById('page-admin');
+    if (adminPage && adminPage.style.display !== 'none') refreshHealthPill();
+  }, 2000);
 });
 
 
