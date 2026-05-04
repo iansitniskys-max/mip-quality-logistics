@@ -2287,6 +2287,64 @@ html,body{overflow-x:hidden;max-width:100vw}
         </div>
       </div>
 
+      <!-- Numeros Admin WhatsApp -->
+      <div style="margin-top:24px">
+        <div class="card" style="padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div>
+              <h3 style="font-size:16px;font-weight:600"><i class="fab fa-whatsapp" style="color:#25D366;margin-right:8px"></i>Administradores WhatsApp</h3>
+              <p style="font-size:12px;color:var(--text-secondary);margin-top:4px">Numeros que reciben alertas + pueden interactuar con Mateo en modo admin (consultar metricas, prospects, etc).</p>
+            </div>
+            <button class="btn btn-dark btn-sm" onclick="openAdminUserModal()" style="background:#25D366;border:none"><i class="fas fa-user-plus"></i> Agregar admin</button>
+          </div>
+          <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px">
+            <div style="padding:24px;color:var(--text-muted);font-size:12px;text-align:center">Cargando admins...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: agregar/editar admin user -->
+      <div id="admin-user-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;justify-content:center;align-items:center">
+        <div style="background:var(--bg);border-radius:var(--radius);max-width:600px;width:92%;max-height:90vh;overflow-y:auto;padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 id="admin-user-modal-title" style="font-size:16px;font-weight:600">Agregar admin WhatsApp</h3>
+            <button onclick="closeAdminUserModal()" style="background:none;border:none;cursor:pointer;font-size:18px"><i class="fas fa-times"></i></button>
+          </div>
+          <input type="hidden" id="admin-user-id">
+          <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="admin-user-nombre" placeholder="ej: Ian"></div>
+          <div class="form-group"><label class="form-label">Telefono WhatsApp (con codigo pais, sin +)</label><input class="form-input" id="admin-user-phone" placeholder="56966491761"></div>
+          <div class="form-group"><label class="form-label">Rol</label>
+            <select class="form-input" id="admin-user-rol">
+              <option value="admin">Admin (todo)</option>
+              <option value="operador">Operador (consultas + takeover)</option>
+              <option value="observador">Observador (solo alertas)</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Severity minima de alertas</label>
+            <select class="form-input" id="admin-user-sev">
+              <option value="info">Info (todas)</option>
+              <option value="warning" selected>Warning (default)</option>
+              <option value="critical">Critical (solo criticas)</option>
+            </select>
+          </div>
+          <h4 style="font-size:13px;font-weight:600;margin:14px 0 8px">Permisos</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="admin-user-receive" checked> Recibir alertas WhatsApp</label>
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="admin-user-metrics" checked> Consultar metricas</label>
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="admin-user-prospects" checked> Consultar prospects</label>
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="admin-user-costos" checked> Consultar costos</label>
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="admin-user-takeover" checked> Tomar control de chats</label>
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="admin-user-modify"> Modificar settings</label>
+            <label style="display:flex;align-items:center;gap:6px;grid-column:1/-1"><input type="checkbox" id="admin-user-activo" checked> Activo</label>
+          </div>
+          <div class="form-group" style="margin-top:14px"><label class="form-label">Notas (opcional)</label><textarea class="form-input" id="admin-user-notas" rows="2"></textarea></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn btn-outline btn-sm" onclick="closeAdminUserModal()">Cancelar</button>
+            <button class="btn btn-dark btn-sm" onclick="saveAdminUser()" style="background:#25D366;border:none"><i class="fas fa-save"></i> Guardar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ SOCIOS (Splitwise) ═══ -->
       <div style="margin-top:24px">
         <div class="card" style="padding:24px">
@@ -2620,8 +2678,8 @@ html,body{overflow-x:hidden;max-width:100vw}
     <div class="page-body" id="a-costs" style="display:none">
       <div class="admin-header-flex">
         <div>
-          <h2 style="font-size:18px;font-weight:600;margin:0"><i class="fas fa-dollar-sign" style="margin-right:6px;color:var(--success)"></i> Costos IA — Consumo live</h2>
-          <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0 0">Consumo de tokens por proveedor, feature y día. Seteá límites mensuales y alertas.</p>
+          <h2 style="font-size:18px;font-weight:600;margin:0"><i class="fas fa-dollar-sign" style="margin-right:6px;color:var(--success)"></i> Costos</h2>
+          <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0 0">Consumo IA + facturas software. Limites, tarjetas asociadas, portales de billing.</p>
         </div>
         <div class="admin-btn-group">
           <select id="cost-period" class="form-input" style="padding:6px 10px;font-size:12px" onchange="loadCosts()">
@@ -2629,10 +2687,23 @@ html,body{overflow-x:hidden;max-width:100vw}
             <option value="30" selected>Ultimos 30 dias</option>
             <option value="90">Ultimos 90 dias</option>
           </select>
-          <button class="btn btn-outline btn-sm" onclick="loadCosts()"><i class="fas fa-sync"></i> Refrescar</button>
+          <button class="btn btn-outline btn-sm" onclick="loadCosts(); loadBillingServices();"><i class="fas fa-sync"></i> Refrescar</button>
           <button class="btn btn-dark btn-sm" onclick="openIncreaseQuotaModal()" style="background:#f59e0b;border-color:#f59e0b"><i class="fas fa-rocket"></i> Aumentar tokens</button>
         </div>
       </div>
+      <!-- Tabs Costos IA / Costos Software -->
+      <div style="display:flex;gap:6px;border-bottom:1px solid var(--border);margin:14px 0 0">
+        <button class="costos-tab costos-tab-active" data-tab="ai" onclick="switchCostosTab('ai')"><i class="fas fa-robot"></i> Costos IA</button>
+        <button class="costos-tab" data-tab="software" onclick="switchCostosTab('software')"><i class="fas fa-cubes"></i> Costos Software</button>
+      </div>
+      <style>
+        .costos-tab{padding:10px 14px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-size:13px;color:var(--text-muted);font-weight:500;transition:all .15s}
+        .costos-tab:hover{color:var(--text)}
+        .costos-tab-active{color:var(--success);border-bottom-color:var(--success)}
+        .billing-card{padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-surface);display:flex;flex-direction:column;gap:6px;transition:box-shadow .15s}
+        .billing-card:hover{box-shadow:0 4px 14px rgba(0,0,0,0.08)}
+      </style>
+      <div id="costos-tab-ai" class="costos-tab-content"><!-- contenido IA antes existente -->
       <!-- Banner: sin creditos / quota -->
       <div id="quota-warning-banner" style="display:none;background:linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);border:1px solid var(--warning);border-radius:var(--radius);padding:14px 16px;margin-top:12px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
@@ -2679,6 +2750,47 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="dtable-wrap">
           <table class="dtable"><thead><tr><th>Fecha</th><th>Proveedor</th><th>Tokens (in/out)</th><th>Costo</th><th>Latencia</th><th>Session</th></tr></thead>
           <tbody id="cost-breakdown-tbody"></tbody></table>
+        </div>
+      </div>
+      </div><!-- /costos-tab-ai -->
+
+      <!-- Costos Software -->
+      <div id="costos-tab-software" class="costos-tab-content" style="display:none;margin-top:14px">
+        <div style="padding:12px 14px;background:var(--bg-surface);border-left:3px solid var(--info);border-radius:var(--radius);margin-bottom:14px;font-size:12px">
+          <i class="fas fa-info-circle" style="color:var(--info);margin-right:4px"></i>
+          Aca tienes el catalogo de servicios externos con tarjeta asociada, gasto del mes, limites y links a portales de billing. Click 'Editar' para asociar tarjeta o cambiar info.
+        </div>
+        <div id="billing-services-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px">
+          <div style="grid-column:1/-1;padding:24px;color:var(--text-muted);font-size:12px;text-align:center">Cargando servicios...</div>
+        </div>
+      </div>
+
+      <!-- Modal: editar billing service -->
+      <div id="billing-edit-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;justify-content:center;align-items:center">
+        <div style="background:var(--bg);border-radius:var(--radius);max-width:520px;width:92%;padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="font-size:16px;font-weight:600">Editar servicio: <span id="billing-edit-title"></span></h3>
+            <button onclick="document.getElementById('billing-edit-modal').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px"><i class="fas fa-times"></i></button>
+          </div>
+          <input type="hidden" id="billing-edit-provider">
+          <div class="form-group"><label class="form-label">Cuenta de billing (email o ID)</label><input class="form-input" id="billing-edit-account" placeholder="ej: tu-email@gmail.com"></div>
+          <div class="form-group"><label class="form-label">Ultimos 4 digitos tarjeta</label><input class="form-input" id="billing-edit-card" maxlength="4" placeholder="1234"></div>
+          <div class="form-group"><label class="form-label">URL portal de billing</label><input class="form-input" id="billing-edit-portal" placeholder="https://..."></div>
+          <div class="form-group"><label class="form-label">Email de alertas (opcional)</label><input class="form-input" id="billing-edit-email" placeholder="alertas@empresa.com"></div>
+          <div class="form-group"><label class="form-label">Categoria</label>
+            <select class="form-input" id="billing-edit-categoria">
+              <option value="ai">AI / LLM</option>
+              <option value="hosting">Hosting / Infra</option>
+              <option value="messaging">Messaging</option>
+              <option value="email">Email</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Descripcion</label><textarea class="form-input" id="billing-edit-desc" rows="2"></textarea></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('billing-edit-modal').style.display='none'">Cancelar</button>
+            <button class="btn btn-dark btn-sm" onclick="saveBillingService()"><i class="fas fa-save"></i> Guardar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3871,7 +3983,7 @@ function aView(id) {
   links.forEach(l => { const oc = l.getAttribute('onclick') || ''; if (oc.includes("'"+id+"'")) l.classList.add('active'); });
   if (id === 'a-acc') { loadContabilidad(); loadContabilidadDynamic(); }
   if (id === 'a-clients') loadAdminClients();
-  if (id === 'a-config') { loadAdminUsers(); if (typeof loadFeatures === 'function') loadFeatures(); if (typeof loadEmailDiagnostic === 'function') loadEmailDiagnostic(); }
+  if (id === 'a-config') { loadAdminUsers(); if (typeof loadFeatures === 'function') loadFeatures(); if (typeof loadEmailDiagnostic === 'function') loadEmailDiagnostic(); if (typeof loadAdminWaUsers === 'function') loadAdminWaUsers(); }
   if (id === 'a-reports') { loadAdminReports(); loadAdminReportsKPIs(); }
   if (id === 'a-history') loadAdminHistory();
   if (id === 'a-tickets') loadAdminTickets();
@@ -6160,6 +6272,215 @@ async function testAdminAlert() {
     setTimeout(loadAdminAlerts, 800);
   } catch (e) { toast('error', 'Error', e.message); }
 }
+
+// ═══ COSTOS - Tabs IA / Software ═══
+
+function switchCostosTab(tab) {
+  document.querySelectorAll('.costos-tab').forEach(b => b.classList.toggle('costos-tab-active', b.dataset.tab === tab));
+  document.querySelectorAll('.costos-tab-content').forEach(c => {
+    const id = c.id;
+    if (id === 'costos-tab-' + tab) c.style.display = '';
+    else c.style.display = 'none';
+  });
+  if (tab === 'software') loadBillingServices();
+}
+
+async function loadBillingServices() {
+  try {
+    const services = await api('/api/admin/billing/services');
+    const grid = document.getElementById('billing-services-grid');
+    if (!grid) return;
+    if (!services.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:24px;color:var(--text-muted);font-size:12px;text-align:center">No hay servicios configurados.</div>';
+      return;
+    }
+    const catEmoji = {ai:'🤖', hosting:'☁️', messaging:'💬', email:'📧', otro:'⚙️'};
+    const statusColor = {exceeded:'#dc2626', warning:'#f59e0b', ok:'#16a34a', unmetered:'#6b7280'};
+    const statusLabel = {exceeded:'TOPE', warning:'80%+', ok:'OK', unmetered:'sin limite'};
+    grid.innerHTML = services.map(s => {
+      const sc = statusColor[s.status] || '#6b7280';
+      const pct = s.monthly_limit_usd > 0 ? `${s.pct_used.toFixed(0)}%` : '—';
+      const barWidth = Math.min(s.pct_used || 0, 100);
+      return `<div class="billing-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:13px">${catEmoji[s.categoria] || '⚙️'} ${escapeHtml(s.billing_account || s.provider.toUpperCase())}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${escapeHtml(s.descripcion || '')}</div>
+          </div>
+          <span style="padding:2px 7px;border-radius:8px;font-size:9px;font-weight:600;background:${sc}1a;color:${sc};white-space:nowrap">${statusLabel[s.status] || s.status}</span>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:6px;font-size:11px">
+          <div><span style="color:var(--text-muted)">Mes:</span> <b>$${(s.spent_this_month_usd || 0).toFixed(4)}</b></div>
+          <div><span style="color:var(--text-muted)">Limit:</span> <b>${s.monthly_limit_usd > 0 ? '$' + s.monthly_limit_usd.toFixed(2) : 'sin'}</b></div>
+          <div><span style="color:var(--text-muted)">Tarjeta:</span> <b>${s.card_last4 ? '•••• ' + s.card_last4 : '—'}</b></div>
+        </div>
+        ${s.monthly_limit_usd > 0 ? `<div style="height:5px;background:rgba(0,0,0,0.06);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${barWidth}%;background:${sc};transition:width .3s"></div></div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${s.portal_url ? `<a href="${s.portal_url}" target="_blank" class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px;text-decoration:none"><i class="fas fa-external-link-alt"></i> Portal</a>` : ''}
+          <button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px" onclick='editBillingService(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="fas fa-edit"></i> Editar</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.error('loadBillingServices error:', e);
+  }
+}
+
+function editBillingService(s) {
+  document.getElementById('billing-edit-title').textContent = s.provider;
+  document.getElementById('billing-edit-provider').value = s.provider;
+  document.getElementById('billing-edit-account').value = s.billing_account || '';
+  document.getElementById('billing-edit-card').value = s.card_last4 || '';
+  document.getElementById('billing-edit-portal').value = s.portal_url || '';
+  document.getElementById('billing-edit-email').value = s.alert_email || '';
+  document.getElementById('billing-edit-categoria').value = s.categoria || 'otro';
+  document.getElementById('billing-edit-desc').value = s.descripcion || '';
+  document.getElementById('billing-edit-modal').style.display = 'flex';
+}
+
+async function saveBillingService() {
+  const provider = document.getElementById('billing-edit-provider').value;
+  const payload = {
+    billing_account: document.getElementById('billing-edit-account').value,
+    billing_card_last4: document.getElementById('billing-edit-card').value,
+    portal_url: document.getElementById('billing-edit-portal').value,
+    alert_email: document.getElementById('billing-edit-email').value,
+    categoria: document.getElementById('billing-edit-categoria').value,
+    descripcion: document.getElementById('billing-edit-desc').value,
+  };
+  try {
+    await api(`/api/admin/billing/services/${provider}`, { method: 'PUT', body: JSON.stringify(payload) });
+    document.getElementById('billing-edit-modal').style.display = 'none';
+    toast('success', 'OK', 'Servicio actualizado');
+    loadBillingServices();
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+
+// ═══ ADMIN WhatsApp USERS (multi-admin con permisos) ═══
+
+async function loadAdminWaUsers() {
+  try {
+    const users = await api('/api/admin/wa-users');
+    const cont = document.getElementById('admin-users-list');
+    if (!cont) return;
+    if (!users.length) {
+      cont.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:12px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius)">No hay admins configurados. Agrega tu numero para recibir alertas + interactuar en modo admin con Mateo.</div>';
+      return;
+    }
+    cont.innerHTML = users.map(u => {
+      const sevColor = u.alert_severity_min === 'critical' ? '#dc2626' : u.alert_severity_min === 'warning' ? '#f59e0b' : '#3b82f6';
+      const perms = [];
+      if (u.can_query_metrics) perms.push('Métricas');
+      if (u.can_query_prospects) perms.push('Prospects');
+      if (u.can_query_costs) perms.push('Costos');
+      if (u.can_modify_settings) perms.push('Modify');
+      if (u.can_takeover_chats) perms.push('Takeover');
+      return `<div style="padding:14px;background:${u.activo ? 'var(--bg-surface)' : 'rgba(0,0,0,0.03)'};border-radius:var(--radius);${!u.activo ? 'opacity:0.6;' : ''}display:flex;align-items:center;gap:14px">
+        <div style="width:42px;height:42px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0">${(u.nombre || '?').charAt(0).toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:13px">${escapeHtml(u.nombre || 'Sin nombre')}</span>
+            <span style="font-size:11px;color:var(--text-muted)">+${u.phone_number}</span>
+            <span style="padding:1px 7px;border-radius:8px;font-size:9px;font-weight:600;background:rgba(124,58,237,0.12);color:#7c3aed;text-transform:uppercase">${u.rol}</span>
+            ${u.receive_alerts ? `<span style="padding:1px 7px;border-radius:8px;font-size:9px;font-weight:600;background:${sevColor}1a;color:${sevColor}">${u.alert_severity_min}+</span>` : '<span style="padding:1px 7px;border-radius:8px;font-size:9px;background:rgba(0,0,0,0.06);color:var(--text-muted)">Sin alertas</span>'}
+            ${!u.activo ? '<span style="padding:1px 7px;border-radius:8px;font-size:9px;background:#fee2e2;color:#991b1b">INACTIVO</span>' : ''}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Permisos: ${perms.length ? perms.join(' · ') : 'Ninguno'}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 9px" onclick='editAdminUser(${JSON.stringify(u).replace(/'/g, "&apos;")})'><i class="fas fa-edit"></i></button>
+          <button class="btn btn-outline btn-sm" style="font-size:10px;padding:5px 9px;color:#dc2626" onclick="deleteAdminUser(${u.id}, '${escapeHtml(u.nombre || u.phone_number)}')"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function openAdminUserModal() {
+  document.getElementById('admin-user-modal-title').textContent = 'Agregar admin WhatsApp';
+  document.getElementById('admin-user-id').value = '';
+  document.getElementById('admin-user-nombre').value = '';
+  document.getElementById('admin-user-phone').value = '';
+  document.getElementById('admin-user-rol').value = 'admin';
+  document.getElementById('admin-user-sev').value = 'warning';
+  document.getElementById('admin-user-receive').checked = true;
+  document.getElementById('admin-user-metrics').checked = true;
+  document.getElementById('admin-user-prospects').checked = true;
+  document.getElementById('admin-user-costos').checked = true;
+  document.getElementById('admin-user-takeover').checked = true;
+  document.getElementById('admin-user-modify').checked = false;
+  document.getElementById('admin-user-activo').checked = true;
+  document.getElementById('admin-user-notas').value = '';
+  document.getElementById('admin-user-modal').style.display = 'flex';
+}
+
+function editAdminUser(u) {
+  document.getElementById('admin-user-modal-title').textContent = 'Editar admin: ' + (u.nombre || '');
+  document.getElementById('admin-user-id').value = u.id;
+  document.getElementById('admin-user-nombre').value = u.nombre || '';
+  document.getElementById('admin-user-phone').value = u.phone_number || '';
+  document.getElementById('admin-user-rol').value = u.rol || 'admin';
+  document.getElementById('admin-user-sev').value = u.alert_severity_min || 'warning';
+  document.getElementById('admin-user-receive').checked = !!u.receive_alerts;
+  document.getElementById('admin-user-metrics').checked = !!u.can_query_metrics;
+  document.getElementById('admin-user-prospects').checked = !!u.can_query_prospects;
+  document.getElementById('admin-user-costos').checked = !!u.can_query_costs;
+  document.getElementById('admin-user-takeover').checked = !!u.can_takeover_chats;
+  document.getElementById('admin-user-modify').checked = !!u.can_modify_settings;
+  document.getElementById('admin-user-activo').checked = !!u.activo;
+  document.getElementById('admin-user-notas').value = u.notas || '';
+  document.getElementById('admin-user-modal').style.display = 'flex';
+}
+
+function closeAdminUserModal() {
+  document.getElementById('admin-user-modal').style.display = 'none';
+}
+
+async function saveAdminUser() {
+  const id = document.getElementById('admin-user-id').value;
+  const phone = (document.getElementById('admin-user-phone').value || '').replace(/[^0-9]/g, '');
+  if (!phone || phone.length < 8) { toast('error', 'Error', 'Telefono invalido'); return; }
+  const payload = {
+    nombre: document.getElementById('admin-user-nombre').value,
+    phone_number: phone,
+    rol: document.getElementById('admin-user-rol').value,
+    alert_severity_min: document.getElementById('admin-user-sev').value,
+    receive_alerts: document.getElementById('admin-user-receive').checked,
+    can_query_metrics: document.getElementById('admin-user-metrics').checked,
+    can_query_prospects: document.getElementById('admin-user-prospects').checked,
+    can_query_costs: document.getElementById('admin-user-costos').checked,
+    can_takeover_chats: document.getElementById('admin-user-takeover').checked,
+    can_modify_settings: document.getElementById('admin-user-modify').checked,
+    activo: document.getElementById('admin-user-activo').checked,
+    notas: document.getElementById('admin-user-notas').value,
+  };
+  try {
+    if (id) {
+      await api(`/api/admin/wa-users/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      toast('success', 'OK', 'Admin actualizado');
+    } else {
+      await api('/api/admin/wa-users', { method: 'POST', body: JSON.stringify(payload) });
+      toast('success', 'OK', 'Admin agregado');
+    }
+    closeAdminUserModal();
+    loadAdminWaUsers();
+  } catch (e) {
+    toast('error', 'Error', e.message);
+  }
+}
+
+async function deleteAdminUser(id, nombre) {
+  if (!confirm(`¿Eliminar admin "${nombre}"?`)) return;
+  try {
+    await api(`/api/admin/wa-users/${id}`, { method: 'DELETE' });
+    toast('success', 'OK', 'Admin eliminado');
+    loadAdminWaUsers();
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
 
 // Auto-refresh badge cada 60s mientras estes en page-admin
 setInterval(() => {
