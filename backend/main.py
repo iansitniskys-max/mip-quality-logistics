@@ -1775,6 +1775,201 @@ def _smtp_config():
     }
 
 
+# ─── EMAIL TEMPLATES AUTOMATIZADOS ───
+# Cada template es una funcion que recibe contexto y devuelve (subject, html, body_text)
+# El envio real lo hace _send_email_template() que usa _send_email + log + tipo.
+
+def _email_template_cotizacion_aprobada(cliente_nombre: str, cotizacion_id: int,
+                                        proyecto_nombre: str, monto_total: str = "",
+                                        validez: str = "30 días", app_url: str = None) -> tuple:
+    """Cliente recibe que su cotizacion fue aprobada por MIP."""
+    nombre = cliente_nombre or "amigo/a"
+    proyecto = proyecto_nombre or "tu proyecto"
+    app_url = app_url or os.getenv("APP_URL", "https://miptrust.cl")
+    subject = f"✅ Tu cotización está lista — {proyecto}"
+    body_html = f"""
+        <p>Hola {nombre},</p>
+        <p>Buenísimas noticias: terminamos de armar la cotización para <b>{proyecto}</b> y ya está disponible en tu portal.</p>
+        {('<p><b>Total:</b> ' + monto_total + '</p>') if monto_total else ''}
+        <p><b>Validez:</b> {validez} desde hoy.</p>
+        <p>Entrá al portal para revisar el detalle, descargar el PDF formal y aprobar para iniciar producción.</p>
+        <p style="font-size:12px;color:#6b7280;margin-top:18px">Cualquier ajuste o pregunta, respondé este email o escribinos por WhatsApp.</p>
+    """
+    body_text = (
+        f"Hola {nombre},\n\nTu cotización para {proyecto} está lista en tu portal MIP.\n"
+        f"Validez: {validez}\n\nIngresá a {app_url} para verla."
+    )
+    html = _wrap_html_email(
+        title="Tu cotización está lista",
+        body_html=body_html,
+        cta_label="Ver cotización",
+        cta_url=f"{app_url}#cotizacion-{cotizacion_id}",
+    )
+    return subject, html, body_text
+
+
+def _email_template_pedido_produccion(cliente_nombre: str, pedido_id: int,
+                                      proyecto_nombre: str, eta_dias: str = "45",
+                                      app_url: str = None) -> tuple:
+    """Cliente recibe que su pedido entró a produccion."""
+    nombre = cliente_nombre or "amigo/a"
+    proyecto = proyecto_nombre or "tu pedido"
+    app_url = app_url or os.getenv("APP_URL", "https://miptrust.cl")
+    subject = f"🏭 Producción iniciada — {proyecto}"
+    body_html = f"""
+        <p>Hola {nombre},</p>
+        <p>El proveedor en China comenzó la producción de <b>{proyecto}</b>.</p>
+        <p><b>Tiempo estimado:</b> {eta_dias} días + tránsito marítimo.</p>
+        <p>Vamos a estar haciendo control de calidad en planta y te avisaremos cuando estemos listos para inspección final.</p>
+        <p style="font-size:12px;color:#6b7280;margin-top:18px">Podés ver el progreso en cualquier momento desde tu portal.</p>
+    """
+    body_text = f"Producción iniciada para {proyecto}. ETA: {eta_dias} días + tránsito."
+    html = _wrap_html_email(
+        title="Producción iniciada",
+        body_html=body_html,
+        cta_label="Ver pedido",
+        cta_url=f"{app_url}#pedido-{pedido_id}",
+    )
+    return subject, html, body_text
+
+
+def _email_template_pedido_despachado(cliente_nombre: str, pedido_id: int,
+                                      proyecto_nombre: str, tracking: str = "",
+                                      eta_chile: str = "", app_url: str = None) -> tuple:
+    """Cliente recibe que su pedido salio de China."""
+    nombre = cliente_nombre or "amigo/a"
+    proyecto = proyecto_nombre or "tu pedido"
+    app_url = app_url or os.getenv("APP_URL", "https://miptrust.cl")
+    subject = f"🚢 Tu pedido salió de China — {proyecto}"
+    body_html = f"""
+        <p>Hola {nombre},</p>
+        <p>Tu pedido <b>{proyecto}</b> está en tránsito desde China.</p>
+        {('<p><b>Tracking:</b> <code style="background:#f3f4f6;padding:2px 6px;border-radius:3px">' + tracking + '</code></p>') if tracking else ''}
+        {('<p><b>ETA Chile:</b> ' + eta_chile + '</p>') if eta_chile else ''}
+        <p>Te avisaremos cuando llegue al puerto y empiece el desaduanaje.</p>
+    """
+    body_text = f"Tu pedido {proyecto} salió de China. {('Tracking: ' + tracking) if tracking else ''} {('ETA: ' + eta_chile) if eta_chile else ''}"
+    html = _wrap_html_email(
+        title="Pedido despachado",
+        body_html=body_html,
+        cta_label="Ver tracking",
+        cta_url=f"{app_url}#pedido-{pedido_id}",
+    )
+    return subject, html, body_text
+
+
+def _email_template_pedido_entregado(cliente_nombre: str, pedido_id: int,
+                                     proyecto_nombre: str, app_url: str = None) -> tuple:
+    """Cliente recibe que su pedido fue entregado."""
+    nombre = cliente_nombre or "amigo/a"
+    proyecto = proyecto_nombre or "tu pedido"
+    app_url = app_url or os.getenv("APP_URL", "https://miptrust.cl")
+    subject = f"📦 Entregado — {proyecto}"
+    body_html = f"""
+        <p>Hola {nombre},</p>
+        <p>Tu pedido <b>{proyecto}</b> fue entregado.</p>
+        <p>Esperamos que todo haya llegado en perfecto estado. Si algo no cumple con tus expectativas, escribinos en las próximas 48 horas y lo revisamos.</p>
+        <p style="font-size:12px;color:#6b7280;margin-top:18px">Si te gustó nuestro trabajo, contanos y armamos el próximo proyecto juntos.</p>
+    """
+    body_text = f"Tu pedido {proyecto} fue entregado. Cualquier observación, escribinos en 48h."
+    html = _wrap_html_email(
+        title="Pedido entregado",
+        body_html=body_html,
+        cta_label="Calificar experiencia",
+        cta_url=f"{app_url}#pedido-{pedido_id}-feedback",
+    )
+    return subject, html, body_text
+
+
+def _email_template_factura_emitida(cliente_nombre: str, factura_id: int,
+                                    monto: str, vencimiento: str = "",
+                                    app_url: str = None) -> tuple:
+    """Cliente recibe notificacion de factura nueva."""
+    nombre = cliente_nombre or "amigo/a"
+    app_url = app_url or os.getenv("APP_URL", "https://miptrust.cl")
+    subject = f"🧾 Nueva factura — ${monto}"
+    body_html = f"""
+        <p>Hola {nombre},</p>
+        <p>Emitimos una nueva factura por <b>${monto}</b>.</p>
+        {('<p><b>Vencimiento:</b> ' + vencimiento + '</p>') if vencimiento else ''}
+        <p>Podés descargar el PDF y ver el detalle desde tu portal.</p>
+        <p style="font-size:12px;color:#6b7280;margin-top:18px">Para coordinar el pago, escribinos por aquí o por WhatsApp.</p>
+    """
+    body_text = f"Nueva factura por ${monto}. {('Vencimiento: ' + vencimiento) if vencimiento else ''}"
+    html = _wrap_html_email(
+        title="Nueva factura emitida",
+        body_html=body_html,
+        cta_label="Ver factura",
+        cta_url=f"{app_url}#factura-{factura_id}",
+    )
+    return subject, html, body_text
+
+
+EMAIL_TEMPLATES = {
+    "cotizacion_aprobada": _email_template_cotizacion_aprobada,
+    "pedido_produccion": _email_template_pedido_produccion,
+    "pedido_despachado": _email_template_pedido_despachado,
+    "pedido_entregado": _email_template_pedido_entregado,
+    "factura_emitida": _email_template_factura_emitida,
+}
+
+
+def _send_email_template(template_id: str, to: str, db: Session = None,
+                         cliente_id: int = None, cotizacion_id: int = None,
+                         **template_args) -> dict:
+    """Envia un email usando uno de los templates predefinidos."""
+    fn = EMAIL_TEMPLATES.get(template_id)
+    if not fn:
+        return {"sent": False, "reason": f"Template '{template_id}' no existe. Disponibles: {list(EMAIL_TEMPLATES.keys())}"}
+    try:
+        subject, html, body_text = fn(**template_args)
+    except TypeError as e:
+        return {"sent": False, "reason": f"Args invalidos para template {template_id}: {e}"}
+    return _send_email(
+        to=to, subject=subject, body=body_text, html=html,
+        db=db, tipo=f"template_{template_id}",
+        cliente_id=cliente_id, cotizacion_id=cotizacion_id,
+    )
+
+
+@app.get("/api/admin/email-templates")
+def list_email_templates():
+    """Lista los templates disponibles para envio manual desde admin."""
+    return {
+        "templates": [
+            {"id": "cotizacion_aprobada", "label": "Cotización lista",
+             "args": ["cliente_nombre", "cotizacion_id", "proyecto_nombre", "monto_total", "validez"]},
+            {"id": "pedido_produccion", "label": "Pedido en producción",
+             "args": ["cliente_nombre", "pedido_id", "proyecto_nombre", "eta_dias"]},
+            {"id": "pedido_despachado", "label": "Pedido despachado",
+             "args": ["cliente_nombre", "pedido_id", "proyecto_nombre", "tracking", "eta_chile"]},
+            {"id": "pedido_entregado", "label": "Pedido entregado",
+             "args": ["cliente_nombre", "pedido_id", "proyecto_nombre"]},
+            {"id": "factura_emitida", "label": "Factura emitida",
+             "args": ["cliente_nombre", "factura_id", "monto", "vencimiento"]},
+        ],
+    }
+
+
+@app.post("/api/admin/email-templates/send")
+def send_email_template(data: dict, db: Session = Depends(get_db)):
+    """Envia un template a un destinatario.
+    Body: { template_id, to, args: {nombre: valor, ...}, cliente_id?, cotizacion_id? }
+    """
+    template_id = data.get("template_id")
+    to = data.get("to")
+    args = data.get("args") or {}
+    if not template_id or not to:
+        raise HTTPException(400, "template_id + to requeridos")
+    result = _send_email_template(
+        template_id=template_id, to=to, db=db,
+        cliente_id=data.get("cliente_id"),
+        cotizacion_id=data.get("cotizacion_id"),
+        **args,
+    )
+    return {"template_id": template_id, "to": to, "result": result}
+
+
 def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url: str = None, footer_extra: str = "") -> str:
     """Envuelve un cuerpo HTML en un template responsivo con branding MIP."""
     cta_html = ""
