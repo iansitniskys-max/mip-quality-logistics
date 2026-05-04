@@ -927,6 +927,245 @@ def add_productos(cot_id: int, data: dict, db: Session = Depends(get_db)):
 
 
 # ═══════════════════════════════════════════════════
+# COTIZACIONES MASIVAS - bulk import via Excel template
+# ═══════════════════════════════════════════════════
+
+@app.get("/api/cotizaciones/bulk-template")
+def download_bulk_template():
+    """Descarga template Excel con columnas predefinidas para cotizar masivo."""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        raise HTTPException(500, "openpyxl no instalado")
+    wb = Workbook()
+    # Hoja 1: instrucciones
+    ws_inst = wb.active
+    ws_inst.title = "Instrucciones"
+    ws_inst["A1"] = "TEMPLATE COTIZACIONES MASIVAS - MIP Quality Sourcing"
+    ws_inst["A1"].font = Font(bold=True, size=14, color="FFFFFF")
+    ws_inst["A1"].fill = PatternFill("solid", fgColor="1A1A1A")
+    ws_inst.merge_cells("A1:B1")
+    ws_inst["A3"] = "Como usar este template:"
+    ws_inst["A3"].font = Font(bold=True)
+    instrucciones = [
+        "1. Ve a la hoja 'Productos' y completa una fila por cada producto a cotizar.",
+        "2. Productos con el MISMO 'proyecto_nombre' se agrupan en UNA cotizacion.",
+        "3. Si proyecto_nombre esta vacio, cada fila sera una cotizacion separada.",
+        "4. Campos REQUERIDOS: producto_nombre, cantidad.",
+        "5. Resto de campos son opcionales pero ayudan a cotizar mejor.",
+        "6. Si tu marca esta registrada, pone su nombre en 'marca_nombre' y se vincula auto.",
+        "7. Sube este archivo en MIP > Nueva Cotizacion > Importar Excel.",
+    ]
+    for i, inst in enumerate(instrucciones, start=4):
+        ws_inst[f"A{i}"] = inst
+    ws_inst.column_dimensions["A"].width = 80
+
+    # Hoja 2: Productos
+    ws = wb.create_sheet("Productos")
+    headers = [
+        "proyecto_nombre", "proyecto_descripcion", "marca_nombre",
+        "producto_nombre", "categoria", "materialidad",
+        "dimensiones", "colores", "cantidad", "precio_objetivo",
+        "plazo", "personalizacion", "notas",
+    ]
+    for col_idx, h in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1A1A1A")
+        cell.alignment = Alignment(horizontal="center")
+    # Fila ejemplo
+    ws.append([
+        "Lanzamiento Navidad", "Caja regalo corporativo", "Bichos Toys",
+        "Termo acero 500ml", "Bebibles", "Acero 18/8 + tapa madera",
+        "20x7 cm", "Negro mate, dorado", 500, "USD 6 FOB",
+        "45 dias produccion", "Logo grabado laser", "Empaque individual",
+    ])
+    # Anchos
+    widths = [22, 28, 18, 26, 16, 22, 14, 18, 12, 18, 18, 24, 22]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64+i)].width = w
+
+    import io as _io
+    buf = _io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    headers_resp = {
+        "Content-Disposition": 'attachment; filename="template-cotizaciones-MIP.xlsx"',
+    }
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers_resp,
+    )
+
+
+@app.post("/api/cotizaciones/bulk-from-excel")
+async def bulk_from_excel(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Procesa Excel cargado y crea N cotizaciones agrupadas por proyecto_nombre.
+
+    Form fields:
+    - file: el xlsx
+    - cliente_id: id cliente al que se asocian las cotizaciones
+    - marca_id: opcional, marca a vincular (sino busca por marca_nombre por fila)
+    """
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        raise HTTPException(500, "openpyxl no instalado")
+    form = await request.form()
+    file = form.get("file")
+    cliente_id = form.get("cliente_id")
+    marca_id = form.get("marca_id")
+    if not file or not hasattr(file, "filename"):
+        raise HTTPException(400, "Archivo requerido")
+    if not cliente_id:
+        raise HTTPException(400, "cliente_id requerido")
+    cliente = db.query(Cliente).filter(Cliente.id == int(cliente_id)).first()
+    if not cliente:
+        raise HTTPException(404, "Cliente no encontrado")
+
+    content = await file.read()
+    import io as _io
+    try:
+        wb = load_workbook(_io.BytesIO(content), data_only=True)
+    except Exception as e:
+        raise HTTPException(400, f"No se pudo leer Excel: {e}")
+    # Buscar hoja 'Productos'
+    if "Productos" in wb.sheetnames:
+        ws = wb["Productos"]
+    else:
+        ws = wb.active
+
+    rows = list(ws.iter_rows(values_only=True))
+    if len(rows) < 2:
+        raise HTTPException(400, "Excel vacio (sin filas de datos)")
+    headers = [str(h or "").strip().lower() for h in rows[0]]
+    expected = ["proyecto_nombre", "producto_nombre", "cantidad"]
+    missing = [c for c in expected if c not in headers]
+    if missing:
+        raise HTTPException(400, f"Faltan columnas requeridas: {missing}")
+    h_idx = {h: headers.index(h) for h in headers if h}
+
+    # Validar y agrupar
+    grupos = {}  # proyecto_nombre -> lista de productos
+    errores = []
+    for row_n, row in enumerate(rows[1:], start=2):
+        if not row or all(c is None or c == "" for c in row):
+            continue
+        def _v(key):
+            i = h_idx.get(key)
+            return row[i] if i is not None and i < len(row) else None
+        producto_nombre = (_v("producto_nombre") or "")
+        if isinstance(producto_nombre, (int, float)):
+            producto_nombre = str(producto_nombre)
+        producto_nombre = (producto_nombre or "").strip()
+        cantidad = _v("cantidad")
+        if not producto_nombre:
+            errores.append({"fila": row_n, "error": "Falta producto_nombre"})
+            continue
+        if cantidad is None:
+            errores.append({"fila": row_n, "error": "Falta cantidad"})
+            continue
+        proyecto_key = ((_v("proyecto_nombre") or producto_nombre) or "").strip()
+        prod = {
+            "nombre": producto_nombre,
+            "categoria": _v("categoria") or "",
+            "materialidad": _v("materialidad") or "",
+            "dimensiones": _v("dimensiones") or "",
+            "colores": _v("colores") or "",
+            "cantidad": str(cantidad)[:100],
+            "precio_objetivo": _v("precio_objetivo") or "",
+            "plazo": _v("plazo") or "",
+            "personalizacion": _v("personalizacion") or "",
+            "notas": _v("notas") or "",
+            "marca_nombre": (_v("marca_nombre") or "").strip(),
+            "proyecto_descripcion": _v("proyecto_descripcion") or "",
+        }
+        grupos.setdefault(proyecto_key, []).append(prod)
+
+    if errores and not grupos:
+        raise HTTPException(400, json.dumps({"creadas": 0, "errores": errores}))
+
+    # Crear cotizaciones + productos
+    creadas = []
+    for proyecto_nombre, productos in grupos.items():
+        first = productos[0]
+        # Buscar marca: prioridad marca_id form > marca_nombre fila
+        cot_marca_id = None
+        if marca_id:
+            try:
+                cot_marca_id = int(marca_id)
+            except Exception:
+                pass
+        if not cot_marca_id and first.get("marca_nombre"):
+            mm = db.query(Marca).filter(
+                Marca.cliente_id == cliente.id,
+                func.lower(Marca.nombre) == first["marca_nombre"].lower(),
+            ).first()
+            if mm:
+                cot_marca_id = mm.id
+        cot = Cotizacion(
+            cliente_id=cliente.id,
+            proyecto_nombre=proyecto_nombre[:300],
+            proyecto_descripcion=str(first.get("proyecto_descripcion") or "")[:1000],
+            producto=", ".join([p["nombre"] for p in productos])[:300],
+            descripcion=f"Cotizacion bulk con {len(productos)} producto(s)"[:500],
+            cantidad=", ".join([p["cantidad"] for p in productos])[:200],
+            plazo=first.get("plazo") or "",
+            personalizacion=first.get("personalizacion") or "",
+            estado="pendiente",
+        )
+        if cot_marca_id and hasattr(cot, "marca_id"):
+            cot.marca_id = cot_marca_id
+        db.add(cot)
+        db.commit()
+        db.refresh(cot)
+        # Crear ProductoCotizacion por cada
+        for p in productos:
+            try:
+                prod_row = ProductoCotizacion(
+                    cotizacion_id=cot.id,
+                    nombre=p["nombre"][:300],
+                    categoria=p["categoria"][:100] if p["categoria"] else None,
+                    materialidad=p["materialidad"][:200] if p["materialidad"] else None,
+                    dimensiones=p["dimensiones"][:200] if p["dimensiones"] else None,
+                    colores=p["colores"][:200] if p["colores"] else None,
+                    cantidad=p["cantidad"][:100],
+                    precio_objetivo=p["precio_objetivo"][:100] if p["precio_objetivo"] else None,
+                    personalizacion=p["personalizacion"][:500] if p["personalizacion"] else None,
+                )
+                db.add(prod_row)
+            except Exception as e:
+                print(f"[bulk producto] {e}")
+        db.commit()
+        creadas.append({"id": cot.id, "proyecto_nombre": proyecto_nombre, "productos_count": len(productos)})
+        # Trigger admin alert
+        try:
+            _emit_admin_alert(
+                tipo="new_cotizacion_bulk",
+                severity="warning",
+                title=f"Cotizacion bulk: {proyecto_nombre[:60]}",
+                message=f"De: {cliente.nombre}. {len(productos)} productos. Importada via Excel masivo.",
+                metadata={"cotizacion_id": cot.id, "cliente_id": cliente.id, "productos_count": len(productos)},
+                source="bulk_import", related_id=cot.id, related_type="cotizacion",
+                db=db,
+            )
+        except Exception:
+            pass
+
+    return {
+        "creadas": len(creadas),
+        "ids": [c["id"] for c in creadas],
+        "details": creadas,
+        "errores": errores,
+    }
+
+
+# ═══════════════════════════════════════════════════
 # PDF PARSER - extrae productos de cotizaciones PDF
 # ═══════════════════════════════════════════════════
 
