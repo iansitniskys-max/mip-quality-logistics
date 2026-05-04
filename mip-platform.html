@@ -1361,6 +1361,14 @@ html,body{overflow-x:hidden;max-width:100vw}
         <form onsubmit="doQuote(event)">
           <div style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><i class="fas fa-info-circle" style="margin-right:4px"></i> DATOS GENERALES</div>
           <div class="form-row">
+            <div class="form-group" style="flex:1"><label class="form-label">Marca / Proyecto <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+              <select class="form-input" id="q-marca-id">
+                <option value="">— sin marca —</option>
+              </select>
+              <p style="font-size:10px;color:var(--text-muted);margin-top:2px">Vincula esta cotización con una <a href="javascript:void(0)" onclick="cView('c-brands')">marca tuya</a> para que el equipo tenga el contexto.</p>
+            </div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label class="form-label">Industria *</label>
               <select class="form-input" id="q-industria" required>
                 <option value="">Seleccionar...</option>
@@ -3853,6 +3861,18 @@ function cView(id) {
   if (id === 'c-invoices') loadClientInvoices();
   if (id === 'c-history') loadClientHistory();
   if (id === 'c-brands' && typeof loadClientBrands === 'function') loadClientBrands();
+  if (id === 'c-quote' && typeof loadQuoteMarcasSelect === 'function') loadQuoteMarcasSelect();
+}
+
+async function loadQuoteMarcasSelect() {
+  try {
+    if (!currentUser || !currentUser.id) return;
+    const sel = document.getElementById('q-marca-id');
+    if (!sel) return;
+    const brands = await api(`/api/clientes/${currentUser.id}/marcas`);
+    sel.innerHTML = '<option value="">— sin marca —</option>' +
+      brands.map(b => `<option value="${b.id}">${b.nombre}</option>`).join('');
+  } catch (e) { /* silent */ }
 }
 
 // ─── Quotation: Category cascading ───
@@ -4046,6 +4066,7 @@ async function doQuote(e) {
   });
 
   const names = productos.map(p => p.nombre);
+  const marcaIdSel = document.getElementById('q-marca-id')?.value || '';
   const cotData = {
     cliente_id: currentUser.id,
     producto: names.join(' + '),
@@ -4056,10 +4077,17 @@ async function doQuote(e) {
     uso_final: document.getElementById('q-uso')?.value || '',
     personalizacion: '',
   };
+  if (marcaIdSel) cotData.marca_id = parseInt(marcaIdSel);
 
   try {
     // 1. Create cotizacion
     const cot = await api('/api/cotizaciones', { method: 'POST', body: JSON.stringify(cotData) });
+    // 1b. Vincular marca si fue elegida (por si CotizacionCreate schema no la acepta)
+    if (marcaIdSel) {
+      try {
+        await api(`/api/cotizaciones/${cot.id}/marca`, { method: 'PUT', body: JSON.stringify({ marca_id: parseInt(marcaIdSel) }) });
+      } catch (_) {}
+    }
     // 2. Add products to cotizacion
     await api(`/api/cotizaciones/${cot.id}/productos`, { method: 'POST', body: JSON.stringify({ productos }) });
     // 3. Notify

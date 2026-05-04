@@ -116,10 +116,11 @@ def on_startup():
                     print(f"Added column conversation_pipelines.{col}")
                 except Exception:
                     conn.rollback()
-            # Migrate cotizaciones: agregar proyecto_nombre y proyecto_descripcion
+            # Migrate cotizaciones: agregar proyecto_nombre, proyecto_descripcion y marca_id
             for col, col_type in [
                 ("proyecto_nombre", "VARCHAR(300)"),
                 ("proyecto_descripcion", "TEXT"),
+                ("marca_id", "INTEGER"),
             ]:
                 try:
                     conn.execute(text(f"ALTER TABLE cotizaciones ADD COLUMN {col} {col_type}"))
@@ -7870,7 +7871,27 @@ def trigger_automation_manual(data: dict, db: Session = Depends(get_db)):
     return {"logs_creados": created or 0, "etapa": etapa, "cotizacion_id": cot_id}
 
 
-@app.put("/api/cotizaciones/{id}/estado")
+@app.put("/api/cotizaciones/{id:int}/marca")
+def vincular_cotizacion_marca(id: int, data: dict, db: Session = Depends(get_db)):
+    """Vincula (o desvincula con marca_id=null) una cotizacion a una marca."""
+    cot = db.query(Cotizacion).get(id)
+    if not cot:
+        raise HTTPException(404, "Cotizacion no encontrada")
+    marca_id = data.get("marca_id")
+    if marca_id:
+        m = db.query(Marca).get(marca_id)
+        if not m:
+            raise HTTPException(404, "Marca no encontrada")
+        if m.cliente_id != cot.cliente_id:
+            raise HTTPException(400, "La marca no pertenece al cliente de esta cotizacion")
+        cot.marca_id = marca_id
+    else:
+        cot.marca_id = None
+    db.commit()
+    return {"id": cot.id, "marca_id": cot.marca_id}
+
+
+@app.put("/api/cotizaciones/{id:int}/estado")
 def cambiar_estado_cotizacion(id: int, data: dict, db: Session = Depends(get_db)):
     """Quick state change for pipeline drag & drop"""
     nuevo_estado = data.get("estado")
@@ -9357,6 +9378,33 @@ def _invoke_agent_for_whatsapp(
             spent_gemini = _get_monthly_spent("gemini", db)
             spent_claude = _get_monthly_spent("claude", db)
 
+            # Cotizaciones recientes (ultimos 5) - para responder "que cotizaciones nuevas?"
+            recent_cots = (
+                db.query(Cotizacion)
+                .order_by(Cotizacion.created_at.desc())
+                .limit(5)
+                .all()
+            )
+            cots_summary = []
+            for c in recent_cots:
+                cli = db.query(Cliente).filter(Cliente.id == c.cliente_id).first()
+                cli_nombre = (cli.nombre if cli else "?")
+                proy = (c.proyecto_nombre or c.producto or "Sin nombre")[:50]
+                cots_summary.append(f"#{c.id} {proy} ({cli_nombre}, {c.estado})")
+
+            # Alertas no leidas (top 5 mas recientes)
+            recent_alerts = (
+                db.query(AdminAlert)
+                .filter(AdminAlert.read_at.is_(None), AdminAlert.dismissed_at.is_(None))
+                .order_by(AdminAlert.created_at.desc())
+                .limit(5)
+                .all()
+            )
+            alerts_summary = []
+            for a in recent_alerts:
+                emoji = "🚨" if a.severity == "critical" else "⚠️"
+                alerts_summary.append(f"{emoji} {a.title[:60]}")
+
             admin_lines = [
                 "",
                 "═══ MODO ADMIN ACTIVO ═══",
@@ -9369,15 +9417,29 @@ def _invoke_agent_for_whatsapp(
                 f"Costos mes: Gemini ${spent_gemini:.4f} · Claude ${spent_claude:.4f}",
                 f"Alertas no leidas: {unread_alerts} (criticas: {critical_alerts})",
                 "",
+                f"[ULTIMAS COTIZACIONES] ({len(cots_summary)}):",
+                *(["- " + s for s in cots_summary] if cots_summary else ["(ninguna)"]),
+                "",
+                f"[ALERTAS NO LEIDAS] ({len(alerts_summary)}):",
+                *(["- " + s for s in alerts_summary] if alerts_summary else ["(ninguna)"]),
+                "",
+                "[COMANDOS RAPIDOS QUE EL ADMIN PUEDE USAR]",
+                "El admin puede preguntar literalmente cosas como:",
+                "- 'estado' / 'status' / 'resumen' -> dale el resumen completo arriba en bullets",
+                "- 'alertas' / 'que alertas hay?' -> lista las alertas no leidas con detalle",
+                "- 'cotizaciones nuevas' / 'que se cotizo hoy' -> lista las recientes",
+                "- 'costos' / 'cuanto gaste' -> los numeros de costos del mes",
+                "- 'prospects' / 'leads nuevos' -> count de prospects",
+                "Cuando responde a estos comandos, sea conciso (3-5 lineas max).",
+                "",
                 "[INSTRUCCIONES MODO ADMIN]",
-                "Quien te escribe es admin del sistema. Responde de forma DIRECTA y CONCISA.",
-                "- Si pregunta 'cuantas cotizaciones hay?', responde con el numero exacto.",
-                "- Si pregunta 'que paso con X', revisa contexto y responde con datos reales.",
-                "- NO uses el flujo de cotizacion/calificacion (no es cliente).",
-                "- NO digas 'Hola, soy Mateo' largo - solo responde la pregunta.",
-                "- NO captures lead (es admin interno).",
-                "- Si hay alertas criticas, mencionalas brevemente al inicio si es relevante.",
-                "- Si te pide accion (cambiar limit, etc), explica que esa accion debe hacerse por panel admin (no la podes ejecutar directo desde aca).",
+                "Quien te escribe es admin. Responde DIRECTO y CONCISO. Sin saludos largos.",
+                "- Si pregunta cantidad/numero exacto, da el numero.",
+                "- NO uses flujo de cotizacion (no es cliente).",
+                "- NO digas 'Hola, soy Mateo'.",
+                "- NO captures lead.",
+                "- Si pide accion (cambiar limit, etc), explica que va por panel admin web.",
+                "- Si menciona 'alertas' o 'estado', dale los datos arriba.",
                 "═══ FIN MODO ADMIN ═══",
             ]
             extra_lines.extend(admin_lines)
@@ -9449,6 +9511,27 @@ def _invoke_agent_for_whatsapp(
                 err_str = str(e).lower()
                 is_rate_limit = ("429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or "rate" in err_str)
                 print(f"[wa-mateo gemini] error: {e}{' (rate-limit detectado, fallback a Claude)' if is_rate_limit else ''}")
+                # Alerta admin: rate-limit + fallback a Claude (debounce 30 min)
+                if is_rate_limit:
+                    try:
+                        from datetime import timedelta as _td
+                        cutoff_30m = datetime.utcnow() - _td(minutes=30)
+                        recent = db.query(AdminAlert).filter(
+                            AdminAlert.tipo == "gemini_rate_limit",
+                            AdminAlert.created_at >= cutoff_30m,
+                        ).first()
+                        if not recent:
+                            _emit_admin_alert(
+                                tipo="gemini_rate_limit",
+                                severity="warning",
+                                title="Gemini rate-limit (free tier)",
+                                message="Hubo rate-limit de Gemini. Mateo cayo en fallback Claude (mas caro). "
+                                        "Considera activar paid tier de Gemini en GCP para 1000+ RPM.",
+                                metadata={"error_excerpt": str(e)[:300]},
+                                source="wa-mateo", db=db,
+                            )
+                    except Exception as _e:
+                        print(f"[rate-limit alert] {_e}")
 
         # Fallback automatico a Claude si Gemini fallo
         if not reply_text and ANTHROPIC_API_KEY:
