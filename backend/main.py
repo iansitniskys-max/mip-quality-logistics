@@ -8780,6 +8780,65 @@ def _invoke_agent_for_whatsapp(
             extra_lines.append(f"Rubro: {cliente.rubro}")
     else:
         extra_lines.append("Cliente CRM: NO vinculado todavia (cliente nuevo)")
+
+    # ─── MODO ADMIN: si quien escribe es un admin autorizado ───
+    admin_user = _is_admin_phone(conv.phone_number, db)
+    is_admin_mode = bool(admin_user and getattr(admin_user, "activo", True))
+    if is_admin_mode:
+        # Datos en vivo del sistema para que Mateo pueda responder consultas internas
+        try:
+            from datetime import timedelta as _td
+            now = datetime.now()
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+            cot_total = db.query(Cotizacion).count()
+            cot_pendientes = db.query(Cotizacion).filter(Cotizacion.estado == "pendiente").count()
+            cot_mes = db.query(Cotizacion).filter(Cotizacion.created_at >= month_start).count()
+            cot_hoy = db.query(Cotizacion).filter(Cotizacion.created_at >= today_start).count()
+            clientes_total = db.query(Cliente).count()
+            prospects_total = 0
+            try:
+                prospects_total = db.query(Prospect).count()
+            except Exception:
+                pass
+            unread_alerts = db.query(AdminAlert).filter(
+                AdminAlert.read_at.is_(None), AdminAlert.dismissed_at.is_(None)
+            ).count()
+            critical_alerts = db.query(AdminAlert).filter(
+                AdminAlert.read_at.is_(None), AdminAlert.dismissed_at.is_(None),
+                AdminAlert.severity == "critical",
+            ).count()
+            spent_gemini = _get_monthly_spent("gemini", db)
+            spent_claude = _get_monthly_spent("claude", db)
+
+            admin_lines = [
+                "",
+                "═══ MODO ADMIN ACTIVO ═══",
+                f"Hablas con: {admin_user.nombre or 'admin'} (rol: {admin_user.rol})",
+                f"Permisos: metrics={admin_user.can_query_metrics}, prospects={admin_user.can_query_prospects}, costos={admin_user.can_query_costs}, modify={admin_user.can_modify_settings}",
+                "",
+                "[ESTADO ACTUAL DEL SISTEMA]",
+                f"Cotizaciones: {cot_total} total | {cot_pendientes} pendientes | {cot_mes} este mes | {cot_hoy} hoy",
+                f"Clientes: {clientes_total} | Prospects: {prospects_total}",
+                f"Costos mes: Gemini ${spent_gemini:.4f} · Claude ${spent_claude:.4f}",
+                f"Alertas no leidas: {unread_alerts} (criticas: {critical_alerts})",
+                "",
+                "[INSTRUCCIONES MODO ADMIN]",
+                "Quien te escribe es admin del sistema. Responde de forma DIRECTA y CONCISA.",
+                "- Si pregunta 'cuantas cotizaciones hay?', responde con el numero exacto.",
+                "- Si pregunta 'que paso con X', revisa contexto y responde con datos reales.",
+                "- NO uses el flujo de cotizacion/calificacion (no es cliente).",
+                "- NO digas 'Hola, soy Mateo' largo - solo responde la pregunta.",
+                "- NO captures lead (es admin interno).",
+                "- Si hay alertas criticas, mencionalas brevemente al inicio si es relevante.",
+                "- Si te pide accion (cambiar limit, etc), explica que esa accion debe hacerse por panel admin (no la podes ejecutar directo desde aca).",
+                "═══ FIN MODO ADMIN ═══",
+            ]
+            extra_lines.extend(admin_lines)
+        except Exception as e:
+            print(f"[admin-mode context] {e}")
+
     extra_context = "\n".join(extra_lines)
 
     # Setear contexto WhatsApp para que tools puedan usarlo
@@ -8788,6 +8847,8 @@ def _invoke_agent_for_whatsapp(
         "phone_number": conv.phone_number,
         "cliente_id": conv.cliente_id,
         "agent_id": agent.id,
+        "is_admin_mode": is_admin_mode,
+        "admin_user_id": getattr(admin_user, "id", None) if is_admin_mode else None,
     })
 
     try:
@@ -8872,6 +8933,20 @@ def _invoke_agent_for_whatsapp(
                 "Dame un par de minutos y vuelvo contigo. Si es urgente, escribime de nuevo en un momento."
             )
             provider_used = "fallback-tecnico"
+            # Trigger alerta admin: agente cayo sin respuesta de ningun LLM
+            try:
+                _emit_admin_alert(
+                    tipo="agent_total_fallback", severity="critical",
+                    title="Mateo cayo en fallback total",
+                    message=f"Cliente +{conv.phone_number} ({conv.nombre_contacto or 'sin nombre'}) "
+                            f"recibio mensaje generico porque Gemini Y Claude fallaron. "
+                            f"Mensaje del cliente: '{user_message[:200]}'",
+                    metadata={"conv_id": conv.id, "phone": conv.phone_number, "agent_id": agent.id},
+                    source="agent_invoke", related_id=conv.id, related_type="whatsapp_conv",
+                    db=db,
+                )
+            except Exception as _e:
+                print(f"[fallback alert] {_e}")
 
         # Enviar respuesta al cliente
         send_result = _send_text(conv.phone_number, reply_text)
