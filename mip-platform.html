@@ -3078,20 +3078,24 @@ html,body{overflow-x:hidden;max-width:100vw}
 
 <!-- CHATBOT MATEO + WhatsApp chooser -->
 <style>
-.chat-fab-chooser{position:fixed;bottom:24px;right:24px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.chat-fab-options{display:flex;flex-direction:column;gap:8px;opacity:0;transform:translateY(10px) scale(0.95);pointer-events:none;transition:all .25s cubic-bezier(.4,0,.2,1)}
+.chat-fab-chooser{position:fixed;bottom:24px;right:24px;z-index:900;display:flex;flex-direction:column;align-items:flex-end;gap:14px}
+.chat-fab-options{display:flex;flex-direction:column;gap:10px;opacity:0;transform:translateY(10px) scale(0.95);pointer-events:none;transition:all .25s cubic-bezier(.4,0,.2,1);width:auto}
 .chat-fab-options.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
-.chat-fab-opt{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;background:#fff;border-radius:28px;box-shadow:0 6px 20px rgba(0,0,0,0.18);cursor:pointer;transition:transform .15s, box-shadow .15s;min-width:170px;border:1px solid rgba(0,0,0,0.04)}
-.chat-fab-opt:hover{transform:translateX(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.24)}
-.chat-fab-opt-icon{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:18px;overflow:hidden}
+.chat-fab-opt{display:flex;align-items:center;gap:12px;padding:10px 18px 10px 10px;background:#fff;border-radius:32px;box-shadow:0 8px 28px rgba(0,0,0,0.18);cursor:pointer;transition:transform .15s, box-shadow .15s;min-width:230px;border:1px solid rgba(0,0,0,0.06)}
+.chat-fab-opt:hover{transform:translateX(-4px);box-shadow:0 10px 30px rgba(0,0,0,0.24)}
+.chat-fab-opt-icon{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:20px;overflow:hidden}
 .chat-fab-opt-icon img{width:100%;height:100%;object-fit:cover}
 .chat-fab-opt-icon.wa{background:#25D366}
-.chat-fab-opt-text{display:flex;flex-direction:column;line-height:1.2}
-.chat-fab-opt-title{font-size:13px;font-weight:600;color:#1a1a1a}
-.chat-fab-opt-sub{font-size:10px;color:#666}
+.chat-fab-opt-text{display:flex;flex-direction:column;line-height:1.25}
+.chat-fab-opt-title{font-size:14px;font-weight:600;color:#1a1a1a;white-space:nowrap}
+.chat-fab-opt-sub{font-size:11px;color:#666;white-space:nowrap}
+/* Cuando el chooser esta abierto, ocultar el greeting bubble (que se solapa con las opciones) */
+body.chooser-open .chat-greeting{display:none !important}
 @media (max-width:480px){
-  .chat-fab-chooser{bottom:16px;right:16px}
-  .chat-fab-opt{min-width:160px;padding:6px 12px 6px 6px}
+  .chat-fab-chooser{bottom:16px;right:16px;gap:12px}
+  .chat-fab-opt{min-width:210px;padding:8px 14px 8px 8px}
+  .chat-fab-opt-title{font-size:13px}
+  .chat-fab-opt-sub{font-size:10px}
 }
 </style>
 <div class="chat-fab-chooser" id="chatFabChooser">
@@ -6638,7 +6642,11 @@ function toggleFabChooser() {
   // Si el panel ya esta abierto, cerralo en vez de mostrar chooser
   const panel = document.getElementById('chatPanel');
   if (panel && panel.classList.contains('open')) { toggleChat(); return; }
+  // Cerrar el greeting bubble (Mateo "Hola...") si esta visible para no solapar
+  closeChatGreeting();
   opts.classList.toggle('open');
+  // Toggle clase en body para CSS pueda ocultar greeting via :has fallback
+  document.body.classList.toggle('chooser-open', opts.classList.contains('open'));
 }
 // Cerrar chooser si click fuera
 document.addEventListener('click', (e) => {
@@ -6647,10 +6655,12 @@ document.addEventListener('click', (e) => {
   if (!chooser || !opts) return;
   if (!chooser.contains(e.target) && opts.classList.contains('open')) {
     opts.classList.remove('open');
+    document.body.classList.remove('chooser-open');
   }
 });
 function chooseChatChannel(channel) {
   document.getElementById('chatFabOptions').classList.remove('open');
+  document.body.classList.remove('chooser-open');
   if (channel === 'whatsapp') {
     // Numero MIP Trust WhatsApp Business (Kapso BSP) - +1 201-510-1766
     const phone = (window.MIP_WHATSAPP_NUMBER || '+12015101766').replace(/[^0-9]/g, '');
