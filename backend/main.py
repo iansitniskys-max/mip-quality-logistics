@@ -9885,6 +9885,37 @@ def _invoke_agent_for_whatsapp(
                 emoji = "🚨" if a.severity == "critical" else "⚠️"
                 alerts_summary.append(f"{emoji} {a.title[:60]}")
 
+            # Top 3 clientes por cotizaciones (para 'top clientes' admin queries)
+            top_cli_summary = []
+            try:
+                rows = (
+                    db.query(
+                        Cliente.nombre, Cliente.empresa,
+                        func.count(Cotizacion.id).label("c"),
+                    )
+                    .join(Cotizacion, Cotizacion.cliente_id == Cliente.id)
+                    .group_by(Cliente.id, Cliente.nombre, Cliente.empresa)
+                    .order_by(func.count(Cotizacion.id).desc())
+                    .limit(3)
+                    .all()
+                )
+                top_cli_summary = [
+                    f"{r[0]}{(' (' + r[1] + ')') if r[1] else ''}: {r[2]} cot"
+                    for r in rows
+                ]
+            except Exception:
+                pass
+
+            # Conversion rate
+            try:
+                total_cots_for_rate = db.query(Cotizacion).count() or 1
+                avanzadas = db.query(Cotizacion).filter(
+                    Cotizacion.estado.in_(["cotizado", "produccion", "entregado"])
+                ).count()
+                conv_rate = round((avanzadas / total_cots_for_rate) * 100, 1)
+            except Exception:
+                conv_rate = 0.0
+
             admin_lines = [
                 "",
                 "═══ MODO ADMIN ACTIVO ═══",
@@ -9896,6 +9927,10 @@ def _invoke_agent_for_whatsapp(
                 f"Clientes: {clientes_total} | Prospects: {prospects_total}",
                 f"Costos mes: Gemini ${spent_gemini:.4f} · Claude ${spent_claude:.4f}",
                 f"Alertas no leidas: {unread_alerts} (criticas: {critical_alerts})",
+                f"Conversion rate: {conv_rate}% (cot avanzadas / total)",
+                "",
+                f"[TOP 3 CLIENTES POR COTIZACIONES]:",
+                *(["- " + s for s in top_cli_summary] if top_cli_summary else ["(sin datos)"]),
                 "",
                 f"[ULTIMAS COTIZACIONES] ({len(cots_summary)}):",
                 *(["- " + s for s in cots_summary] if cots_summary else ["(ninguna)"]),
