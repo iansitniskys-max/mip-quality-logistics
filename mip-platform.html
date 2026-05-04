@@ -3109,15 +3109,21 @@ body.chooser-open .chat-greeting{display:none !important}
       <div class="chat-fab-opt-text"><span class="chat-fab-opt-title">WhatsApp</span><span class="chat-fab-opt-sub">Habla con un asesor</span></div>
     </div>
   </div>
-  <div class="chat-fab" id="chatFab" onclick="toggleFabChooser()">
-    <img class="fab-avatar" src="/images/avatar-mateo.jpg" alt="Mateo" style="width:40px;height:40px;border-radius:50%;object-fit:cover">
+  <div class="chat-fab" id="chatFab" onclick="toggleFabChooser()" title="¿Hablamos?" aria-label="Abrir opciones de contacto">
+    <i class="fas fa-comment-dots fab-icon" aria-hidden="true"></i>
+    <span class="fab-pulse-dot"></span>
   </div>
 </div>
-<div class="chat-greeting" id="chatGreeting" onclick="toggleChat()">
-  <div class="cg-avatar"><img src="/images/avatar-mateo.jpg" alt="Mateo" style="width:40px;height:40px;border-radius:50%;object-fit:cover"></div>
+<style>
+.chat-fab .fab-icon{font-size:24px;color:#fff;line-height:1}
+.chat-fab .fab-pulse-dot{position:absolute;top:8px;right:10px;width:10px;height:10px;background:#25D366;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 0 rgba(37,211,102,0.7);animation:fabPulse 2s ease-in-out infinite}
+@keyframes fabPulse{0%{box-shadow:0 0 0 0 rgba(37,211,102,0.6)}70%{box-shadow:0 0 0 10px rgba(37,211,102,0)}100%{box-shadow:0 0 0 0 rgba(37,211,102,0)}}
+</style>
+<div class="chat-greeting" id="chatGreeting" onclick="toggleFabChooser()">
+  <div class="cg-avatar" style="background:linear-gradient(135deg,#1a1a1a,#333);display:flex;align-items:center;justify-content:center;color:#e8af43"><i class="fas fa-comment-dots" style="font-size:18px"></i></div>
   <div class="cg-bubble">
-    <div class="cg-name">Mateo — Asesor de importaciones MIP</div>
-    <div class="cg-text">Hola, ¿necesitas ayuda con tu importación desde China?</div>
+    <div class="cg-name">¿Hablamos?</div>
+    <div class="cg-text">Cotiza con un asesor o por WhatsApp</div>
   </div>
   <button class="cg-close" onclick="event.stopPropagation();closeChatGreeting()"><i class="fas fa-times"></i></button>
 </div>
