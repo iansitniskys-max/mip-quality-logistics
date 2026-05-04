@@ -10852,6 +10852,134 @@ def health_nginx():
     return {"status": "ok"}
 
 
+@app.get("/api/admin/health-check")
+def admin_full_health_check(db: Session = Depends(get_db)):
+    """Health-check completo: valida estado de TODAS las integraciones.
+    Util para diagnostico admin desde un solo endpoint.
+    """
+    out = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "overall": "ok",  # ok | degraded | error
+        "services": {},
+    }
+    issues = []
+
+    # 1. DB
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1")).fetchone()
+        out["services"]["database"] = {"status": "ok", "info": "PostgreSQL responde"}
+    except Exception as e:
+        out["services"]["database"] = {"status": "error", "info": f"DB no responde: {str(e)[:100]}"}
+        issues.append("database")
+
+    # 2. Gemini API key
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        out["services"]["gemini"] = {"status": "warning", "info": "GEMINI_API_KEY no configurada"}
+        issues.append("gemini")
+    else:
+        out["services"]["gemini"] = {"status": "ok", "info": f"API key configurada (***{gemini_key[-4:] if len(gemini_key) >= 4 else ''})"}
+
+    # 3. Anthropic Claude
+    anth_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not anth_key:
+        out["services"]["anthropic"] = {"status": "warning", "info": "ANTHROPIC_API_KEY no configurada (sin fallback)"}
+    else:
+        out["services"]["anthropic"] = {"status": "ok", "info": f"API key configurada"}
+
+    # 4. SMTP
+    smtp_host = os.getenv("SMTP_HOST", "")
+    smtp_user = os.getenv("SMTP_USER", "")
+    if not smtp_host or not smtp_user:
+        out["services"]["smtp"] = {"status": "warning", "info": "SMTP no configurado"}
+    else:
+        out["services"]["smtp"] = {"status": "ok", "info": f"{smtp_user} via {smtp_host}"}
+
+    # 5. WhatsApp Kapso
+    kapso_ready = WHATSAPP_ENABLED and bool(KAPSO_API_KEY) and bool(KAPSO_PHONE_NUMBER_ID)
+    out["services"]["whatsapp"] = {
+        "status": "ok" if kapso_ready else "warning",
+        "info": f"Phone ID {KAPSO_PHONE_NUMBER_ID[-6:] if KAPSO_PHONE_NUMBER_ID else 'no config'} · enabled={WHATSAPP_ENABLED}",
+    }
+    if not kapso_ready:
+        issues.append("whatsapp")
+
+    # 6. Google Calendar OAuth
+    gcal_ready = bool(GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET and GOOGLE_OAUTH_REDIRECT_URI)
+    out["services"]["google_calendar"] = {
+        "status": "ok" if gcal_ready else "warning",
+        "info": "OAuth configurado" if gcal_ready else "Falta CLIENT_ID/SECRET/REDIRECT",
+    }
+
+    # 7. Cloud Storage buckets
+    try:
+        from google.cloud import storage as _gcs
+        client = _gcs.Client()
+        buckets_ok = []
+        buckets_fail = []
+        for bucket_name in [WHATSAPP_BUCKET, BRAND_BUCKET]:
+            try:
+                b = client.bucket(bucket_name)
+                if b.exists():
+                    buckets_ok.append(bucket_name)
+                else:
+                    buckets_fail.append(bucket_name)
+            except Exception:
+                buckets_fail.append(bucket_name)
+        out["services"]["cloud_storage"] = {
+            "status": "ok" if not buckets_fail else "warning",
+            "info": f"OK: {buckets_ok} · Fail: {buckets_fail}" if buckets_fail else f"Buckets accesibles: {buckets_ok}",
+        }
+    except Exception as e:
+        out["services"]["cloud_storage"] = {"status": "warning", "info": f"No se pudo verificar: {str(e)[:80]}"}
+
+    # 8. Cost limits configurados
+    try:
+        with engine.connect() as conn:
+            count_limits = conn.execute(text("SELECT COUNT(*) FROM cost_limits WHERE monthly_limit_usd > 0")).fetchone()[0]
+        out["services"]["cost_limits"] = {
+            "status": "ok" if count_limits > 0 else "warning",
+            "info": f"{count_limits} limit(s) configurados" if count_limits else "Sin limites configurados (riesgo de gasto descontrolado)",
+        }
+    except Exception:
+        out["services"]["cost_limits"] = {"status": "warning", "info": "No se pudo consultar"}
+
+    # 9. Admins WhatsApp
+    try:
+        admins_count = db.query(AdminWhatsAppUser).filter(AdminWhatsAppUser.activo == True).count()
+        out["services"]["admin_users"] = {
+            "status": "ok" if admins_count > 0 else "warning",
+            "info": f"{admins_count} admin(s) WhatsApp activos",
+        }
+    except Exception:
+        out["services"]["admin_users"] = {"status": "warning", "info": "No se pudo consultar"}
+
+    # 10. Cotizaciones pendientes >3d
+    try:
+        from datetime import timedelta as _td
+        cutoff = datetime.utcnow() - _td(days=3)
+        stale_count = db.query(Cotizacion).filter(
+            Cotizacion.estado == "pendiente",
+            Cotizacion.created_at <= cutoff,
+        ).count()
+        out["services"]["stale_cotizaciones"] = {
+            "status": "ok" if stale_count == 0 else "warning",
+            "info": f"{stale_count} cotizacion(es) sin atender hace 3+ dias" if stale_count else "Sin cotizaciones rezagadas",
+        }
+    except Exception:
+        out["services"]["stale_cotizaciones"] = {"status": "warning", "info": "No se pudo consultar"}
+
+    # Overall status
+    statuses = [s["status"] for s in out["services"].values()]
+    if "error" in statuses:
+        out["overall"] = "error"
+    elif "warning" in statuses:
+        out["overall"] = "degraded"
+    out["issues_count"] = sum(1 for s in statuses if s != "ok")
+    return out
+
+
 # Mount static images directory
 if os.path.isdir(IMAGES_DIR):
     app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
