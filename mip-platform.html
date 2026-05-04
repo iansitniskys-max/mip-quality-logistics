@@ -1639,6 +1639,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" onclick="aView('a-ops')"><i class="fas fa-project-diagram"></i> Gestión Operacional</a>
         <a class="sb-link" onclick="aView('a-acc')"><i class="fas fa-calculator"></i> Contabilidad</a>
         <a class="sb-link" onclick="aView('a-clients')"><i class="fas fa-users"></i> Clientes</a>
+        <a class="sb-link" onclick="aView('a-marcas-admin')"><i class="fas fa-palette"></i> Marcas <span class="cnt" id="admin-marcas-count" style="display:none;background:#e8af43;color:#1a1a1a">0</span></a>
         <a class="sb-link" onclick="aView('a-reports')"><i class="fas fa-chart-bar"></i> Reportes</a>
         <a class="sb-link" data-feature="proyectos" onclick="aView('a-proyectos')"><i class="fas fa-tasks"></i> Proyectos</a>
         <a class="sb-link" data-feature="proveedores" onclick="aView('a-proveedores')"><i class="fas fa-industry"></i> Proveedores</a>
@@ -3242,6 +3243,29 @@ html,body{overflow-x:hidden;max-width:100vw}
       </div>
     </div>
 
+    <!-- ADMIN: Marcas (panel global) -->
+    <div class="page-body" id="a-marcas-admin" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div>
+          <h2 style="font-size:18px;font-weight:600"><i class="fas fa-palette" style="margin-right:6px;color:#e8af43"></i>Marcas de clientes</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Inventario completo de marcas con assets que tus clientes registraron. Click para ver detalle.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="form-input" id="admin-marcas-search" placeholder="Buscar marca..." style="padding:6px 10px;font-size:12px;width:200px" oninput="loadAdminMarcas()">
+          <button class="btn btn-outline btn-sm" onclick="loadAdminMarcas()"><i class="fas fa-sync"></i></button>
+        </div>
+      </div>
+      <div id="admin-marcas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+        <div style="grid-column:1/-1;padding:24px;color:var(--text-muted);font-size:12px;text-align:center">Cargando...</div>
+      </div>
+    </div>
+    <!-- Admin marca detail modal -->
+    <div id="admin-marca-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;justify-content:center;align-items:center">
+      <div style="background:var(--bg);border-radius:var(--radius);max-width:680px;width:92%;max-height:90vh;overflow-y:auto;padding:24px">
+        <div id="admin-marca-modal-body"></div>
+      </div>
+    </div>
+
     <!-- ADMIN: Alertas del Sistema -->
     <div class="page-body" id="a-alerts" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -4140,10 +4164,10 @@ async function downloadBulkCSV() {
 
 // ─── Admin ───
 function aView(id) {
-  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-live-chats','a-whatsapp','a-agents','a-config','a-integrations','a-costs','a-editor','a-history','a-tickets','a-alerts'];
+  const ALL_VIEWS = ['a-req','a-ops','a-acc','a-clients','a-reports','a-proyectos','a-proveedores','a-prospects','a-emails','a-live-chats','a-whatsapp','a-agents','a-config','a-integrations','a-costs','a-editor','a-history','a-tickets','a-alerts','a-marcas-admin'];
   ALL_VIEWS.forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
   const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
-  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-whatsapp':'WhatsApp','a-agents':'Agent Builder','a-config':'Configuración','a-integrations':'Integraciones','a-costs':'Costos','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte','a-alerts':'Alertas del sistema' };
+  const t = { 'a-req':'Solicitudes entrantes','a-ops':'Gestión Operacional','a-acc':'Contabilidad & Gastos','a-clients':'Maestra de Clientes','a-reports':'Reportes & Análisis','a-proyectos':'Proyectos','a-proveedores':'Proveedores','a-prospects':'Prospects','a-emails':'Automatizaciones','a-whatsapp':'WhatsApp','a-agents':'Agent Builder','a-config':'Configuración','a-integrations':'Integraciones','a-costs':'Costos','a-editor':'Editor Web','a-history':'Historial del Sistema','a-tickets':'Tickets de Soporte','a-alerts':'Alertas del sistema','a-marcas-admin':'Marcas (admin)' };
   document.getElementById('aTitle').textContent = t[id] || 'Admin';
   const links = document.querySelectorAll('#page-admin .sb-link');
   links.forEach(l => l.classList.remove('active'));
@@ -4162,6 +4186,7 @@ function aView(id) {
   if (id === 'a-costs' && typeof loadCosts === 'function') loadCosts();
   if (id === 'a-whatsapp' && typeof loadWhatsApp === 'function') loadWhatsApp();
   if (id === 'a-alerts' && typeof loadAdminAlerts === 'function') loadAdminAlerts();
+  if (id === 'a-marcas-admin' && typeof loadAdminMarcas === 'function') loadAdminMarcas();
 }
 
 // ─── View Toggle: Pipeline / Table ───
@@ -6360,6 +6385,81 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); waSendCurrent(); }
   });
 });
+
+
+// ═══ ADMIN MARCAS GLOBAL ═══
+
+async function loadAdminMarcas() {
+  try {
+    const q = (document.getElementById('admin-marcas-search')?.value || '').trim();
+    const url = '/api/marcas' + (q ? `?q=${encodeURIComponent(q)}` : '');
+    const marcas = await api(url);
+    const badge = document.getElementById('admin-marcas-count');
+    if (badge) {
+      if (marcas.length > 0) { badge.style.display = 'inline-block'; badge.textContent = marcas.length; }
+      else badge.style.display = 'none';
+    }
+    const grid = document.getElementById('admin-marcas-grid');
+    if (!grid) return;
+    if (!marcas.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:32px;color:var(--text-muted);font-size:13px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius)">No hay marcas registradas. Cuando los clientes creen marcas en su portal, las veras aca.</div>';
+      return;
+    }
+    grid.innerHTML = marcas.map(m => {
+      const initial = (m.nombre || '?').charAt(0).toUpperCase();
+      const colores = (m.colores || []).slice(0, 5).map(c => `<div title="${c.hex}" style="width:14px;height:14px;border-radius:3px;background:${c.hex || '#ddd'};border:1px solid rgba(0,0,0,0.08)"></div>`).join('');
+      const logo = m.logo_principal_url
+        ? `<img src="${m.logo_principal_url}" style="width:100%;height:120px;object-fit:contain;background:#f8f8f5;border-radius:var(--radius) var(--radius) 0 0">`
+        : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#1a1a1a,#333);display:flex;align-items:center;justify-content:center;color:#e8af43;font-size:42px;font-weight:700;border-radius:var(--radius) var(--radius) 0 0">${initial}</div>`;
+      return `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:transform .15s, box-shadow .15s" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''" onclick="adminViewMarcaDetail(${m.id})">
+        ${logo}
+        <div style="padding:12px">
+          <div style="font-weight:600;font-size:13px">${escapeHtml(m.nombre)}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px"><i class="fas fa-user" style="margin-right:3px"></i>${escapeHtml(m.cliente_nombre || '?')}${m.cliente_empresa ? ' · ' + escapeHtml(m.cliente_empresa) : ''}</div>
+          ${m.sector ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px"><i class="fas fa-briefcase" style="margin-right:3px"></i>${escapeHtml(m.sector)}</div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+            <div style="display:flex;gap:3px">${colores}</div>
+            <div style="font-size:10px;color:var(--text-muted)"><i class="fas fa-folder"></i> ${m.assets_count || 0}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function adminViewMarcaDetail(marcaId) {
+  try {
+    const [marca, assets] = await Promise.all([
+      api(`/api/marcas/${marcaId}`),
+      api(`/api/marcas/${marcaId}/assets`),
+    ]);
+    let cli = null;
+    try { cli = await api(`/api/clientes/${marca.cliente_id}`); } catch {}
+    const html = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="font-size:16px;font-weight:600">${escapeHtml(marca.nombre)}</h3>
+        <button onclick="document.getElementById('admin-marca-modal').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px;margin-bottom:12px">
+        <b>Cliente:</b> ${cli ? escapeHtml(cli.nombre) + ' · ' + escapeHtml(cli.empresa || '') : '?'} <br>
+        <b>Sector:</b> ${escapeHtml(marca.sector || '—')} <br>
+        ${marca.sitio_web ? `<b>Web:</b> <a href="${marca.sitio_web}" target="_blank">${escapeHtml(marca.sitio_web)}</a><br>` : ''}
+        ${marca.descripcion ? `<b>Descripcion:</b> ${escapeHtml(marca.descripcion)}<br>` : ''}
+        ${marca.notas ? `<b>Briefing:</b> ${escapeHtml(marca.notas)}` : ''}
+      </div>
+      <h4 style="font-size:13px;font-weight:600;margin-bottom:8px">Assets (${assets.length})</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;max-height:50vh;overflow-y:auto">
+        ${assets.length ? assets.map(a => `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:6px">
+          ${a.mime_type && a.mime_type.startsWith('image/') ? `<img src="${a.archivo_url}" style="width:100%;height:70px;object-fit:contain;background:#f8f8f5;border-radius:3px">` : `<div style="width:100%;height:70px;background:#f8f8f5;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:24px"><i class="fas fa-${a.extension==='pdf'?'file-pdf':a.extension==='zip'?'file-archive':'file'}"></i></div>`}
+          <div style="font-size:10px;font-weight:600;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(a.nombre)}">${escapeHtml(a.nombre)}</div>
+          <a href="${a.archivo_url}" target="_blank" class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 6px;width:100%;text-align:center;text-decoration:none;margin-top:4px"><i class="fas fa-download"></i></a>
+        </div>`).join('') : '<div style="grid-column:1/-1;padding:14px;color:var(--text-muted);font-size:11px;text-align:center">Sin assets</div>'}
+      </div>
+    `;
+    document.getElementById('admin-marca-modal-body').innerHTML = html;
+    document.getElementById('admin-marca-modal').style.display = 'flex';
+  } catch (e) { toast('error', 'Error', e.message); }
+}
 
 
 // ═══ ADMIN ALERTS ═══
