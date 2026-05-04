@@ -22,6 +22,7 @@ from models import (
     ConversationPipeline, PipelineStageLog, AgentIntegration, HumanHandoff,
     StageAssignment, AgentAutoRule,
     WhatsAppConversation, WhatsAppMessage, WhatsAppMockup,
+    AdminAlert, AdminWhatsAppUser,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -453,18 +454,18 @@ def admin_invite(data: dict, db: Session = Depends(get_db)):
     invite_link = f"{APP_URL}#invite={token}&email={email}"
 
     # Send invitation email
-    subject = "Invitaci\u00f3n Admin \u2014 MIP Quality & Logistics"
+    subject = "Invitaci\u00f3n Admin \u2014 MIP Quality Sourcing"
     body = (
         f"Hola {nombre or email},\n\n"
-        f"Has sido invitado/a como administrador en la plataforma MIP Quality & Logistics.\n\n"
+        f"Has sido invitado/a como administrador en la plataforma MIP Quality Sourcing.\n\n"
         f"Para acceder, ingresa con tu cuenta de Google o regístrate en el siguiente enlace:\n"
         f"{invite_link}\n\n"
         f"Tu rol de administrador ya está activo.\n\n"
-        f"— MIP Quality & Logistics Platform"
+        f"— MIP Quality Sourcing Platform"
     )
     html = _wrap_html_email(
         title=f"Bienvenido al equipo MIP, {email.split('@')[0]}",
-        body_html=f"<p>Se te ha otorgado acceso de <strong>administrador</strong> a la plataforma MIP Quality & Logistics.</p><p>Con tu cuenta podrás gestionar clientes, cotizaciones, proyectos, facturación y más.</p>",
+        body_html=f"<p>Se te ha otorgado acceso de <strong>administrador</strong> a la plataforma MIP Quality Sourcing.</p><p>Con tu cuenta podrás gestionar clientes, cotizaciones, proyectos, facturación y más.</p>",
         cta_label="Acceder a la plataforma",
         cta_url=invite_link,
     )
@@ -482,10 +483,10 @@ def admin_invite_client(data: dict, db: Session = Depends(get_db)):
     if not email:
         raise HTTPException(400, "Email requerido")
     app_url = os.getenv("APP_URL", "https://miptrust.cl")
-    subject = f"Bienvenido a MIP Quality & Logistics, {nombre or 'amigo/a'}"
+    subject = f"Bienvenido a MIP Quality Sourcing, {nombre or 'amigo/a'}"
     body = message or (
         f"Hola {nombre},\n\n"
-        f"Te invitamos a acceder a tu portal en MIP Quality & Logistics.\n"
+        f"Te invitamos a acceder a tu portal en MIP Quality Sourcing.\n"
         f"Ahí vas a poder ver el avance de tus proyectos, descargar cotizaciones y hablar con nuestro equipo.\n\n"
         f"Ingresá en: {app_url}\n\n"
         f"— Equipo MIP"
@@ -493,7 +494,7 @@ def admin_invite_client(data: dict, db: Session = Depends(get_db)):
     html = _wrap_html_email(
         title=f"Hola {nombre or 'amigo/a'}, bienvenido a MIP",
         body_html=(message.replace("\n", "<br>") if message else
-                   "<p>Te invitamos a acceder a tu portal en MIP Quality & Logistics.</p>"
+                   "<p>Te invitamos a acceder a tu portal en MIP Quality Sourcing.</p>"
                    "<p>Desde ahí vas a poder:</p>"
                    "<ul><li>Ver el avance de tus cotizaciones y pedidos</li>"
                    "<li>Descargar facturas, cotizaciones formales y archivos</li>"
@@ -677,6 +678,28 @@ def crear_cotizacion(data: CotizacionCreate, db: Session = Depends(get_db)):
     db.add(cot)
     db.commit()
     db.refresh(cot)
+    # Trigger alerta admin: nueva cotizacion
+    try:
+        cliente = db.query(Cliente).filter(Cliente.id == cot.cliente_id).first()
+        cliente_nombre = cliente.nombre if cliente else f"Cliente #{cot.cliente_id}"
+        empresa = (cliente.empresa or "") if cliente else ""
+        producto = (cot.proyecto_nombre or cot.producto or "Sin nombre")[:80]
+        _emit_admin_alert(
+            tipo="new_cotizacion",
+            severity="warning",
+            title=f"Nueva cotizacion: {producto}",
+            message=f"De: {cliente_nombre}{(' (' + empresa + ')') if empresa else ''}.\n"
+                    f"Cantidad: {cot.cantidad or '-'}\n"
+                    f"Plazo: {cot.plazo or '-'}\n"
+                    f"Ver detalle en miptrust.cl > Solicitudes #{cot.id}",
+            metadata={"cotizacion_id": cot.id, "cliente_id": cot.cliente_id,
+                      "producto": producto, "cantidad": cot.cantidad},
+            source="cotizacion_create",
+            related_id=cot.id, related_type="cotizacion",
+            db=db,
+        )
+    except Exception as e:
+        print(f"[alert new_cotizacion] {e}")
     return cot
 
 
@@ -710,7 +733,7 @@ def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
         f"Uso final: {cot.uso_final or '-'}\n"
         f"Personalización: {cot.personalizacion or 'No'}\n\n"
         f"Ver en plataforma: {app_url}\n\n"
-        f"— MIP Quality & Logistics Platform"
+        f"— MIP Quality Sourcing Platform"
     )
     html_team = _wrap_html_email(
         title=f"Nueva cotización #{cot.id}",
@@ -748,12 +771,12 @@ def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
             f"- Plazo: {cot.plazo or 'por confirmar'}\n\n"
             f"Podés ver el estado en vivo en: {app_url}\n\n"
             f"Gracias por confiar en nosotros.\n\n"
-            f"— Equipo MIP Quality & Logistics"
+            f"— Equipo MIP Quality Sourcing"
         )
         html_client = _wrap_html_email(
             title=f"Recibimos tu solicitud, {cliente_nombre}",
             body_html=(
-                f"<p>Gracias por tu interés en MIP Quality & Logistics. Recibimos tu solicitud de cotización y ya estamos trabajando en ella.</p>"
+                f"<p>Gracias por tu interés en MIP Quality Sourcing. Recibimos tu solicitud de cotización y ya estamos trabajando en ella.</p>"
                 f"<p><strong>Número de solicitud:</strong> #SOL-{str(cot.id).zfill(3)}</p>"
                 f"<p><strong>¿Qué sigue?</strong></p>"
                 f"<ol><li>Nuestro equipo revisa tu solicitud (hoy)</li>"
@@ -1505,7 +1528,7 @@ def _smtp_config():
         "port": int(os.getenv("SMTP_PORT", "587")),
         "user": os.getenv("SMTP_USER", ""),
         "password": os.getenv("SMTP_PASS", ""),
-        "from_name": os.getenv("SMTP_FROM_NAME", "MIP Quality & Logistics"),
+        "from_name": os.getenv("SMTP_FROM_NAME", "MIP Quality Sourcing"),
         "from_email": os.getenv("SMTP_FROM_EMAIL", "") or os.getenv("SMTP_USER", ""),
         "reply_to": os.getenv("SMTP_REPLY_TO", ""),
     }
@@ -1528,7 +1551,7 @@ def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url:
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
         <tr><td style="background:#0f172a;padding:20px 24px;color:#fff">
           <div style="display:inline-block;width:40px;height:40px;background:#f59e0b;border-radius:8px;vertical-align:middle;margin-right:12px"></div>
-          <span style="font-size:18px;font-weight:700;vertical-align:middle">MIP Quality & Logistics</span>
+          <span style="font-size:18px;font-weight:700;vertical-align:middle">MIP Quality Sourcing</span>
         </td></tr>
         <tr><td style="padding:28px 28px 8px 28px">
           <h2 style="margin:0 0 14px 0;font-size:20px;color:#0f172a">{title}</h2>
@@ -1536,7 +1559,7 @@ def _wrap_html_email(title: str, body_html: str, cta_label: str = None, cta_url:
           {cta_html}
         </td></tr>
         <tr><td style="padding:16px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
-          MIP Quality & Logistics · Importación y logística desde China<br>
+          MIP Quality Sourcing · Importación y logística desde China<br>
           Si tenés preguntas, respondé directamente a este email.
           {('<br>' + footer_extra) if footer_extra else ''}
         </td></tr>
@@ -1758,7 +1781,7 @@ def email_test(data: dict, db: Session = Depends(get_db)):
     )
     result = _send_email(
         to=to,
-        subject="✅ Test de email — MIP Quality & Logistics",
+        subject="✅ Test de email — MIP Quality Sourcing",
         body="Este email confirma que tu configuración SMTP está funcionando correctamente.",
         html=html,
         db=db,
@@ -2043,7 +2066,7 @@ def update_ticket(id: int, data: dict, db: Session = Depends(get_db)):
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-MATEO_SYSTEM_PROMPT = """Eres Mateo, asesor senior de importaciones de MIP Quality & Logistics, broker de importación desde China con oficinas en Shenzhen, Guangzhou y Santiago de Chile. Tienes 8 años de experiencia cerrando negocios de importación y eres el mejor vendedor de la empresa.
+MATEO_SYSTEM_PROMPT = """Eres Mateo, asesor senior de importaciones de MIP Quality Sourcing, broker de importación desde China con oficinas en Shenzhen, Guangzhou y Santiago de Chile. Tienes 8 años de experiencia cerrando negocios de importación y eres el mejor vendedor de la empresa.
 
 PERSONALIDAD Y TONO:
 - Cercano, seguro y persuasivo. Usas "tú" (no "usted"). Hablas como un ejecutivo de cuentas senior que sabe lo que hace.
@@ -2182,7 +2205,7 @@ def chat_with_mateo(data: dict, db: Session = Depends(get_db)):
 
     # Both failed or no keys configured
     return {
-        "reply": "¡Hola! Soy Mateo de MIP Quality & Logistics. En este momento estoy teniendo problemas técnicos, pero puedes escribirnos a contacto@mipquality.com o al +56 9 8765 4321 por WhatsApp y te atendemos de inmediato.",
+        "reply": "¡Hola! Soy Mateo de MIP Quality Sourcing. En este momento estoy teniendo problemas técnicos, pero puedes escribirnos a contacto@mipquality.com o al +56 9 8765 4321 por WhatsApp y te atendemos de inmediato.",
         "provider": "fallback"
     }
 
@@ -2437,7 +2460,7 @@ def mateo_book_meeting(data: dict, db: Session = Depends(get_db)):
     email = data.get('email', '').strip()
     nombre = data.get('nombre', '').strip()
     fecha_str = data.get('fecha', '').strip()
-    motivo = data.get('motivo', 'Reunion MIP Quality & Logistics')
+    motivo = data.get('motivo', 'Reunion MIP Quality Sourcing')
     conversation_id = data.get('conversation_id')
     if not email or not fecha_str:
         raise HTTPException(400, "Requiere email y fecha")
@@ -2464,7 +2487,7 @@ def mateo_book_meeting(data: dict, db: Session = Depends(get_db)):
         log = EmailLog(
             destinatario=email,
             asunto=f"Reunion MIP confirmada - {fecha.strftime('%d/%m/%Y %H:%M')}",
-            cuerpo=f"Hola {nombre},\n\nTu reunion con MIP Quality & Logistics esta confirmada.\n\n"
+            cuerpo=f"Hola {nombre},\n\nTu reunion con MIP Quality Sourcing esta confirmada.\n\n"
                    f"Fecha: {fecha.strftime('%d/%m/%Y a las %H:%M')}\nMotivo: {motivo}\n"
                    f"Link Meet: {meet_link}\n\nSaludos,\nEquipo MIP",
             estado="pendiente",
@@ -2599,7 +2622,7 @@ def chat_with_mateo_v2(data: dict, db: Session = Depends(get_db)):
             print(f"Claude v2 error: {e}")
 
     if not reply_text:
-        reply_text = "Hola! Soy Mateo de MIP Quality & Logistics. Ahora mismo estoy con problemas tecnicos, pero puedes escribirnos a contacto@mipquality.com."
+        reply_text = "Hola! Soy Mateo de MIP Quality Sourcing. Ahora mismo estoy con problemas tecnicos, pero puedes escribirnos a contacto@mipquality.com."
         provider_used = "fallback"
 
     # Extract lead data & booking action
@@ -2998,7 +3021,7 @@ def _seed_agent_builder(db):
     agent = AgentConfig(
         agent_type="mateo-sdr",
         display_name=display_name,
-        descripcion="Asesor senior de importaciones MIP Quality & Logistics. Atiende leads entrantes, califica, cotiza y agenda reuniones.",
+        descripcion="Asesor senior de importaciones MIP Quality Sourcing. Atiende leads entrantes, califica, cotiza y agenda reuniones.",
         avatar="🤵",
         modelo=modelo,
         activo=True,
@@ -3083,7 +3106,7 @@ def _seed_additional_agents(db):
         db.commit()
         db.refresh(carla)
         _add_agent_blocks(carla, db, [
-            ("personificacion", "identidad", "Personalidad", 0, """Eres Carla, ejecutiva de cierre senior de MIP Quality & Logistics. Tienes 10 años de experiencia cerrando ventas B2B de importacion. Eres directa, profesional, orientada a numeros y a cerrar.
+            ("personificacion", "identidad", "Personalidad", 0, """Eres Carla, ejecutiva de cierre senior de MIP Quality Sourcing. Tienes 10 años de experiencia cerrando ventas B2B de importacion. Eres directa, profesional, orientada a numeros y a cerrar.
 
 Usas 'tu' en espanol chileno, tono cercano pero con autoridad comercial. Nunca regateas, defiendes el valor."""),
             ("formato", "identidad", "Formato respuesta", 20, """RESPUESTAS:
@@ -3132,7 +3155,7 @@ Usas 'tu' en espanol chileno, tono cercano pero con autoridad comercial. Nunca r
         db.commit()
         db.refresh(paula)
         _add_agent_blocks(paula, db, [
-            ("personificacion", "identidad", "Personalidad", 0, """Eres Paula, del equipo de Atencion al Cliente de MIP Quality & Logistics. Empatica, paciente y orientada a resolver. Haces que el cliente se sienta escuchado y acompañado durante todo el proceso de su importacion.
+            ("personificacion", "identidad", "Personalidad", 0, """Eres Paula, del equipo de Atencion al Cliente de MIP Quality Sourcing. Empatica, paciente y orientada a resolver. Haces que el cliente se sienta escuchado y acompañado durante todo el proceso de su importacion.
 
 Usas 'tu', tono calido y profesional."""),
             ("formato", "identidad", "Formato", 20, """- Mensajes empaticos, maximo 3 parrafos.
@@ -3170,7 +3193,7 @@ Usas 'tu', tono calido y profesional."""),
         db.commit()
         db.refresh(diego)
         _add_agent_blocks(diego, db, [
-            ("personificacion", "identidad", "Personalidad", 0, """Eres Diego, especialista en recuperacion de clientes de MIP Quality & Logistics. Humilde, curioso, empatico. Tu mision NO es vender a la fuerza, es entender que paso y dejar la puerta abierta con valor.
+            ("personificacion", "identidad", "Personalidad", 0, """Eres Diego, especialista en recuperacion de clientes de MIP Quality Sourcing. Humilde, curioso, empatico. Tu mision NO es vender a la fuerza, es entender que paso y dejar la puerta abierta con valor.
 
 Usas 'tu', tono conversacional, genuinamente interesado."""),
             ("formato", "identidad", "Formato", 20, """- Corto y conciso. Respeta el tiempo del cliente.
@@ -5727,7 +5750,7 @@ def _generate_conversation_summary(messages: list, pipeline) -> str:
         transcript_lines.append(f"{speaker}: {(content or '')[:500]}")
     transcript = "\n".join(transcript_lines)
 
-    prompt = f"""Eres un analista de ventas. Resume la siguiente conversacion entre un cliente y un agente de MIP Quality & Logistics (broker de importacion China-Chile).
+    prompt = f"""Eres un analista de ventas. Resume la siguiente conversacion entre un cliente y un agente de MIP Quality Sourcing (broker de importacion China-Chile).
 
 CONVERSACION:
 {transcript}
@@ -6681,9 +6704,51 @@ def _check_cost_limit(provider: str, db=None):
             if not row:
                 return  # sin limite configurado, dejar pasar
             monthly_limit, hard_block = row[0] or 0.0, bool(row[1])
-            if monthly_limit <= 0 or not hard_block:
-                return  # limite en 0 o bloqueo desactivado
+            if monthly_limit <= 0:
+                return  # limite en 0
             spent = _get_monthly_spent(provider, db)
+            # Emitir alertas a 80% (warning) y 100% (critical) - una vez por dia
+            try:
+                pct = (spent / monthly_limit) if monthly_limit > 0 else 0
+                from datetime import timedelta as _td
+                day_ago = datetime.utcnow() - _td(hours=20)
+                from sqlalchemy.orm import Session as _S
+                with _S(engine) as _adb:
+                    if pct >= 1.0:
+                        recent = _adb.query(AdminAlert).filter(
+                            AdminAlert.tipo == "cost_limit_exceeded",
+                            AdminAlert.metadata_json.like(f"%{provider}%"),
+                            AdminAlert.created_at >= day_ago,
+                        ).first()
+                        if not recent:
+                            _emit_admin_alert(
+                                tipo="cost_limit_exceeded", severity="critical",
+                                title=f"Limite mensual {provider.upper()} alcanzado",
+                                message=f"Gasto: ${spent:.4f} / limite: ${monthly_limit:.2f} ({pct*100:.0f}%). " + (
+                                    "El servicio esta BLOQUEADO automaticamente." if hard_block else
+                                    "Hard-block desactivado. Las llamadas siguen pasando."
+                                ),
+                                metadata={"provider": provider, "spent": spent, "limit": monthly_limit, "pct": pct},
+                                source="cost_guard", db=_adb,
+                            )
+                    elif pct >= 0.8:
+                        recent = _adb.query(AdminAlert).filter(
+                            AdminAlert.tipo == "cost_limit_warning",
+                            AdminAlert.metadata_json.like(f"%{provider}%"),
+                            AdminAlert.created_at >= day_ago,
+                        ).first()
+                        if not recent:
+                            _emit_admin_alert(
+                                tipo="cost_limit_warning", severity="warning",
+                                title=f"Costo {provider.upper()} al {pct*100:.0f}%",
+                                message=f"Gasto: ${spent:.4f} / limite: ${monthly_limit:.2f}. Considera aumentar el limite o revisar consumo.",
+                                metadata={"provider": provider, "spent": spent, "limit": monthly_limit, "pct": pct},
+                                source="cost_guard", db=_adb,
+                            )
+            except Exception as e:
+                print(f"[cost-guard alert] {e}")
+            if not hard_block:
+                return  # alertamos pero no bloqueamos
             if spent >= monthly_limit:
                 # Log al historial de actividades
                 try:
@@ -6829,17 +6894,115 @@ def get_cost_limits(db: Session = Depends(get_db)):
     out = []
     try:
         with engine.connect() as conn:
-            rows = conn.execute(text("SELECT id, provider, monthly_limit_usd, alert_pct, hard_block, billing_account, billing_card_last4, notas FROM cost_limits ORDER BY provider")).fetchall()
+            rows = conn.execute(text("""
+                SELECT id, provider, monthly_limit_usd, alert_pct, hard_block,
+                       billing_account, billing_card_last4, notas,
+                       portal_url, alert_email, descripcion, categoria,
+                       COALESCE(activo, TRUE) as activo
+                FROM cost_limits ORDER BY provider
+            """)).fetchall()
             for r in rows:
                 out.append({
                     "id": r[0], "provider": r[1], "monthly_limit_usd": r[2] or 0,
                     "alert_pct": r[3] or 80, "hard_block": bool(r[4]),
                     "billing_account": r[5] or "", "billing_card_last4": r[6] or "",
                     "notas": r[7] or "",
+                    "portal_url": r[8] or "",
+                    "alert_email": r[9] or "",
+                    "descripcion": r[10] or "",
+                    "categoria": r[11] or "otro",
+                    "activo": bool(r[12]) if r[12] is not None else True,
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[get_cost_limits] {e}")
     return out
+
+
+@app.get("/api/admin/billing/services")
+def billing_services(db: Session = Depends(get_db)):
+    """Catalogo completo de servicios con tarjeta + gasto actual + URL portal.
+
+    Combina cost_limits (configuracion) con _get_monthly_spent (gasto real) + status.
+    Devuelve lista ordenada por gasto descendente.
+    Para usar en Configuracion > Billing dashboard.
+    """
+    services = []
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT provider, monthly_limit_usd, alert_pct, hard_block,
+                       billing_account, billing_card_last4, notas,
+                       portal_url, alert_email, descripcion, categoria,
+                       COALESCE(activo, TRUE) as activo
+                FROM cost_limits
+                WHERE COALESCE(activo, TRUE) = TRUE
+                ORDER BY provider
+            """)).fetchall()
+            for r in rows:
+                provider = r[0]
+                monthly_limit = r[1] or 0.0
+                alert_pct = r[2] or 80
+                spent = _get_monthly_spent(provider, None)
+                pct_used = (spent / monthly_limit * 100) if monthly_limit > 0 else 0
+                if monthly_limit > 0 and pct_used >= 100:
+                    status = "exceeded"
+                elif monthly_limit > 0 and pct_used >= alert_pct:
+                    status = "warning"
+                elif monthly_limit > 0:
+                    status = "ok"
+                else:
+                    status = "unmetered"  # sin limit configurado
+                services.append({
+                    "provider": provider,
+                    "billing_account": r[4] or "",
+                    "card_last4": r[5] or "",
+                    "categoria": r[10] or "otro",
+                    "descripcion": r[9] or "",
+                    "portal_url": r[7] or "",
+                    "monthly_limit_usd": monthly_limit,
+                    "alert_pct": alert_pct,
+                    "hard_block": bool(r[3]),
+                    "alert_email": r[8] or "",
+                    "spent_this_month_usd": round(spent, 4),
+                    "pct_used": round(pct_used, 1),
+                    "status": status,
+                    "notas": r[6] or "",
+                })
+    except Exception as e:
+        print(f"[billing_services] error: {e}")
+    # Sort por gasto desc
+    services.sort(key=lambda s: s.get("spent_this_month_usd", 0), reverse=True)
+    return services
+
+
+@app.put("/api/admin/billing/services/{provider}")
+def update_billing_service(provider: str, data: dict, db: Session = Depends(get_db)):
+    """Actualiza info de tarjeta / portal / categoria de un servicio.
+    No modifica los limits/hard_block (esos van por /api/admin/costs/limits).
+    """
+    fields_allowed = {"billing_account", "billing_card_last4", "portal_url",
+                      "alert_email", "descripcion", "categoria", "activo"}
+    updates = {k: v for k, v in data.items() if k in fields_allowed}
+    if not updates:
+        raise HTTPException(400, "Sin campos validos para actualizar")
+    try:
+        with engine.connect() as conn:
+            existing = conn.execute(text("SELECT id FROM cost_limits WHERE provider = :p"),
+                                    {"p": provider}).fetchone()
+            if not existing:
+                # Crear row nueva minima
+                conn.execute(text("""
+                    INSERT INTO cost_limits (provider, monthly_limit_usd, alert_pct, hard_block, activo)
+                    VALUES (:p, 0, 80, FALSE, TRUE)
+                """), {"p": provider})
+            set_clause = ", ".join([f"{k} = :{k}" for k in updates.keys()])
+            params = dict(updates)
+            params["p"] = provider
+            conn.execute(text(f"UPDATE cost_limits SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE provider = :p"), params)
+            conn.commit()
+        return {"updated": True, "provider": provider, "fields": list(updates.keys())}
+    except Exception as e:
+        raise HTTPException(500, f"Error: {e}")
 
 
 @app.put("/api/admin/costs/limits/{provider}")
@@ -7093,7 +7256,7 @@ def _send_email_log_now(log: EmailLog) -> bool:
         is_html = "<html" in body.lower() or "<body" in body.lower() or "<table" in body.lower()
         if is_html:
             msg = MIMEMultipart("alternative")
-            msg["Subject"] = log.asunto or "MIP Quality & Logistics"
+            msg["Subject"] = log.asunto or "MIP Quality Sourcing"
             msg["From"] = f"{cfg['from_name']} <{cfg['from_email']}>"
             msg["To"] = log.destinatario
             if cfg["reply_to"]: msg["Reply-To"] = cfg["reply_to"]
@@ -7104,7 +7267,7 @@ def _send_email_log_now(log: EmailLog) -> bool:
             msg.attach(MIMEText(body, "html", "utf-8"))
         else:
             msg = MIMEText(body, "plain", "utf-8")
-            msg["Subject"] = log.asunto or "MIP Quality & Logistics"
+            msg["Subject"] = log.asunto or "MIP Quality Sourcing"
             msg["From"] = f"{cfg['from_name']} <{cfg['from_email']}>"
             msg["To"] = log.destinatario
             if cfg["reply_to"]: msg["Reply-To"] = cfg["reply_to"]
@@ -7889,6 +8052,380 @@ KAPSO_API_VERSION = os.getenv("KAPSO_API_VERSION", "v24.0")
 WHATSAPP_ENABLED = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
 NANO_BANANA_ENABLED = os.getenv("NANO_BANANA_ENABLED", "false").lower() == "true"
 WHATSAPP_BUCKET = os.getenv("WHATSAPP_BUCKET", "mip-quality-whatsapp-media")
+# Numero del admin para recibir alertas via WhatsApp + activar modo admin en Mateo
+# Formato E.164 sin '+' (igual que como Kapso lo usa). Ej: 56966491761
+ADMIN_WHATSAPP_NUMBER = os.getenv("ADMIN_WHATSAPP_NUMBER", "56966491761")
+
+
+# ─── Sistema de alertas para admin ───
+
+def _emit_admin_alert(
+    tipo: str,
+    title: str,
+    message: str,
+    severity: str = "info",
+    metadata: Optional[dict] = None,
+    source: str = "",
+    related_id: Optional[int] = None,
+    related_type: Optional[str] = None,
+    db: Optional[Session] = None,
+    notify_whatsapp: bool = True,
+) -> Optional[int]:
+    """Emite una alerta al admin: persiste en DB + opcional WhatsApp.
+
+    Severity:
+      - 'info': solo persiste, no notifica.
+      - 'warning': persiste + WhatsApp si notify=True.
+      - 'critical': persiste + WhatsApp siempre.
+
+    Returns alert_id si exitoso.
+    """
+    own_db = False
+    if db is None:
+        from sqlalchemy.orm import Session as _S
+        db = _S(engine)
+        own_db = True
+    alert_id = None
+    try:
+        meta_str = json.dumps(metadata or {}, default=str)[:5000]
+        alert = AdminAlert(
+            tipo=tipo, severity=severity, title=title[:300], message=message,
+            metadata_json=meta_str, source=source[:50] if source else "",
+            related_id=related_id, related_type=related_type,
+        )
+        db.add(alert)
+        db.commit()
+        db.refresh(alert)
+        alert_id = alert.id
+
+        # Notificar WhatsApp a TODOS los admin elegibles segun permisos
+        should_send_wa = (
+            severity in ("warning", "critical")
+            and notify_whatsapp
+            and WHATSAPP_ENABLED
+        )
+        if should_send_wa:
+            emoji = "🚨" if severity == "critical" else "⚠️"
+            wa_text = f"{emoji} *{title}*\n\n{message}"[:1500]
+            recipients = _get_alert_recipients(severity, tipo, db)
+            sent_count = 0
+            last_msg_id = None
+            for phone in recipients:
+                try:
+                    result = _send_text(phone, wa_text)
+                    if result.get("status") == "sent":
+                        sent_count += 1
+                        response = result.get("response") or {}
+                        if isinstance(response, dict):
+                            msgs = response.get("messages") or []
+                            if msgs and isinstance(msgs[0], dict):
+                                last_msg_id = msgs[0].get("id") or last_msg_id
+                except Exception as e:
+                    print(f"[_emit_admin_alert wa->{phone}] error: {e}")
+            if sent_count > 0:
+                alert.sent_to_whatsapp = True
+                alert.whatsapp_sent_at = datetime.utcnow()
+                if last_msg_id:
+                    alert.whatsapp_message_id = last_msg_id
+                db.commit()
+
+        # Email tambien para criticas (best-effort)
+        if severity == "critical":
+            try:
+                admin_email = os.getenv("ADMIN_NOTIFY_EMAIL", "")
+                if admin_email:
+                    _send_email(
+                        to=admin_email,
+                        subject=f"🚨 [MIP] {title}",
+                        html=f"<h3>{title}</h3><p>{message}</p><pre>{meta_str[:1000]}</pre>",
+                        tipo=f"admin_alert_{tipo}",
+                        db=db,
+                    )
+            except Exception as e:
+                print(f"[_emit_admin_alert email] error: {e}")
+    except Exception as e:
+        print(f"[_emit_admin_alert] error: {e}")
+    finally:
+        if own_db:
+            try:
+                db.close()
+            except Exception:
+                pass
+    return alert_id
+
+
+def _is_admin_phone(phone: str, db: Optional[Session] = None) -> Optional[AdminWhatsAppUser]:
+    """Devuelve el AdminWhatsAppUser activo que matchea con el phone, o None.
+    Fallback: si no hay tabla o no encuentra, compara con ADMIN_WHATSAPP_NUMBER.
+    """
+    norm = _normalize_phone(phone)
+    if not norm:
+        return None
+    own_db = False
+    if db is None:
+        from sqlalchemy.orm import Session as _S
+        db = _S(engine)
+        own_db = True
+    try:
+        users = db.query(AdminWhatsAppUser).filter(AdminWhatsAppUser.activo == True).all()
+        for u in users:
+            if _normalize_phone(u.phone_number) == norm:
+                return u
+        # Fallback al env var legacy
+        if ADMIN_WHATSAPP_NUMBER and norm == _normalize_phone(ADMIN_WHATSAPP_NUMBER):
+            # Crear sintetico (no persistido) con permisos default admin
+            class _Synth:
+                phone_number = ADMIN_WHATSAPP_NUMBER
+                nombre = "Admin (env var)"
+                rol = "admin"
+                activo = True
+                receive_alerts = True
+                alert_severity_min = "warning"
+                can_query_metrics = True
+                can_query_prospects = True
+                can_query_costs = True
+                can_modify_settings = True
+                can_takeover_chats = True
+                alert_tipos_subscribed = "[]"
+            return _Synth()
+        return None
+    except Exception as e:
+        print(f"[_is_admin_phone] error: {e}")
+        return None
+    finally:
+        if own_db:
+            try:
+                db.close()
+            except Exception:
+                pass
+
+
+def _get_alert_recipients(severity: str, tipo: str, db: Optional[Session] = None) -> list:
+    """Devuelve lista de phone_numbers admin que deben recibir esta alerta.
+    Aplica filtros: receive_alerts=True, severity >= alert_severity_min,
+    tipo NO en blacklist (alert_tipos_subscribed vacio = todos).
+    """
+    own_db = False
+    if db is None:
+        from sqlalchemy.orm import Session as _S
+        db = _S(engine)
+        own_db = True
+    recipients = []
+    sev_rank = {"info": 0, "warning": 1, "critical": 2}
+    sev_n = sev_rank.get(severity, 1)
+    try:
+        users = db.query(AdminWhatsAppUser).filter(
+            AdminWhatsAppUser.activo == True,
+            AdminWhatsAppUser.receive_alerts == True,
+        ).all()
+        for u in users:
+            if sev_rank.get(u.alert_severity_min or "warning", 1) > sev_n:
+                continue
+            try:
+                tipos = json.loads(u.alert_tipos_subscribed or "[]")
+                if tipos and tipo not in tipos:
+                    continue
+            except Exception:
+                pass
+            recipients.append(u.phone_number)
+        # Fallback al env var si no hay users config
+        if not recipients and ADMIN_WHATSAPP_NUMBER:
+            recipients.append(ADMIN_WHATSAPP_NUMBER)
+    except Exception as e:
+        print(f"[_get_alert_recipients] {e}")
+        if ADMIN_WHATSAPP_NUMBER:
+            recipients.append(ADMIN_WHATSAPP_NUMBER)
+    finally:
+        if own_db:
+            try:
+                db.close()
+            except Exception:
+                pass
+    return recipients
+
+
+# ─── Endpoints admin alerts ───
+
+@app.get("/api/admin/alerts")
+def list_admin_alerts(
+    status: str = "unread",  # unread, all, dismissed
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    q = db.query(AdminAlert)
+    if status == "unread":
+        q = q.filter(AdminAlert.read_at.is_(None), AdminAlert.dismissed_at.is_(None))
+    elif status == "dismissed":
+        q = q.filter(AdminAlert.dismissed_at.isnot(None))
+    items = q.order_by(AdminAlert.created_at.desc()).limit(limit).all()
+    out = []
+    for a in items:
+        try:
+            meta = json.loads(a.metadata_json or "{}")
+        except Exception:
+            meta = {}
+        out.append({
+            "id": a.id, "tipo": a.tipo, "severity": a.severity,
+            "title": a.title, "message": a.message, "metadata": meta,
+            "source": a.source or "", "related_id": a.related_id,
+            "related_type": a.related_type,
+            "sent_to_whatsapp": a.sent_to_whatsapp,
+            "read_at": a.read_at.isoformat() if a.read_at else None,
+            "dismissed_at": a.dismissed_at.isoformat() if a.dismissed_at else None,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+    return out
+
+
+@app.get("/api/admin/alerts/count")
+def count_admin_alerts(db: Session = Depends(get_db)):
+    """Devuelve count de no leidas por severity."""
+    rows = (
+        db.query(AdminAlert.severity, func.count(AdminAlert.id))
+        .filter(AdminAlert.read_at.is_(None), AdminAlert.dismissed_at.is_(None))
+        .group_by(AdminAlert.severity)
+        .all()
+    )
+    by_sev = {sev: cnt for sev, cnt in rows}
+    return {
+        "total": sum(by_sev.values()),
+        "info": by_sev.get("info", 0),
+        "warning": by_sev.get("warning", 0),
+        "critical": by_sev.get("critical", 0),
+    }
+
+
+@app.put("/api/admin/alerts/{alert_id}/read")
+def mark_alert_read(alert_id: int, db: Session = Depends(get_db)):
+    a = db.query(AdminAlert).get(alert_id)
+    if not a:
+        raise HTTPException(404, "Alert no encontrada")
+    a.read_at = datetime.utcnow()
+    db.commit()
+    return {"id": alert_id, "read": True}
+
+
+@app.put("/api/admin/alerts/{alert_id}/dismiss")
+def dismiss_alert(alert_id: int, db: Session = Depends(get_db)):
+    a = db.query(AdminAlert).get(alert_id)
+    if not a:
+        raise HTTPException(404, "Alert no encontrada")
+    a.dismissed_at = datetime.utcnow()
+    if not a.read_at:
+        a.read_at = datetime.utcnow()
+    db.commit()
+    return {"id": alert_id, "dismissed": True}
+
+
+@app.put("/api/admin/alerts/mark-all-read")
+def mark_all_read(db: Session = Depends(get_db)):
+    db.query(AdminAlert).filter(AdminAlert.read_at.is_(None)).update(
+        {"read_at": datetime.utcnow()}, synchronize_session=False
+    )
+    db.commit()
+    return {"marked": True}
+
+
+# ─── CRUD Admin WhatsApp Users (multi-admin con permisos) ───
+
+def _admin_user_to_dict(u: AdminWhatsAppUser) -> dict:
+    try:
+        tipos = json.loads(u.alert_tipos_subscribed or "[]")
+    except Exception:
+        tipos = []
+    return {
+        "id": u.id, "phone_number": u.phone_number, "nombre": u.nombre or "",
+        "rol": u.rol or "admin", "activo": u.activo,
+        "receive_alerts": u.receive_alerts,
+        "alert_severity_min": u.alert_severity_min or "warning",
+        "alert_tipos_subscribed": tipos,
+        "can_query_metrics": u.can_query_metrics,
+        "can_query_prospects": u.can_query_prospects,
+        "can_query_costs": u.can_query_costs,
+        "can_modify_settings": u.can_modify_settings,
+        "can_takeover_chats": u.can_takeover_chats,
+        "notas": u.notas or "",
+        "created_at": u.created_at.isoformat() if u.created_at else None,
+    }
+
+
+@app.get("/api/admin/wa-users")
+def list_admin_wa_users(db: Session = Depends(get_db)):
+    items = db.query(AdminWhatsAppUser).order_by(AdminWhatsAppUser.id.asc()).all()
+    return [_admin_user_to_dict(u) for u in items]
+
+
+@app.post("/api/admin/wa-users")
+def create_admin_wa_user(data: dict, db: Session = Depends(get_db)):
+    phone = _normalize_phone(data.get("phone_number") or "")
+    if not phone or len(phone) < 8:
+        raise HTTPException(400, "phone_number requerido (formato E.164 o digitos)")
+    existing = db.query(AdminWhatsAppUser).filter(AdminWhatsAppUser.phone_number == phone).first()
+    if existing:
+        raise HTTPException(400, f"Ya existe admin con phone {phone}")
+    u = AdminWhatsAppUser(
+        phone_number=phone,
+        nombre=(data.get("nombre") or "").strip()[:200],
+        rol=data.get("rol") or "admin",
+        activo=bool(data.get("activo", True)),
+        receive_alerts=bool(data.get("receive_alerts", True)),
+        alert_severity_min=data.get("alert_severity_min") or "warning",
+        alert_tipos_subscribed=json.dumps(data.get("alert_tipos_subscribed") or []),
+        can_query_metrics=bool(data.get("can_query_metrics", True)),
+        can_query_prospects=bool(data.get("can_query_prospects", True)),
+        can_query_costs=bool(data.get("can_query_costs", True)),
+        can_modify_settings=bool(data.get("can_modify_settings", False)),
+        can_takeover_chats=bool(data.get("can_takeover_chats", True)),
+        notas=data.get("notas") or "",
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return _admin_user_to_dict(u)
+
+
+@app.put("/api/admin/wa-users/{user_id}")
+def update_admin_wa_user(user_id: int, data: dict, db: Session = Depends(get_db)):
+    u = db.query(AdminWhatsAppUser).get(user_id)
+    if not u:
+        raise HTTPException(404, "Admin no encontrado")
+    fields = {"nombre", "rol", "activo", "receive_alerts", "alert_severity_min",
+              "can_query_metrics", "can_query_prospects", "can_query_costs",
+              "can_modify_settings", "can_takeover_chats", "notas"}
+    for k in fields:
+        if k in data:
+            setattr(u, k, data[k])
+    if "alert_tipos_subscribed" in data:
+        u.alert_tipos_subscribed = json.dumps(data["alert_tipos_subscribed"] or [])
+    if "phone_number" in data and data["phone_number"]:
+        u.phone_number = _normalize_phone(data["phone_number"])
+    db.commit()
+    db.refresh(u)
+    return _admin_user_to_dict(u)
+
+
+@app.delete("/api/admin/wa-users/{user_id}")
+def delete_admin_wa_user(user_id: int, db: Session = Depends(get_db)):
+    u = db.query(AdminWhatsAppUser).get(user_id)
+    if not u:
+        raise HTTPException(404, "Admin no encontrado")
+    db.delete(u)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.post("/api/admin/wa-users/test-alert")
+def send_test_alert(data: dict, db: Session = Depends(get_db)):
+    """Envia una alerta de prueba a todos los admin activos para validar setup."""
+    title = data.get("title") or "Prueba de alerta MIP"
+    message = data.get("message") or "Esta es una alerta de prueba. Si recibis este mensaje, tu configuracion de admin WhatsApp funciona correctamente."
+    severity = data.get("severity") or "warning"
+    alert_id = _emit_admin_alert(
+        tipo="test_admin_alert", title=title, message=message,
+        severity=severity, source="manual_test", db=db,
+    )
+    recipients = _get_alert_recipients(severity, "test_admin_alert", db)
+    return {"alert_id": alert_id, "sent_to": recipients, "severity": severity}
 
 
 @app.get("/api/whatsapp/diagnostic")
@@ -9360,7 +9897,7 @@ def test_send_whatsapp(payload: dict):
     Body: { "to": "+56912345678", "message": "..." }
     """
     to = payload.get("to", "").strip()
-    msg = payload.get("message", "Mensaje de prueba MIP Quality & Logistics")
+    msg = payload.get("message", "Mensaje de prueba MIP Quality Sourcing")
     if not to:
         raise HTTPException(400, "to requerido (numero E.164 con +)")
     return {"to": to, "message": msg, "result": _send_text(to, msg)}

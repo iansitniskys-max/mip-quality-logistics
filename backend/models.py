@@ -842,3 +842,64 @@ class WhatsAppMockup(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     conversation = relationship("WhatsAppConversation", back_populates="mockups")
+
+
+# ═══════════════════════════════════════════════════
+# ADMIN ALERTS - sistema de notificaciones para admin
+# ═══════════════════════════════════════════════════
+
+class AdminAlert(Base):
+    """Alertas que se generan por eventos del sistema y se notifican al admin
+    via WhatsApp + panel UI.
+
+    Tipos: cost_limit_warning, cost_limit_exceeded, new_cotizacion, new_prospect,
+           agent_fallback, agent_error, mateo_rate_limit, webhook_invalid_sig,
+           sandbox_expiring, custom.
+    Severity: info, warning, critical.
+    """
+    __tablename__ = "admin_alerts"
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String(50), nullable=False, index=True)
+    severity = Column(String(20), default="info", index=True)
+    title = Column(String(300), nullable=False)
+    message = Column(Text, nullable=False)
+    metadata_json = Column(Text, default="{}")  # info adicional (cot_id, cliente_id, gasto, etc)
+    source = Column(String(50))  # cost_guard, webhook_wa, agent_invoke, etc
+    related_id = Column(Integer)  # FK opcional al objeto fuente (cotizacion_id, etc)
+    related_type = Column(String(50))  # 'cotizacion', 'prospect', 'whatsapp_conv', etc
+    sent_to_whatsapp = Column(Boolean, default=False)
+    whatsapp_sent_at = Column(DateTime)
+    whatsapp_message_id = Column(String(100))
+    read_at = Column(DateTime)
+    dismissed_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
+class AdminWhatsAppUser(Base):
+    """Numeros de admin autorizados para recibir alertas + interactuar con
+    Mateo en modo admin (consultar metricas, prospects, etc).
+
+    Cada admin tiene permisos granulares.
+    """
+    __tablename__ = "admin_whatsapp_users"
+    id = Column(Integer, primary_key=True, index=True)
+    phone_number = Column(String(30), unique=True, nullable=False, index=True)
+    nombre = Column(String(200))
+    rol = Column(String(50), default="admin")  # admin, operador, observador
+    activo = Column(Boolean, default=True)
+
+    # Permisos granulares (booleans)
+    receive_alerts = Column(Boolean, default=True)
+    alert_severity_min = Column(String(20), default="warning")  # info, warning, critical
+    can_query_metrics = Column(Boolean, default=True)  # cuantas cotizaciones, costos
+    can_query_prospects = Column(Boolean, default=True)
+    can_query_costs = Column(Boolean, default=True)
+    can_modify_settings = Column(Boolean, default=False)  # cambiar limits, activar/desactivar features
+    can_takeover_chats = Column(Boolean, default=True)
+
+    # Filtros opcionales de tipos de alerta a recibir (JSON array)
+    alert_tipos_subscribed = Column(Text, default="[]")  # vacio = todos
+
+    notas = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
