@@ -9354,6 +9354,113 @@ def send_test_alert(data: dict, db: Session = Depends(get_db)):
     return {"alert_id": alert_id, "sent_to": recipients, "severity": severity}
 
 
+@app.post("/api/admin/setup-wizard/quick-fix")
+def setup_wizard_quick_fix(data: dict, db: Session = Depends(get_db)):
+    """Endpoint de auto-fix para issues comunes detectados por health-check.
+
+    Body opcional:
+      admin_phone: str -> agrega como AdminWhatsAppUser activo si no existe.
+      admin_name: str -> nombre admin (default 'Admin Principal').
+      gemini_limit: float -> setea monthly_limit_usd para gemini (default 50).
+      claude_limit: float -> setea monthly_limit_usd para claude (default 20).
+      kapso_limit: float -> idem (default 30).
+    """
+    actions = []
+    errors = []
+
+    # 1. Crear admin user si phone provisto y no existe
+    admin_phone = data.get("admin_phone")
+    if admin_phone:
+        try:
+            phone = _normalize_phone(admin_phone)
+            existing = db.query(AdminWhatsAppUser).filter(
+                AdminWhatsAppUser.phone_number == phone
+            ).first()
+            if existing:
+                if not existing.activo:
+                    existing.activo = True
+                    db.commit()
+                    actions.append(f"Admin {phone} reactivado")
+                else:
+                    actions.append(f"Admin {phone} ya existe activo")
+            else:
+                u = AdminWhatsAppUser(
+                    phone_number=phone,
+                    nombre=data.get("admin_name") or "Admin Principal",
+                    rol="admin",
+                    activo=True,
+                    receive_alerts=True,
+                    alert_severity_min="warning",
+                    can_query_metrics=True,
+                    can_query_prospects=True,
+                    can_query_costs=True,
+                    can_modify_settings=True,
+                    can_takeover_chats=True,
+                    alert_tipos_subscribed="[]",
+                )
+                db.add(u)
+                db.commit()
+                actions.append(f"Admin {phone} ({u.nombre}) creado con permisos full")
+        except Exception as e:
+            errors.append(f"admin_user: {e}")
+
+    # 2. Setear cost limits razonables si no hay
+    cost_defaults = {
+        "gemini": float(data.get("gemini_limit", 50)),
+        "claude": float(data.get("claude_limit", 20)),
+        "kapso": float(data.get("kapso_limit", 30)),
+    }
+    for provider, limit in cost_defaults.items():
+        if limit <= 0:
+            continue
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT id, monthly_limit_usd FROM cost_limits WHERE provider = :p"
+                ), {"p": provider}).fetchone()
+                if row and (row[1] or 0) > 0:
+                    actions.append(f"{provider}: limit ya configurado (${row[1]:.2f})")
+                    continue
+                conn.execute(text("""
+                    UPDATE cost_limits
+                    SET monthly_limit_usd = :ml, alert_pct = 80, hard_block = TRUE,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE provider = :p
+                """), {"ml": limit, "p": provider})
+                conn.commit()
+                actions.append(f"{provider}: limit configurado a ${limit:.2f}/mes con hard-block")
+        except Exception as e:
+            errors.append(f"cost_limit_{provider}: {e}")
+
+    # 3. Test alert opcional para verificar que el setup funciona
+    if data.get("send_test_alert", True):
+        try:
+            recipients = _get_alert_recipients("warning", "setup_test", db)
+            if recipients:
+                _emit_admin_alert(
+                    tipo="setup_test",
+                    severity="warning",
+                    title="Setup wizard completado",
+                    message=f"Ejecutaste setup wizard. Acciones: {', '.join(actions[:5])}.\n"
+                            f"Si recibis este mensaje en WhatsApp, todo funciona correctamente.",
+                    metadata={"actions": actions},
+                    source="setup_wizard", db=db,
+                )
+                actions.append(f"Alerta de prueba enviada a {len(recipients)} admin(s)")
+        except Exception as e:
+            errors.append(f"test_alert: {e}")
+
+    return {
+        "actions_executed": actions,
+        "errors": errors,
+        "next_steps": [
+            "Verifica que recibiste la alerta de prueba en tu WhatsApp.",
+            "Revisa GET /api/admin/health-check para ver issues restantes.",
+            "Si el limit de costos es muy bajo o muy alto, ajustalo en panel Costos.",
+        ],
+    }
+
+
 @app.get("/api/whatsapp/diagnostic")
 def whatsapp_diagnostic():
     """Verifica que las env vars de Kapso esten configuradas y reporta estado."""
