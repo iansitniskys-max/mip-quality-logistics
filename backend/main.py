@@ -6401,12 +6401,17 @@ def _suggest_next_steps(messages: list, pipeline, commitments: list) -> list:
 @app.get("/api/pipeline/live-conversations")
 def list_live_conversations(db: Session = Depends(get_db)):
     """Lista conversaciones activas en vivo (cliente escribio en los ultimos 15 min).
-    Usado para el widget de 'chats abiertos' en el admin."""
+    Usado para el widget de 'chats abiertos' en el admin.
+    Filtra conversaciones VACIAS (sin mensajes reales) que se crean al abrir
+    la burbuja Mateo sin escribir nada.
+    """
     from datetime import timedelta as _td
     cutoff = datetime.now() - _td(minutes=15)
     convs = db.query(ConversationPipeline).filter(
         (ConversationPipeline.last_client_activity_at >= cutoff) |
         (ConversationPipeline.control_mode == "human")
+    ).filter(
+        ConversationPipeline.total_messages > 0  # Filtrar vacias
     ).order_by(ConversationPipeline.last_message_at.desc()).all()
     out = []
     for c in convs:
@@ -6426,6 +6431,33 @@ def list_live_conversations(db: Session = Depends(get_db)):
             "total_messages": c.total_messages or 0,
         })
     return out
+
+
+@app.post("/api/admin/cleanup/empty-pipelines")
+def cleanup_empty_pipelines(older_than_hours: int = 24, db: Session = Depends(get_db)):
+    """Borra ConversationPipeline vacios (total_messages=0) creados hace X+ horas.
+
+    Estos pipelines se crean cuando alguien abre la burbuja Mateo sin
+    escribir nada. Despues quedan en la DB sin valor.
+    Idempotente: si no hay vacios, no borra nada.
+    """
+    from datetime import timedelta as _td
+    cutoff = datetime.now() - _td(hours=older_than_hours)
+    empty = db.query(ConversationPipeline).filter(
+        (ConversationPipeline.total_messages == 0) | (ConversationPipeline.total_messages.is_(None))
+    ).filter(
+        ConversationPipeline.created_at <= cutoff
+    ).all()
+    deleted_count = 0
+    for c in empty:
+        try:
+            db.delete(c)
+            deleted_count += 1
+        except Exception as e:
+            print(f"[cleanup empty pipeline {c.id}] {e}")
+    if deleted_count > 0:
+        db.commit()
+    return {"deleted": deleted_count, "older_than_hours": older_than_hours}
 
 
 # Human Handoffs endpoints
