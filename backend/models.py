@@ -875,6 +875,54 @@ class AdminAlert(Base):
     created_at = Column(DateTime, server_default=func.now(), index=True)
 
 
+# ═══════════════════════════════════════════════════
+# MARCAS / BRAND ASSETS
+# ═══════════════════════════════════════════════════
+
+class Marca(Base):
+    """Marca / proyecto de un cliente. Un cliente puede tener N marcas.
+    Cada marca tiene assets (logos, brand book, etc).
+    """
+    __tablename__ = "marcas"
+    id = Column(Integer, primary_key=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(200), nullable=False)
+    descripcion = Column(Text)
+    sector = Column(String(100))
+    sitio_web = Column(String(300))
+    colores_json = Column(Text, default="[]")
+    tipografias_json = Column(Text, default="[]")
+    notas = Column(Text)
+    logo_principal_url = Column(String(500))
+    activo = Column(String(10), default="true")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    cliente = relationship("Cliente", backref="marcas")
+    assets = relationship("MarcaAsset", back_populates="marca", cascade="all, delete-orphan")
+
+
+class MarcaAsset(Base):
+    """Archivos asociados a una marca (logos, brand book, mockups, fonts, etc)."""
+    __tablename__ = "marca_assets"
+    id = Column(Integer, primary_key=True, index=True)
+    marca_id = Column(Integer, ForeignKey("marcas.id", ondelete="CASCADE"), nullable=False, index=True)
+    tipo = Column(String(30), nullable=False)  # logo, isotipo, brandbook, mockup, foto_referencia, font_file, otro
+    nombre = Column(String(300), nullable=False)
+    archivo_url = Column(String(500), nullable=False)
+    mime_type = Column(String(100))
+    extension = Column(String(20))
+    size_bytes = Column(Integer, default=0)
+    descripcion = Column(Text)
+    version = Column(String(50))
+    es_principal = Column(Boolean, default=False)
+    orden = Column(Integer, default=0)
+    subido_por_email = Column(String(200))
+    created_at = Column(DateTime, server_default=func.now())
+
+    marca = relationship("Marca", back_populates="assets")
+
+
 class AdminWhatsAppUser(Base):
     """Numeros de admin autorizados para recibir alertas + interactuar con
     Mateo en modo admin (consultar metricas, prospects, etc).

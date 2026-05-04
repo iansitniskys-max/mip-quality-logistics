@@ -23,6 +23,7 @@ from models import (
     StageAssignment, AgentAutoRule,
     WhatsAppConversation, WhatsAppMessage, WhatsAppMockup,
     AdminAlert, AdminWhatsAppUser,
+    Marca, MarcaAsset,
 )
 from schemas import (
     ClienteCreate, ClienteOut, ClienteUpdate, CotizacionCreate, CotizacionUpdate, CotizacionOut,
@@ -7003,6 +7004,311 @@ def update_billing_service(provider: str, data: dict, db: Session = Depends(get_
         return {"updated": True, "provider": provider, "fields": list(updates.keys())}
     except Exception as e:
         raise HTTPException(500, f"Error: {e}")
+
+
+# ═══════════════════════════════════════════════════
+# MARCAS / BRAND ASSETS - portal cliente
+# ═══════════════════════════════════════════════════
+
+BRAND_BUCKET = os.getenv("BRAND_BUCKET", "mip-quality-brand-assets")
+MAX_BRAND_ASSET_BYTES = 30 * 1024 * 1024  # 30 MB
+ALLOWED_ASSET_EXTS = {"png", "jpg", "jpeg", "svg", "webp", "gif",
+                      "pdf", "ai", "eps", "psd", "zip",
+                      "ttf", "otf", "woff", "woff2"}
+
+
+def _upload_to_brand_bucket(content: bytes, dest_path: str, mime_type: str) -> str:
+    """Sube bytes al bucket brand. Devuelve URL publica."""
+    if not content or not BRAND_BUCKET:
+        return ""
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(BRAND_BUCKET)
+        blob = bucket.blob(dest_path)
+        blob.upload_from_string(content, content_type=mime_type or "application/octet-stream")
+        return f"https://storage.googleapis.com/{BRAND_BUCKET}/{dest_path}"
+    except Exception as e:
+        print(f"[brand-gcs upload] error: {e}")
+        return ""
+
+
+def _delete_from_brand_bucket(blob_path: str) -> bool:
+    if not blob_path or not BRAND_BUCKET:
+        return False
+    try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(BRAND_BUCKET)
+        blob = bucket.blob(blob_path)
+        blob.delete()
+        return True
+    except Exception as e:
+        print(f"[brand-gcs delete] {e}")
+        return False
+
+
+def _marca_to_dict(m: Marca, assets_count: int = 0) -> dict:
+    try:
+        colores = json.loads(m.colores_json or "[]")
+    except Exception:
+        colores = []
+    try:
+        tipografias = json.loads(m.tipografias_json or "[]")
+    except Exception:
+        tipografias = []
+    return {
+        "id": m.id, "cliente_id": m.cliente_id,
+        "nombre": m.nombre, "descripcion": m.descripcion or "",
+        "sector": m.sector or "", "sitio_web": m.sitio_web or "",
+        "colores": colores, "tipografias": tipografias,
+        "notas": m.notas or "", "logo_principal_url": m.logo_principal_url or "",
+        "activo": m.activo, "assets_count": assets_count,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+def _asset_to_dict(a: MarcaAsset) -> dict:
+    return {
+        "id": a.id, "marca_id": a.marca_id,
+        "tipo": a.tipo, "nombre": a.nombre, "archivo_url": a.archivo_url,
+        "mime_type": a.mime_type or "", "extension": a.extension or "",
+        "size_bytes": a.size_bytes or 0,
+        "descripcion": a.descripcion or "", "version": a.version or "",
+        "es_principal": a.es_principal, "orden": a.orden or 0,
+        "subido_por_email": a.subido_por_email or "",
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+@app.get("/api/clientes/{cliente_id}/marcas")
+def list_marcas_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    cliente = db.query(Cliente).get(cliente_id)
+    if not cliente:
+        raise HTTPException(404, "Cliente no encontrado")
+    marcas = db.query(Marca).filter(Marca.cliente_id == cliente_id).order_by(Marca.created_at.desc()).all()
+    out = []
+    for m in marcas:
+        cnt = db.query(MarcaAsset).filter(MarcaAsset.marca_id == m.id).count()
+        out.append(_marca_to_dict(m, assets_count=cnt))
+    return out
+
+
+@app.post("/api/clientes/{cliente_id}/marcas")
+def create_marca(cliente_id: int, data: dict, db: Session = Depends(get_db)):
+    cliente = db.query(Cliente).get(cliente_id)
+    if not cliente:
+        raise HTTPException(404, "Cliente no encontrado")
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        raise HTTPException(400, "nombre requerido")
+    m = Marca(
+        cliente_id=cliente_id,
+        nombre=nombre[:200],
+        descripcion=data.get("descripcion") or "",
+        sector=data.get("sector") or "",
+        sitio_web=data.get("sitio_web") or "",
+        colores_json=json.dumps(data.get("colores") or []),
+        tipografias_json=json.dumps(data.get("tipografias") or []),
+        notas=data.get("notas") or "",
+    )
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return _marca_to_dict(m, assets_count=0)
+
+
+@app.get("/api/marcas/{marca_id}")
+def get_marca(marca_id: int, db: Session = Depends(get_db)):
+    m = db.query(Marca).get(marca_id)
+    if not m:
+        raise HTTPException(404, "Marca no encontrada")
+    cnt = db.query(MarcaAsset).filter(MarcaAsset.marca_id == m.id).count()
+    return _marca_to_dict(m, assets_count=cnt)
+
+
+@app.put("/api/marcas/{marca_id}")
+def update_marca(marca_id: int, data: dict, db: Session = Depends(get_db)):
+    m = db.query(Marca).get(marca_id)
+    if not m:
+        raise HTTPException(404, "Marca no encontrada")
+    for k in ("nombre", "descripcion", "sector", "sitio_web", "notas", "activo"):
+        if k in data:
+            setattr(m, k, data[k])
+    if "colores" in data:
+        m.colores_json = json.dumps(data["colores"] or [])
+    if "tipografias" in data:
+        m.tipografias_json = json.dumps(data["tipografias"] or [])
+    db.commit()
+    db.refresh(m)
+    cnt = db.query(MarcaAsset).filter(MarcaAsset.marca_id == m.id).count()
+    return _marca_to_dict(m, assets_count=cnt)
+
+
+@app.delete("/api/marcas/{marca_id}")
+def delete_marca(marca_id: int, db: Session = Depends(get_db)):
+    m = db.query(Marca).get(marca_id)
+    if not m:
+        raise HTTPException(404, "Marca no encontrada")
+    # Best-effort: borrar blobs de GCS
+    try:
+        for a in m.assets:
+            if a.archivo_url and BRAND_BUCKET in a.archivo_url:
+                blob_path = a.archivo_url.split(f"{BRAND_BUCKET}/", 1)[-1]
+                _delete_from_brand_bucket(blob_path)
+    except Exception as e:
+        print(f"[delete_marca gcs] {e}")
+    db.delete(m)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/marcas/{marca_id}/assets")
+def list_assets(marca_id: int, tipo: Optional[str] = None, db: Session = Depends(get_db)):
+    m = db.query(Marca).get(marca_id)
+    if not m:
+        raise HTTPException(404, "Marca no encontrada")
+    q = db.query(MarcaAsset).filter(MarcaAsset.marca_id == marca_id)
+    if tipo:
+        q = q.filter(MarcaAsset.tipo == tipo)
+    items = q.order_by(MarcaAsset.es_principal.desc(), MarcaAsset.orden.asc(), MarcaAsset.created_at.desc()).all()
+    return [_asset_to_dict(a) for a in items]
+
+
+@app.post("/api/marcas/{marca_id}/assets")
+async def upload_asset(
+    marca_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Sube uno o varios archivos a una marca. Multipart con form fields:
+    - file (single) o files (multiple)
+    - tipo (default 'otro'): logo|isotipo|brandbook|mockup|foto_referencia|font_file|otro
+    - descripcion (opcional)
+    - es_principal (opcional)
+    - subido_por_email (opcional)
+    """
+    m = db.query(Marca).get(marca_id)
+    if not m:
+        raise HTTPException(404, "Marca no encontrada")
+    form = await request.form()
+    # Collect files (any field starting with 'file' or 'files')
+    files = []
+    for key, value in form.multi_items():
+        if hasattr(value, "filename") and value.filename:
+            files.append(value)
+    if not files:
+        raise HTTPException(400, "Sin archivos en el upload")
+    tipo_default = (form.get("tipo") or "otro").strip().lower()
+    descripcion = form.get("descripcion") or ""
+    version_str = form.get("version") or ""
+    es_principal_default = (form.get("es_principal") or "").lower() in ("true", "1", "yes")
+    subido_por_email = form.get("subido_por_email") or ""
+
+    uploaded = []
+    errors = []
+    for f in files:
+        try:
+            content = await f.read()
+            if len(content) > MAX_BRAND_ASSET_BYTES:
+                errors.append({"filename": f.filename, "error": "Excede 30 MB"})
+                continue
+            ext = (f.filename.rsplit(".", 1)[-1] if "." in f.filename else "").lower()
+            if ext not in ALLOWED_ASSET_EXTS:
+                errors.append({"filename": f.filename, "error": f"Extension no permitida: {ext}"})
+                continue
+            safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in (f.filename or "asset"))
+            ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            dest_path = f"brands/{m.cliente_id}/{m.id}/{ts}_{safe_name}"
+            mime_type = f.content_type or "application/octet-stream"
+            archivo_url = _upload_to_brand_bucket(content, dest_path, mime_type)
+            if not archivo_url:
+                errors.append({"filename": f.filename, "error": "Fallo upload a storage"})
+                continue
+            asset = MarcaAsset(
+                marca_id=marca_id,
+                tipo=tipo_default if tipo_default in (
+                    "logo", "isotipo", "brandbook", "mockup",
+                    "foto_referencia", "font_file", "otro"
+                ) else "otro",
+                nombre=f.filename or safe_name,
+                archivo_url=archivo_url,
+                mime_type=mime_type,
+                extension=ext,
+                size_bytes=len(content),
+                descripcion=descripcion,
+                version=version_str,
+                es_principal=es_principal_default and (tipo_default == "logo"),
+                subido_por_email=subido_por_email,
+            )
+            db.add(asset)
+            db.commit()
+            db.refresh(asset)
+            # Update logo_principal_url si es logo principal
+            if asset.es_principal and asset.tipo == "logo":
+                # Desmarcar otros principales
+                db.query(MarcaAsset).filter(
+                    MarcaAsset.marca_id == marca_id,
+                    MarcaAsset.id != asset.id,
+                    MarcaAsset.tipo == "logo",
+                    MarcaAsset.es_principal == True,
+                ).update({"es_principal": False})
+                m.logo_principal_url = archivo_url
+                db.commit()
+            uploaded.append(_asset_to_dict(asset))
+        except Exception as e:
+            errors.append({"filename": getattr(f, "filename", "?"), "error": str(e)[:200]})
+    return {"uploaded": len(uploaded), "assets": uploaded, "errors": errors}
+
+
+@app.put("/api/assets/{asset_id}")
+def update_asset(asset_id: int, data: dict, db: Session = Depends(get_db)):
+    a = db.query(MarcaAsset).get(asset_id)
+    if not a:
+        raise HTTPException(404, "Asset no encontrado")
+    for k in ("nombre", "descripcion", "version", "tipo", "orden"):
+        if k in data:
+            setattr(a, k, data[k])
+    if "es_principal" in data:
+        a.es_principal = bool(data["es_principal"])
+        if a.es_principal and a.tipo == "logo":
+            db.query(MarcaAsset).filter(
+                MarcaAsset.marca_id == a.marca_id,
+                MarcaAsset.id != a.id,
+                MarcaAsset.tipo == "logo",
+                MarcaAsset.es_principal == True,
+            ).update({"es_principal": False})
+            m = db.query(Marca).get(a.marca_id)
+            if m:
+                m.logo_principal_url = a.archivo_url
+    db.commit()
+    db.refresh(a)
+    return _asset_to_dict(a)
+
+
+@app.delete("/api/assets/{asset_id}")
+def delete_asset(asset_id: int, db: Session = Depends(get_db)):
+    a = db.query(MarcaAsset).get(asset_id)
+    if not a:
+        raise HTTPException(404, "Asset no encontrado")
+    # Best-effort: borrar blob
+    try:
+        if a.archivo_url and BRAND_BUCKET in a.archivo_url:
+            blob_path = a.archivo_url.split(f"{BRAND_BUCKET}/", 1)[-1]
+            _delete_from_brand_bucket(blob_path)
+    except Exception as e:
+        print(f"[delete_asset] {e}")
+    # Si era logo principal, limpiar marca
+    try:
+        if a.es_principal and a.tipo == "logo":
+            m = db.query(Marca).get(a.marca_id)
+            if m and m.logo_principal_url == a.archivo_url:
+                m.logo_principal_url = None
+    except Exception:
+        pass
+    db.delete(a)
+    db.commit()
+    return {"deleted": True}
 
 
 @app.put("/api/admin/costs/limits/{provider}")

@@ -1260,6 +1260,9 @@ html,body{overflow-x:hidden;max-width:100vw}
         <a class="sb-link" onclick="cView('c-quote')"><i class="fas fa-plus-circle"></i> Nueva Cotización</a>
         <a class="sb-link" onclick="cView('c-track')"><i class="fas fa-history"></i> Mis Solicitudes</a>
       </div>
+      <div class="sb-section"><div class="sb-section-title">Mi Marca</div>
+        <a class="sb-link" onclick="cView('c-brands')"><i class="fas fa-palette"></i> Mis Marcas</a>
+      </div>
       <div class="sb-section"><div class="sb-section-title">Operaciones</div>
         <a class="sb-link" onclick="cView('c-orders')"><i class="fas fa-box"></i> Mis Pedidos</a>
         <a class="sb-link" onclick="cView('c-invoices')"><i class="fas fa-file-invoice"></i> Facturas</a>
@@ -1493,6 +1496,88 @@ html,body{overflow-x:hidden;max-width:100vw}
       <div class="card" style="padding:28px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h3 style="font-size:16px;font-weight:600">Historial de actividad</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Cotizaciones</button><button class="chip">Pedidos</button><button class="chip">Facturas</button></div></div>
         <div class="timeline" id="c-history-timeline"></div>
+      </div>
+    </div>
+
+    <!-- CLIENT: Mis Marcas (lista) -->
+    <div class="page-body" id="c-brands" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <h2 style="font-size:18px;font-weight:600"><i class="fas fa-palette" style="margin-right:6px;color:#e8af43"></i>Mis Marcas</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Gestiona tus marcas: logos, brand book, paleta de colores y archivos relevantes para que el equipo MIP los tenga a mano al producir.</p>
+        </div>
+        <button class="btn btn-dark btn-sm" onclick="openBrandModal()"><i class="fas fa-plus"></i> Nueva marca</button>
+      </div>
+      <div id="brands-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+        <div style="grid-column:1/-1;padding:32px;color:var(--text-muted);font-size:13px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius)">Cargando marcas...</div>
+      </div>
+    </div>
+
+    <!-- CLIENT: Detalle Marca -->
+    <div class="page-body" id="c-brand-detail" style="display:none">
+      <div style="margin-bottom:16px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="cView('c-brands')"><i class="fas fa-arrow-left"></i> Volver a marcas</button></div>
+      <div id="brand-detail-content"></div>
+    </div>
+
+    <!-- Modal: crear/editar marca -->
+    <div id="brand-form-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;justify-content:center;align-items:center">
+      <div style="background:var(--bg);border-radius:var(--radius);max-width:560px;width:92%;max-height:90vh;overflow-y:auto;padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 id="brand-form-title" style="font-size:16px;font-weight:600">Nueva marca</h3>
+          <button onclick="document.getElementById('brand-form-modal').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px"><i class="fas fa-times"></i></button>
+        </div>
+        <input type="hidden" id="brand-form-id">
+        <div class="form-group"><label class="form-label">Nombre marca *</label><input class="form-input" id="brand-form-nombre" placeholder="ej: Bichos Toys"></div>
+        <div class="form-group"><label class="form-label">Sector</label>
+          <select class="form-input" id="brand-form-sector">
+            <option value="">— sin definir —</option>
+            <option>Moda y Textil</option><option>Hogar y Decoración</option><option>Industrial y Herramientas</option>
+            <option>Tecnología y Electrónica</option><option>Belleza y Cuidado Personal</option>
+            <option>Bebés y Niños</option><option>Deportes y Outdoor</option><option>Alimentos y Bebidas</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Sitio web</label><input class="form-input" id="brand-form-sitio" placeholder="https://..."></div>
+        <div class="form-group"><label class="form-label">Descripción</label><textarea class="form-input" id="brand-form-desc" rows="2" placeholder="Que vende esta marca?"></textarea></div>
+        <div class="form-group"><label class="form-label">Briefing / Notas</label><textarea class="form-input" id="brand-form-notas" rows="3" placeholder="Estilo, tono, referencias visuales, anti-patterns..."></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('brand-form-modal').style.display='none'">Cancelar</button>
+          <button class="btn btn-dark btn-sm" onclick="saveBrand()"><i class="fas fa-save"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: upload assets drag-drop -->
+    <div id="brand-upload-modal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1500;justify-content:center;align-items:center">
+      <div style="background:var(--bg);border-radius:var(--radius);max-width:680px;width:92%;max-height:90vh;overflow-y:auto;padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="font-size:16px;font-weight:600">Subir archivos a la marca</h3>
+          <button onclick="document.getElementById('brand-upload-modal').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px"><i class="fas fa-times"></i></button>
+        </div>
+        <input type="hidden" id="brand-upload-marca-id">
+        <div id="brand-dropzone" style="padding:32px;border:2px dashed var(--border);border-radius:var(--radius);text-align:center;background:var(--bg-surface);cursor:pointer;transition:all .2s" onclick="document.getElementById('brand-file-input').click()">
+          <i class="fas fa-cloud-upload-alt" style="font-size:32px;color:var(--text-muted);margin-bottom:8px"></i>
+          <div style="font-weight:600;font-size:13px">Arrastra archivos aqui o click para elegir</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">PNG, JPG, SVG, AI, PDF, ZIP, fonts. Max 30 MB c/u.</div>
+        </div>
+        <input type="file" id="brand-file-input" multiple accept=".png,.jpg,.jpeg,.svg,.webp,.gif,.pdf,.ai,.eps,.psd,.zip,.ttf,.otf,.woff,.woff2" style="display:none" onchange="handleBrandFiles(event.target.files)">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:14px">
+          <label style="font-size:12px">Tipo por defecto:</label>
+          <select class="form-input" id="brand-upload-tipo" style="flex:1;padding:6px 10px;font-size:12px">
+            <option value="logo">Logo</option>
+            <option value="isotipo">Isotipo</option>
+            <option value="brandbook">Brand book</option>
+            <option value="mockup">Mockup</option>
+            <option value="foto_referencia">Foto referencia</option>
+            <option value="font_file">Tipografía</option>
+            <option value="otro" selected>Otro</option>
+          </select>
+        </div>
+        <div id="brand-staged-list" style="margin-top:14px;display:flex;flex-direction:column;gap:6px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('brand-upload-modal').style.display='none'">Cerrar</button>
+          <button class="btn btn-dark btn-sm" id="brand-upload-submit" onclick="uploadBrandFiles()" disabled><i class="fas fa-upload"></i> Subir <span id="brand-upload-count">0</span> archivo(s)</button>
+        </div>
       </div>
     </div>
 
@@ -3721,18 +3806,19 @@ async function uploadFile(inputEl, pedidoId) {
 
 // ─── Client Views ───
 function cView(id) {
-  ['c-dash', 'c-quote', 'c-track', 'c-orders', 'c-invoices', 'c-support', 'c-history'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
+  ['c-dash', 'c-quote', 'c-track', 'c-orders', 'c-invoices', 'c-support', 'c-history', 'c-brands', 'c-brand-detail'].forEach(v => { const e = document.getElementById(v); if (e) e.style.display = v === id ? 'block' : 'none'; });
   const target = document.getElementById(id); if (target) target.scrollIntoView({behavior:'instant',block:'start'});
-  const t = { 'c-dash': 'Dashboard', 'c-quote': 'Nueva Cotización', 'c-track': 'Seguimiento', 'c-orders': 'Mis Pedidos', 'c-invoices': 'Facturas', 'c-support': 'Soporte', 'c-history': 'Historial' };
+  const t = { 'c-dash': 'Dashboard', 'c-quote': 'Nueva Cotización', 'c-track': 'Seguimiento', 'c-orders': 'Mis Pedidos', 'c-invoices': 'Facturas', 'c-support': 'Soporte', 'c-history': 'Historial', 'c-brands': 'Mis Marcas', 'c-brand-detail': 'Detalle de marca' };
   document.getElementById('cTitle').textContent = t[id] || 'Dashboard';
+  // Highlight sidebar by onclick attr (robust to added items)
   const links = document.querySelectorAll('#page-client .sb-link');
   links.forEach(l => l.classList.remove('active'));
-  const idx = { 'c-dash': 0, 'c-quote': 1, 'c-track': 2, 'c-orders': 3, 'c-invoices': 4, 'c-support': 5, 'c-history': 6 };
-  if (links[idx[id]]) links[idx[id]].classList.add('active');
+  links.forEach(l => { const oc = l.getAttribute('onclick') || ''; if (oc.includes("'"+id+"'")) l.classList.add('active'); });
   if (id === 'c-dash') loadClientDashboard();
   if (id === 'c-orders') loadClientOrders();
   if (id === 'c-invoices') loadClientInvoices();
   if (id === 'c-history') loadClientHistory();
+  if (id === 'c-brands' && typeof loadClientBrands === 'function') loadClientBrands();
 }
 
 // ─── Quotation: Category cascading ───
@@ -6272,6 +6358,233 @@ async function testAdminAlert() {
     setTimeout(loadAdminAlerts, 800);
   } catch (e) { toast('error', 'Error', e.message); }
 }
+
+// ═══ CLIENT BRANDS / Mis Marcas ═══
+
+let _brandStagedFiles = [];
+
+async function loadClientBrands() {
+  try {
+    if (!currentUser || !currentUser.id) return;
+    const brands = await api(`/api/clientes/${currentUser.id}/marcas`);
+    const grid = document.getElementById('brands-grid');
+    if (!grid) return;
+    if (!brands.length) {
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:48px 32px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius)">
+        <i class="fas fa-palette" style="font-size:32px;color:var(--text-muted);margin-bottom:12px"></i>
+        <h3 style="font-size:15px;margin-bottom:6px">Aún no tienes marcas</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Sube logos, paleta de colores y brand book para que el equipo tenga todo a mano cuando produzcamos.</p>
+        <button class="btn btn-dark btn-sm" onclick="openBrandModal()"><i class="fas fa-plus"></i> Crear mi primera marca</button>
+      </div>`;
+      return;
+    }
+    grid.innerHTML = brands.map(b => {
+      const initial = (b.nombre || '?').charAt(0).toUpperCase();
+      const colorBlocks = (b.colores || []).slice(0, 4).map(c => `<div title="${escapeHtml(c.nombre || '')} ${c.hex}" style="width:18px;height:18px;border-radius:4px;background:${c.hex || '#ddd'};border:1px solid rgba(0,0,0,0.08)"></div>`).join('');
+      const logo = b.logo_principal_url
+        ? `<img src="${b.logo_principal_url}" style="width:100%;height:140px;object-fit:contain;background:#f8f8f5;border-radius:var(--radius) var(--radius) 0 0">`
+        : `<div style="width:100%;height:140px;background:linear-gradient(135deg,#1a1a1a,#333);display:flex;align-items:center;justify-content:center;color:#e8af43;font-size:48px;font-weight:700;border-radius:var(--radius) var(--radius) 0 0">${initial}</div>`;
+      return `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:transform .15s, box-shadow .15s" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''" onclick="openBrandDetail(${b.id})">
+        ${logo}
+        <div style="padding:14px">
+          <div style="font-weight:600;font-size:14px">${escapeHtml(b.nombre)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(b.sector || 'Sin sector')}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <div style="display:flex;gap:3px">${colorBlocks}</div>
+            <div style="font-size:11px;color:var(--text-muted)"><i class="fas fa-folder"></i> ${b.assets_count} archivos</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+function openBrandModal(brandId) {
+  document.getElementById('brand-form-title').textContent = brandId ? 'Editar marca' : 'Nueva marca';
+  document.getElementById('brand-form-id').value = brandId || '';
+  if (brandId) {
+    api(`/api/marcas/${brandId}`).then(b => {
+      document.getElementById('brand-form-nombre').value = b.nombre || '';
+      document.getElementById('brand-form-sector').value = b.sector || '';
+      document.getElementById('brand-form-sitio').value = b.sitio_web || '';
+      document.getElementById('brand-form-desc').value = b.descripcion || '';
+      document.getElementById('brand-form-notas').value = b.notas || '';
+    }).catch(() => {});
+  } else {
+    document.getElementById('brand-form-nombre').value = '';
+    document.getElementById('brand-form-sector').value = '';
+    document.getElementById('brand-form-sitio').value = '';
+    document.getElementById('brand-form-desc').value = '';
+    document.getElementById('brand-form-notas').value = '';
+  }
+  document.getElementById('brand-form-modal').style.display = 'flex';
+}
+
+async function saveBrand() {
+  const id = document.getElementById('brand-form-id').value;
+  const nombre = (document.getElementById('brand-form-nombre').value || '').trim();
+  if (!nombre) { toast('error', 'Error', 'Nombre requerido'); return; }
+  const payload = {
+    nombre,
+    sector: document.getElementById('brand-form-sector').value,
+    sitio_web: document.getElementById('brand-form-sitio').value,
+    descripcion: document.getElementById('brand-form-desc').value,
+    notas: document.getElementById('brand-form-notas').value,
+  };
+  try {
+    if (id) {
+      await api(`/api/marcas/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      toast('success', 'OK', 'Marca actualizada');
+    } else {
+      await api(`/api/clientes/${currentUser.id}/marcas`, { method: 'POST', body: JSON.stringify(payload) });
+      toast('success', 'OK', 'Marca creada');
+    }
+    document.getElementById('brand-form-modal').style.display = 'none';
+    loadClientBrands();
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+async function openBrandDetail(brandId) {
+  cView('c-brand-detail');
+  try {
+    const [brand, assets] = await Promise.all([
+      api(`/api/marcas/${brandId}`),
+      api(`/api/marcas/${brandId}/assets`),
+    ]);
+    const cont = document.getElementById('brand-detail-content');
+    const colors = (brand.colores || []);
+    const colorsHtml = colors.length
+      ? colors.map((c, i) => `<div style="display:flex;align-items:center;gap:6px"><div style="width:32px;height:32px;border-radius:6px;background:${c.hex || '#ddd'};border:1px solid rgba(0,0,0,0.08)"></div><div><div style="font-size:11px;font-weight:600">${escapeHtml(c.nombre || 'Color ' + (i+1))}</div><div style="font-size:10px;color:var(--text-muted);font-family:monospace">${c.hex || ''}</div></div></div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-muted)">Sin colores definidos</div>';
+    const fontsHtml = (brand.tipografias || []).length
+      ? brand.tipografias.map(f => `<div style="font-size:12px"><b>${escapeHtml(f.nombre || '')}</b> <span style="color:var(--text-muted)">${escapeHtml(f.uso || '')}</span></div>`).join('')
+      : '<div style="font-size:12px;color:var(--text-muted)">Sin tipografias definidas</div>';
+    const assetsHtml = assets.length
+      ? assets.map(a => `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;display:flex;flex-direction:column;gap:6px">
+          ${a.mime_type && a.mime_type.startsWith('image/') ? `<img src="${a.archivo_url}" style="width:100%;height:90px;object-fit:contain;background:#f8f8f5;border-radius:4px">` : `<div style="width:100%;height:90px;background:#f8f8f5;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:32px;border-radius:4px"><i class="fas fa-${a.extension==='pdf'?'file-pdf':a.extension==='zip'?'file-archive':'file'}"></i></div>`}
+          <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(a.nombre)}</div>
+          <div style="font-size:10px;color:var(--text-muted)">${a.tipo} · ${(a.size_bytes/1024).toFixed(0)} KB ${a.es_principal ? '· <b style="color:#16a34a">PRINCIPAL</b>' : ''}</div>
+          <div style="display:flex;gap:4px">
+            <a href="${a.archivo_url}" target="_blank" class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 6px;flex:1;text-align:center;text-decoration:none"><i class="fas fa-download"></i></a>
+            ${a.tipo === 'logo' && !a.es_principal ? `<button class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 6px" onclick="setAssetPrincipal(${a.id}, ${brandId})" title="Marcar como logo principal"><i class="fas fa-star"></i></button>` : ''}
+            <button class="btn btn-outline btn-sm" style="font-size:10px;padding:3px 6px;color:#dc2626" onclick="deleteAsset(${a.id}, ${brandId})"><i class="fas fa-trash"></i></button>
+          </div>
+        </div>`).join('')
+      : '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)">Sin archivos. Sube tus logos y brand book.</div>';
+    cont.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div>
+          <h2 style="font-size:18px;font-weight:600">${escapeHtml(brand.nombre)}</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:2px">${escapeHtml(brand.sector || 'Sin sector')} ${brand.sitio_web ? '· <a href="' + brand.sitio_web + '" target="_blank">' + escapeHtml(brand.sitio_web) + '</a>' : ''}</p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="openBrandModal(${brandId})"><i class="fas fa-edit"></i> Editar</button>
+          <button class="btn btn-outline btn-sm" style="color:#dc2626" onclick="deleteBrand(${brandId})"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>
+      ${brand.descripcion ? `<div style="padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px;margin-bottom:14px">${escapeHtml(brand.descripcion)}</div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+        <div class="card" style="padding:14px"><h4 style="font-size:13px;margin-bottom:10px">Paleta de colores</h4><div style="display:flex;flex-direction:column;gap:8px">${colorsHtml}</div></div>
+        <div class="card" style="padding:14px"><h4 style="font-size:13px;margin-bottom:10px">Tipografías</h4>${fontsHtml}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="font-size:14px;font-weight:600">Archivos (${assets.length})</h3>
+        <button class="btn btn-dark btn-sm" onclick="openUploadModal(${brandId})"><i class="fas fa-cloud-upload-alt"></i> Subir archivos</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">${assetsHtml}</div>
+    `;
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+function openUploadModal(brandId) {
+  document.getElementById('brand-upload-marca-id').value = brandId;
+  _brandStagedFiles = [];
+  renderStaged();
+  document.getElementById('brand-upload-modal').style.display = 'flex';
+}
+
+function handleBrandFiles(filesList) {
+  for (const f of filesList) _brandStagedFiles.push(f);
+  renderStaged();
+}
+
+function renderStaged() {
+  const cont = document.getElementById('brand-staged-list');
+  cont.innerHTML = _brandStagedFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px">
+      <i class="fas fa-file" style="color:var(--text-muted)"></i>
+      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.name)}</span>
+      <span style="color:var(--text-muted);font-size:10px">${(f.size/1024).toFixed(0)} KB</span>
+      <button onclick="_brandStagedFiles.splice(${i},1); renderStaged()" style="background:none;border:none;cursor:pointer;color:var(--text-muted)"><i class="fas fa-times"></i></button>
+    </div>`).join('');
+  document.getElementById('brand-upload-count').textContent = _brandStagedFiles.length;
+  document.getElementById('brand-upload-submit').disabled = !_brandStagedFiles.length;
+}
+
+async function uploadBrandFiles() {
+  const brandId = document.getElementById('brand-upload-marca-id').value;
+  const tipo = document.getElementById('brand-upload-tipo').value;
+  if (!_brandStagedFiles.length) return;
+  const fd = new FormData();
+  fd.append('tipo', tipo);
+  fd.append('subido_por_email', (currentUser && currentUser.email) || '');
+  for (const f of _brandStagedFiles) fd.append('files', f);
+  try {
+    document.getElementById('brand-upload-submit').disabled = true;
+    document.getElementById('brand-upload-submit').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+    const res = await fetch(`${API}/api/marcas/${brandId}/assets`, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error subiendo');
+    toast('success', 'OK', `${data.uploaded} archivo(s) subidos`);
+    if ((data.errors || []).length) toast('warning', 'Algunos errores', (data.errors[0].error || '').slice(0,80));
+    document.getElementById('brand-upload-modal').style.display = 'none';
+    _brandStagedFiles = [];
+    openBrandDetail(brandId);
+  } catch (e) { toast('error', 'Error', e.message); }
+  finally {
+    document.getElementById('brand-upload-submit').disabled = false;
+    document.getElementById('brand-upload-submit').innerHTML = '<i class="fas fa-upload"></i> Subir <span id="brand-upload-count">' + _brandStagedFiles.length + '</span> archivo(s)';
+  }
+}
+
+async function setAssetPrincipal(assetId, brandId) {
+  try {
+    await api(`/api/assets/${assetId}`, { method: 'PUT', body: JSON.stringify({ es_principal: true }) });
+    openBrandDetail(brandId);
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+async function deleteAsset(assetId, brandId) {
+  if (!confirm('¿Eliminar este archivo?')) return;
+  try {
+    await api(`/api/assets/${assetId}`, { method: 'DELETE' });
+    toast('success', 'OK', 'Archivo eliminado');
+    openBrandDetail(brandId);
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+async function deleteBrand(brandId) {
+  if (!confirm('¿Eliminar la marca y TODOS sus archivos?')) return;
+  try {
+    await api(`/api/marcas/${brandId}`, { method: 'DELETE' });
+    toast('success', 'OK', 'Marca eliminada');
+    cView('c-brands');
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
+// Drag-drop handlers
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('brand-dropzone');
+  if (dz) {
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.style.background = '#fef9c3'; dz.style.borderColor = '#e8af43'; }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.style.background = ''; dz.style.borderColor = ''; }));
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files) handleBrandFiles(e.dataTransfer.files);
+    });
+  }
+});
+
 
 // ═══ COSTOS - Tabs IA / Software ═══
 
