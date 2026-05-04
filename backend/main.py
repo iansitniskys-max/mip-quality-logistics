@@ -1386,6 +1386,43 @@ def crear_factura(data: FacturaCreate, db: Session = Depends(get_db)):
     db.add(f)
     db.commit()
     db.refresh(f)
+    # Si es factura ingreso (cliente paga a MIP), emitir alerta + email cliente
+    try:
+        if (f.tipo or "").lower() == "ingreso" and f.pedido_id:
+            pedido = db.query(Pedido).get(f.pedido_id)
+            cliente = None
+            if pedido and pedido.cotizacion_id:
+                cot = db.query(Cotizacion).get(pedido.cotizacion_id)
+                if cot:
+                    cliente = db.query(Cliente).get(cot.cliente_id)
+            if cliente:
+                # Alerta admin
+                _emit_admin_alert(
+                    tipo="new_factura_emitida",
+                    severity="info",
+                    title=f"Factura emitida: ${f.monto:,.0f}",
+                    message=f"Cliente: {cliente.nombre}\n"
+                            f"Monto: ${f.monto:,.2f}\n"
+                            f"Estado: {f.estado}\n"
+                            f"Pedido: #{f.pedido_id}",
+                    metadata={"factura_id": f.id, "pedido_id": f.pedido_id, "monto": f.monto},
+                    source="factura_create", related_id=f.id, related_type="factura",
+                    db=db, notify_whatsapp=False,
+                )
+                # Email cliente con template
+                if cliente.email and "@" in cliente.email:
+                    fecha_venc = (f.fecha.strftime("%d/%m/%Y") if f.fecha else "")
+                    _send_email_template(
+                        template_id="factura_emitida",
+                        to=cliente.email,
+                        db=db, cliente_id=cliente.id,
+                        cliente_nombre=cliente.nombre,
+                        factura_id=f.id,
+                        monto=f"{f.monto:,.0f}",
+                        vencimiento=fecha_venc,
+                    )
+    except Exception as e:
+        print(f"[crear_factura post-hook] {e}")
     return f
 
 
