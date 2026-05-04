@@ -9147,6 +9147,82 @@ def _send_document(to: str, doc_url: str, filename: str, caption: Optional[str] 
     return _send_whatsapp_kapso(to, {"type": "document", "document": doc})
 
 
+def _send_template(
+    to: str,
+    template_name: str,
+    language_code: str = "es",
+    components: Optional[list] = None,
+) -> dict:
+    """Envia un mensaje template aprobado por Meta. Util para re-engagement
+    cuando la ventana de 24h del cliente se cerro.
+
+    template_name: el nombre del template aprobado en Meta Business Manager.
+    language_code: 'es', 'en', etc.
+    components: parametros del template, formato Meta:
+      [{ "type": "body", "parameters": [{"type":"text", "text":"valor"}] }]
+    """
+    payload = {
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {"code": language_code},
+        },
+    }
+    if components:
+        payload["template"]["components"] = components
+    return _send_whatsapp_kapso(to, payload)
+
+
+@app.post("/api/whatsapp/send-template")
+def send_whatsapp_template(data: dict, db: Session = Depends(get_db)):
+    """Envia template aprobado por Meta a un numero (re-engagement / notif).
+
+    Body:
+      to: telefono E.164 sin '+'
+      template_name: nombre del template aprobado en Meta
+      language_code: 'es' (default)
+      params: lista de strings que reemplazan {{1}}, {{2}}, etc en el body
+      conv_id: opcional, para persistir el outbound en la conversacion existente
+    """
+    to = data.get("to", "")
+    template_name = data.get("template_name", "")
+    if not to or not template_name:
+        raise HTTPException(400, "to + template_name requeridos")
+    language = data.get("language_code", "es")
+    params = data.get("params") or []
+    conv_id = data.get("conv_id")
+
+    components = None
+    if params:
+        components = [{
+            "type": "body",
+            "parameters": [{"type": "text", "text": str(p)} for p in params],
+        }]
+    result = _send_template(to, template_name, language, components)
+
+    # Persistir en conv si se especifico
+    if conv_id and result.get("status") == "sent":
+        try:
+            conv = db.query(WhatsAppConversation).get(conv_id)
+            if conv:
+                _persist_outbound_message(
+                    conv_id=conv.id,
+                    type_="template",
+                    content=f"[template:{template_name}] " + " | ".join(str(p) for p in params),
+                    media_url=None,
+                    agent_id=None,
+                    kapso_response=result,
+                    db=db,
+                )
+        except Exception as e:
+            print(f"[send-template persist] {e}")
+
+    return {
+        "to": to, "template_name": template_name, "language_code": language,
+        "params": params, "result": result,
+    }
+
+
 # ─── Bridge Mateo (Agent Builder) + WhatsApp ───
 # Context global por session_id que los handlers pueden leer cuando
 # el agente fue invocado desde un webhook WhatsApp.
