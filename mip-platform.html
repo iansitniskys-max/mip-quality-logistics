@@ -3864,6 +3864,15 @@ function cView(id) {
   if (id === 'c-quote' && typeof loadQuoteMarcasSelect === 'function') loadQuoteMarcasSelect();
 }
 
+async function vincularMarca(cotId, marcaId) {
+  if (!marcaId) return;
+  try {
+    await api(`/api/cotizaciones/${cotId}/marca`, { method: 'PUT', body: JSON.stringify({ marca_id: parseInt(marcaId) }) });
+    toast('success', 'OK', 'Marca vinculada');
+    if (typeof openDetail === 'function') openDetail(cotId);
+  } catch (e) { toast('error', 'Error', e.message); }
+}
+
 async function loadQuoteMarcasSelect() {
   try {
     if (!currentUser || !currentUser.id) return;
@@ -4511,6 +4520,14 @@ async function openDetail(cotId) {
     const c = await api(`/api/cotizaciones/${cotId}`);
     let cl = { nombre: 'N/A', empresa: '', email: '' };
     try { cl = await api(`/api/clientes/${c.cliente_id}`); } catch {}
+    // Cargar marca si tiene
+    let marca = null;
+    if (c.marca_id) {
+      try { marca = await api(`/api/marcas/${c.marca_id}`); } catch {}
+    }
+    // Cargar lista de marcas del cliente para selector
+    let clienteMarcas = [];
+    try { clienteMarcas = await api(`/api/clientes/${c.cliente_id}/marcas`); } catch {}
     const initials = cl.nombre.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
     const badges = { pendiente:'badge-warning', cotizado:'badge-info', produccion:'badge-success', entregado:'badge-neutral' };
     const labels = { pendiente:'Pendiente', cotizado:'Cotizado', produccion:'Producción', entregado:'Entregado' };
@@ -4548,6 +4565,22 @@ async function openDetail(cotId) {
         <button class="btn btn-outline btn-sm" onclick="inviteClientToPlatform('${cl.email}','${cl.nombre}')" title="Invitar cliente"><i class="fas fa-envelope"></i> Invitar</button>
         <button class="btn btn-outline btn-sm" onclick="deleteSolicitud(${c.id}, ${c.cliente_id}, '${(cl.nombre||'').replace(/'/g,"&#39;")}', '${c.producto ? c.producto.replace(/'/g,"&#39;").substring(0,40) : ''}')" title="Eliminar solicitud" style="color:var(--danger);margin-left:auto"><i class="fas fa-trash"></i> Eliminar</button>
       </div>
+      ${marca ? `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,#fef3c7 0%,#fed7aa 100%);border-left:3px solid #e8af43;border-radius:var(--radius);display:flex;align-items:center;gap:12px">
+        ${marca.logo_principal_url ? `<img src="${marca.logo_principal_url}" style="width:42px;height:42px;border-radius:6px;object-fit:contain;background:#fff;padding:3px">` : `<div style="width:42px;height:42px;border-radius:6px;background:#1a1a1a;color:#e8af43;display:flex;align-items:center;justify-content:center;font-weight:700">${(marca.nombre||'?').charAt(0).toUpperCase()}</div>`}
+        <div style="flex:1">
+          <div style="font-size:11px;color:#92400e;font-weight:600;letter-spacing:.5px">MARCA / PROYECTO</div>
+          <div style="font-weight:600;font-size:14px">${marca.nombre}</div>
+          ${marca.sector ? `<div style="font-size:11px;color:#78350f;margin-top:2px">${marca.sector}${marca.assets_count ? ' · ' + marca.assets_count + ' archivos' : ''}</div>` : ''}
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="window.open('/?goto=brand-${marca.id}','_blank');return false" title="Ver marca completa" style="font-size:11px"><i class="fas fa-external-link-alt"></i></button>
+      </div>` : (clienteMarcas.length ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-surface);border-radius:var(--radius);font-size:12px;display:flex;gap:8px;align-items:center">
+        <i class="fas fa-link" style="color:var(--text-muted)"></i>
+        <span style="color:var(--text-muted)">Sin marca vinculada.</span>
+        <select onchange="vincularMarca(${c.id}, this.value)" style="flex:1;padding:4px 6px;font-size:11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
+          <option value="">— vincular a marca —</option>
+          ${clienteMarcas.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('')}
+        </select>
+      </div>` : '')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
         <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Producto</span><span style="font-weight:500;font-size:13px">${c.producto}</span></div>
         <div><span style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px">Cantidad</span><span style="font-weight:500;font-size:13px">${c.cantidad||'—'}</span></div>

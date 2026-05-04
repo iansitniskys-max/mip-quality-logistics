@@ -7321,6 +7321,34 @@ def _asset_to_dict(a: MarcaAsset) -> dict:
     }
 
 
+@app.get("/api/marcas")
+def list_all_marcas(
+    cliente_id: Optional[int] = None,
+    q: Optional[str] = None,
+    activo: Optional[str] = None,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+):
+    """Lista admin de TODAS las marcas (cross-cliente). Filtros opcionales."""
+    query = db.query(Marca)
+    if cliente_id:
+        query = query.filter(Marca.cliente_id == cliente_id)
+    if q:
+        query = query.filter(Marca.nombre.ilike(f"%{q}%"))
+    if activo in ("true", "false"):
+        query = query.filter(Marca.activo == activo)
+    items = query.order_by(Marca.created_at.desc()).limit(limit).all()
+    out = []
+    for m in items:
+        cnt = db.query(MarcaAsset).filter(MarcaAsset.marca_id == m.id).count()
+        cli = db.query(Cliente).filter(Cliente.id == m.cliente_id).first()
+        d = _marca_to_dict(m, assets_count=cnt)
+        d["cliente_nombre"] = cli.nombre if cli else "?"
+        d["cliente_empresa"] = (cli.empresa if cli else "") or ""
+        out.append(d)
+    return out
+
+
 @app.get("/api/clientes/{cliente_id}/marcas")
 def list_marcas_cliente(cliente_id: int, db: Session = Depends(get_db)):
     cliente = db.query(Cliente).get(cliente_id)
