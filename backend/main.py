@@ -9173,6 +9173,50 @@ def _send_template(
     return _send_whatsapp_kapso(to, payload)
 
 
+@app.post("/api/admin/cron/check-stale-quotes")
+def check_stale_quotes(days: int = 3, db: Session = Depends(get_db)):
+    """Detecta cotizaciones pendientes hace mas de N dias y emite alerta.
+    Idempotente: no duplica si ya hubo alerta misma cot en ultimas 24h.
+    """
+    from datetime import timedelta as _td
+    cutoff = datetime.utcnow() - _td(days=days)
+    cutoff_dedup = datetime.utcnow() - _td(hours=24)
+    stale = db.query(Cotizacion).filter(
+        Cotizacion.estado == "pendiente",
+        Cotizacion.created_at <= cutoff,
+    ).all()
+    emitted = 0
+    skipped = 0
+    for c in stale:
+        recent = db.query(AdminAlert).filter(
+            AdminAlert.tipo == "stale_cotizacion",
+            AdminAlert.related_id == c.id,
+            AdminAlert.created_at >= cutoff_dedup,
+        ).first()
+        if recent:
+            skipped += 1
+            continue
+        cli = db.query(Cliente).filter(Cliente.id == c.cliente_id).first()
+        cli_label = (cli.nombre if cli else f"Cliente #{c.cliente_id}")
+        producto = (c.proyecto_nombre or c.producto or "Sin nombre")[:60]
+        dias_sin = (datetime.utcnow() - (c.created_at or datetime.utcnow())).days
+        try:
+            _emit_admin_alert(
+                tipo="stale_cotizacion",
+                severity="warning",
+                title=f"Cotizacion #{c.id} sin atender ({dias_sin} dias)",
+                message=f"De: {cli_label}\nProyecto: {producto}\n"
+                        f"Sigue 'pendiente' desde {c.created_at.strftime('%d %b') if c.created_at else 'fecha desconocida'}.",
+                metadata={"cotizacion_id": c.id, "cliente_id": c.cliente_id, "dias_sin": dias_sin},
+                source="cron_stale", related_id=c.id, related_type="cotizacion",
+                db=db,
+            )
+            emitted += 1
+        except Exception as e:
+            print(f"[stale-check] {e}")
+    return {"checked": len(stale), "emitted": emitted, "skipped_dedup": skipped, "days_threshold": days}
+
+
 @app.post("/api/whatsapp/send-template")
 def send_whatsapp_template(data: dict, db: Session = Depends(get_db)):
     """Envia template aprobado por Meta a un numero (re-engagement / notif).
