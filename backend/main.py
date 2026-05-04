@@ -163,6 +163,70 @@ def on_startup():
                 conn.commit()
             except Exception:
                 conn.rollback()
+            # Migrate cost_limits: agregar columnas para billing dashboard
+            for col, col_type in [
+                ("portal_url", "VARCHAR(500)"),
+                ("alert_email", "VARCHAR(200)"),
+                ("descripcion", "TEXT"),
+                ("categoria", "VARCHAR(50)"),  # ai, hosting, messaging, email, otro
+                ("activo", "BOOLEAN DEFAULT TRUE"),
+            ]:
+                try:
+                    conn.execute(text(f"ALTER TABLE cost_limits ADD COLUMN {col} {col_type}"))
+                    conn.commit()
+                    print(f"Added column cost_limits.{col}")
+                except Exception:
+                    conn.rollback()
+            # Seed default billing catalog (idempotente)
+            try:
+                default_services = [
+                    ("gemini", "Google AI Studio (Gemini)", "ai",
+                     "Mateo, transcripcion audio, embeddings KB, Nano Banana mockups",
+                     "https://aistudio.google.com/app/apikey",
+                     None, None),
+                    ("anthropic", "Anthropic Claude", "ai",
+                     "Fallback para Mateo si Gemini falla",
+                     "https://console.anthropic.com/settings/billing",
+                     None, None),
+                    ("gcp", "Google Cloud Platform", "hosting",
+                     "Cloud Run + Cloud SQL + Cloud Storage",
+                     "https://console.cloud.google.com/billing",
+                     None, None),
+                    ("kapso", "Kapso WhatsApp", "messaging",
+                     "WhatsApp Business proxy + numero virtual",
+                     "https://app.kapso.ai/billing",
+                     None, None),
+                    ("smtp", "Gmail SMTP", "email",
+                     "Envio de emails transaccionales",
+                     "https://workspace.google.com/billing",
+                     None, None),
+                ]
+                for provider, account, categoria, descripcion, portal, card, monthly in default_services:
+                    exists = conn.execute(text("SELECT 1 FROM cost_limits WHERE provider = :p"),
+                                          {"p": provider}).fetchone()
+                    if not exists:
+                        conn.execute(text("""
+                            INSERT INTO cost_limits (provider, billing_account, categoria, descripcion,
+                                                     portal_url, billing_card_last4, monthly_limit_usd, alert_pct, hard_block, activo)
+                            VALUES (:p, :a, :c, :d, :u, :card, :ml, 80, FALSE, TRUE)
+                        """), {"p": provider, "a": account, "c": categoria, "d": descripcion,
+                               "u": portal, "card": card, "ml": monthly or 0.0})
+                        conn.commit()
+                        print(f"Seeded billing service {provider}")
+                    else:
+                        # Backfill solo categoria/descripcion/portal_url si vacios
+                        conn.execute(text("""
+                            UPDATE cost_limits
+                            SET categoria = COALESCE(NULLIF(categoria, ''), :c),
+                                descripcion = COALESCE(NULLIF(descripcion, ''), :d),
+                                portal_url = COALESCE(NULLIF(portal_url, ''), :u),
+                                billing_account = COALESCE(NULLIF(billing_account, ''), :a)
+                            WHERE provider = :p
+                        """), {"p": provider, "a": account, "c": categoria, "d": descripcion, "u": portal})
+                        conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"[billing seed] {e}")
         # Seed Agent Builder defaults (tools + Mateo como primer agente)
         try:
             from sqlalchemy.orm import Session as _Sess
@@ -6642,6 +6706,40 @@ def _check_cost_limit(provider: str, db=None):
     except Exception as e:
         # Si el check falla por cualquier razon, NO bloquear el servicio
         print(f"[_check_cost_limit] error: {e}")
+
+
+@app.get("/api/admin/costs/debug-guard")
+def debug_cost_guard(provider: str = "gemini"):
+    """Debug endpoint para diagnosticar por que el hard-block no bloquea.
+    Devuelve lo que ve _check_cost_limit en su flow.
+    """
+    try:
+        result = {"provider": provider, "limit_row": None, "spent": None, "should_block": False}
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT monthly_limit_usd, hard_block FROM cost_limits
+                WHERE provider = :p
+            """), {"p": (provider or "gemini").lower()}).fetchone()
+            if row:
+                result["limit_row"] = {
+                    "monthly_limit_usd": row[0] or 0.0,
+                    "hard_block": bool(row[1]),
+                }
+            spent = _get_monthly_spent(provider, None)
+            result["spent"] = spent
+            if row and (row[0] or 0.0) > 0 and bool(row[1]) and spent >= (row[0] or 0.0):
+                result["should_block"] = True
+        # Llamamos el guard real para ver si tira HTTPException
+        try:
+            _check_cost_limit(provider, None)
+            result["guard_called"] = "no_exception"
+        except HTTPException as e:
+            result["guard_called"] = f"BLOCKED: {e.status_code} {e.detail[:200]}"
+        except Exception as e:
+            result["guard_called"] = f"OTHER_ERROR: {type(e).__name__}: {e}"
+        return result
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/admin/costs/summary")
