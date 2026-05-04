@@ -8948,17 +8948,72 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
                     elif msg_type == "audio" and kapso_transcript:
                         print(f"[whatsapp] usando transcripcion Kapso (free): '{kapso_transcript[:80]}'")
                     # Auto-respuesta del agente IA (Mateo) a mensajes inbound
-                    # Skipea: takeover activo, mensajes de status, batch de statuses, audios sin transcripcion
+                    # Skipea: takeover activo, audios sin transcripcion, OR debounce
+                    # (mensajes inbound dentro de los ultimos 8s).
                     agent_result = None
                     if msg_type in ("text", "audio", "image"):
                         user_input = kapso_transcript or text_content
                         if not user_input and msg_type == "image":
                             user_input = "[el cliente envio una imagen]"
-                        if user_input and not conv.takeover:
+                        # Debounce: si llego otro mensaje inbound a esta conv en los ultimos 8s,
+                        # no respondemos a este (espera a que el cliente termine de mandar).
+                        # El "ultimo" sera el que dispare la respuesta. Esto resuelve el caso de
+                        # multiples imagenes/mensajes cortos seguidos.
+                        from datetime import timedelta as _td
+                        recent_inbound_count = (
+                            db.query(WhatsAppMessage)
+                            .filter(WhatsAppMessage.conversation_id == conv.id)
+                            .filter(WhatsAppMessage.direction == "inbound")
+                            .filter(WhatsAppMessage.id != record.id)
+                            .filter(WhatsAppMessage.created_at >= datetime.utcnow() - _td(seconds=8))
+                            .count()
+                        )
+                        # Si hay otro inbound recent (que va a procesarse en otro webhook),
+                        # esperamos 6 segundos para ver si llegan mas. Si llega otro, ese tomara la posta.
+                        should_respond = True
+                        if recent_inbound_count >= 1:
+                            # Hay mensajes recientes. Espera 6s y verifica si este sigue siendo el ultimo.
+                            import time as _time
+                            _time.sleep(6.0)
+                            db.refresh(conv)
+                            latest = (
+                                db.query(WhatsAppMessage)
+                                .filter(WhatsAppMessage.conversation_id == conv.id)
+                                .filter(WhatsAppMessage.direction == "inbound")
+                                .order_by(WhatsAppMessage.id.desc())
+                                .first()
+                            )
+                            if latest and latest.id != record.id:
+                                # Llego otro despues, dejamos que ese responda
+                                print(f"[wa-debounce] msg {record.id} skip - msg {latest.id} llego despues")
+                                should_respond = False
+                            else:
+                                # Recogemos todos los mensajes inbound de los ultimos 15s sin respuesta posterior
+                                recent_inbound = (
+                                    db.query(WhatsAppMessage)
+                                    .filter(WhatsAppMessage.conversation_id == conv.id)
+                                    .filter(WhatsAppMessage.direction == "inbound")
+                                    .filter(WhatsAppMessage.created_at >= datetime.utcnow() - _td(seconds=15))
+                                    .order_by(WhatsAppMessage.id.asc())
+                                    .all()
+                                )
+                                # Construimos un user_input compuesto con todos los mensajes recientes
+                                parts = []
+                                for m in recent_inbound:
+                                    txt = (m.transcription or m.content or "").strip()
+                                    if not txt and m.type == "image":
+                                        txt = "[imagen]"
+                                    elif not txt and m.type == "audio":
+                                        txt = "[audio sin transcripcion]"
+                                    if txt:
+                                        parts.append(txt)
+                                if parts:
+                                    user_input = "\n".join(parts)
+                                    print(f"[wa-debounce] respondiendo a {len(recent_inbound)} msgs combinados")
+                        if should_respond and user_input and not conv.takeover:
                             try:
                                 agent_result = _invoke_agent_for_whatsapp(conv, user_input, db)
                                 if agent_result and not agent_result.get("error"):
-                                    # Marcar como leido (la IA ya proceso)
                                     conv.unread_count = 0
                                     db.commit()
                             except Exception as e:
