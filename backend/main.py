@@ -9215,8 +9215,12 @@ if os.path.isdir(IMAGES_DIR):
     app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
 
 
-@app.get("/{full_path:path}")
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
 def serve_frontend(full_path: str):
+    """Sirve el frontend SPA. Soporta HEAD para crawlers (Meta, Google, etc).
+    Sin HEAD, Meta marca el sitio como 'broken' al validar el dominio en
+    WhatsApp Business setup.
+    """
     index = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index):
         return FileResponse(index, media_type="text/html")
