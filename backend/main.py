@@ -805,7 +805,7 @@ def notify_cotizacion(data: dict, db: Session = Depends(get_db)):
     }
 
 
-@app.get("/api/cotizaciones/{id}", response_model=CotizacionOut)
+@app.get("/api/cotizaciones/{id:int}", response_model=CotizacionOut)
 def get_cotizacion(id: int, db: Session = Depends(get_db)):
     c = db.query(Cotizacion).get(id)
     if not c:
@@ -813,7 +813,7 @@ def get_cotizacion(id: int, db: Session = Depends(get_db)):
     return c
 
 
-@app.put("/api/cotizaciones/{id}", response_model=CotizacionOut)
+@app.put("/api/cotizaciones/{id:int}", response_model=CotizacionOut)
 def update_cotizacion(id: int, data: CotizacionUpdate, db: Session = Depends(get_db)):
     c = db.query(Cotizacion).get(id)
     if not c:
@@ -833,7 +833,7 @@ def update_cotizacion(id: int, data: CotizacionUpdate, db: Session = Depends(get
     return c
 
 
-@app.delete("/api/cotizaciones/{id}")
+@app.delete("/api/cotizaciones/{id:int}")
 def delete_cotizacion(id: int, delete_cliente: bool = False, db: Session = Depends(get_db)):
     """Elimina una cotizacion (y opcionalmente su cliente si este no tiene mas cotizaciones).
     Tambien elimina en cascada: productos, actividades, archivos, pedidos asociados.
