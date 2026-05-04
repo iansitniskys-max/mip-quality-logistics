@@ -6743,13 +6743,22 @@ def debug_cost_guard(provider: str = "gemini"):
 
 
 @app.get("/api/admin/costs/summary")
-def costs_summary(days: int = 30, db: Session = Depends(get_db)):
-    """Resumen de costos en los ultimos N dias.
-    Agrega AgentTrace (agentes + copiloto) + MateoConversation (chats).
-    Calcula costos aun si cost_usd=0 en trace usando pricing publico.
+def costs_summary(days: int = 30, period: str = "calendar_month", db: Session = Depends(get_db)):
+    """Resumen de costos.
+
+    period:
+      - 'calendar_month' (default): desde el primer dia del mes actual.
+        Coincide con lo que usa _get_monthly_spent para hard-block.
+        Asi vos ves el MISMO numero que el guard ve.
+      - 'rolling_days': ultimos N dias segun parametro 'days' (default 30).
     """
     from datetime import timedelta as _td
-    cutoff = datetime.now() - _td(days=days)
+    if period == "rolling_days":
+        cutoff = datetime.now() - _td(days=days)
+    else:
+        # calendar_month (default): primer dia del mes actual
+        now = datetime.now()
+        cutoff = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     # Traces
     traces = db.query(AgentTrace).filter(AgentTrace.created_at >= cutoff).all()
     by_provider = {}
@@ -8294,13 +8303,38 @@ def _invoke_agent_for_whatsapp(
                         tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
                         tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
             except Exception as e:
-                print(f"[wa-mateo gemini] error: {e}")
+                err_str = str(e).lower()
+                is_rate_limit = ("429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or "rate" in err_str)
+                print(f"[wa-mateo gemini] error: {e}{' (rate-limit detectado, fallback a Claude)' if is_rate_limit else ''}")
+
+        # Fallback automatico a Claude si Gemini fallo
+        if not reply_text and ANTHROPIC_API_KEY:
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+                # Claude no soporta function calling igual aqui, hacemos call simple
+                response = client.messages.create(
+                    model=(agent.modelo if (agent.modelo or "").startswith("claude") else "claude-sonnet-4-20250514"),
+                    max_tokens=agent.max_tokens or 800,
+                    system=system,
+                    messages=messages,
+                )
+                reply_text = response.content[0].text if response.content else None
+                provider_used = "claude"
+                if hasattr(response, "usage"):
+                    tokens_in = response.usage.input_tokens or 0
+                    tokens_out = response.usage.output_tokens or 0
+                print(f"[wa-mateo claude-fallback] OK")
+            except Exception as e:
+                print(f"[wa-mateo claude-fallback] error: {e}")
 
         if not reply_text:
+            # Ultimo recurso: mensaje natural y breve, sin sonar como bot generico
             reply_text = (
-                "Hola, soy el asistente de MIP Quality & Logistics. "
-                "Te respondemos a la brevedad. Si es urgente escribinos a contacto@mipquality.com 🙏"
+                "Disculpa, estoy con un detalle tecnico aca. "
+                "Dame un par de minutos y vuelvo contigo. Si es urgente, escribime de nuevo en un momento."
             )
+            provider_used = "fallback-tecnico"
 
         # Enviar respuesta al cliente
         send_result = _send_text(conv.phone_number, reply_text)
