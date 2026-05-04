@@ -1768,6 +1768,106 @@ def client_notifications(cliente_id: int, limit: int = 10, db: Session = Depends
     }
 
 
+@app.get("/api/admin/stats/global")
+def admin_global_stats(db: Session = Depends(get_db)):
+    """Estadisticas agregadas para admin: top clientes, breakdown mes, etc."""
+    from datetime import timedelta as _td
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_30d = now - _td(days=30)
+
+    # Top 5 clientes por cantidad de cotizaciones
+    top_clientes = []
+    try:
+        rows = (
+            db.query(
+                Cliente.id,
+                Cliente.nombre,
+                Cliente.empresa,
+                func.count(Cotizacion.id).label("count"),
+            )
+            .join(Cotizacion, Cotizacion.cliente_id == Cliente.id)
+            .group_by(Cliente.id, Cliente.nombre, Cliente.empresa)
+            .order_by(func.count(Cotizacion.id).desc())
+            .limit(5)
+            .all()
+        )
+        top_clientes = [
+            {"id": r[0], "nombre": r[1], "empresa": r[2] or "", "cotizaciones": r[3]}
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[stats top_clientes] {e}")
+
+    # Conversion rate (cotizado / total cotizaciones)
+    total_cots = db.query(Cotizacion).count() or 1
+    cotizadas_o_mas = db.query(Cotizacion).filter(
+        Cotizacion.estado.in_(["cotizado", "produccion", "entregado"])
+    ).count()
+    conversion_rate = round((cotizadas_o_mas / total_cots) * 100, 1)
+
+    # Cotizaciones por mes (ultimos 6 meses)
+    cots_por_mes = []
+    try:
+        for i in range(5, -1, -1):
+            target = now - _td(days=30 * i)
+            mes_start = target.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if i == 0:
+                mes_end = now
+            else:
+                next_month = (mes_start + _td(days=32)).replace(day=1)
+                mes_end = next_month
+            cnt = db.query(Cotizacion).filter(
+                Cotizacion.created_at >= mes_start,
+                Cotizacion.created_at < mes_end,
+            ).count()
+            cots_por_mes.append({
+                "mes": mes_start.strftime("%Y-%m"),
+                "label": mes_start.strftime("%b %y"),
+                "count": cnt,
+            })
+    except Exception as e:
+        print(f"[stats cots_por_mes] {e}")
+
+    # WhatsApp engagement
+    wa_convs_total = 0
+    wa_convs_active_30d = 0
+    try:
+        wa_convs_total = db.query(WhatsAppConversation).count()
+        wa_convs_active_30d = db.query(WhatsAppConversation).filter(
+            WhatsAppConversation.last_message_at >= last_30d
+        ).count()
+    except Exception:
+        pass
+
+    # Marcas total + por cliente
+    try:
+        marcas_total = db.query(Marca).count()
+        clientes_con_marcas = db.query(func.count(func.distinct(Marca.cliente_id))).scalar() or 0
+    except Exception:
+        marcas_total = 0
+        clientes_con_marcas = 0
+
+    return {
+        "timestamp": now.isoformat(),
+        "totales": {
+            "cotizaciones": total_cots if total_cots > 1 else db.query(Cotizacion).count(),
+            "clientes": db.query(Cliente).count(),
+            "marcas": marcas_total,
+            "clientes_con_marcas": clientes_con_marcas,
+            "wa_conversaciones": wa_convs_total,
+            "wa_conversaciones_activas_30d": wa_convs_active_30d,
+        },
+        "este_mes": {
+            "cotizaciones": db.query(Cotizacion).filter(Cotizacion.created_at >= month_start).count(),
+            "pedidos": db.query(Pedido).filter(Pedido.created_at >= month_start).count() if hasattr(Pedido, "created_at") else 0,
+        },
+        "conversion_rate_pct": conversion_rate,
+        "top_clientes": top_clientes,
+        "cotizaciones_por_mes": cots_por_mes,
+    }
+
+
 @app.get("/api/dashboard/stats")
 def dashboard_stats(cliente_id: Optional[int] = None, db: Session = Depends(get_db)):
     cot_q = db.query(Cotizacion)
