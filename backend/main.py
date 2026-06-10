@@ -16,7 +16,7 @@ from models import (
     MovimientoContable, HistorialEvento, SiteContent, Ticket, Actividad,
     FeatureFlag, Proveedor, ProductoProveedor, Prospect, EmailSequence, EmailLog,
     Proyecto, ProyectoSeccion, Tarea, ComentarioTarea, CotizacionFormal,
-    Socio, GastoSplit,
+    Socio, GastoSplit, Cuenta,
     MateoConfig, MateoConversation, MateoMessage, MateoCalendarBooking,
     AgentConfig, AgentBlock, Tool, KnowledgeFolder, KnowledgeDoc, KnowledgeChunk, AgentTrace,
     ConversationPipeline, PipelineStageLog, AgentIntegration, HumanHandoff,
@@ -33,7 +33,7 @@ from schemas import (
     FeatureFlagOut, ProveedorCreate, ProveedorOut, ProductoProveedorCreate, ProductoProveedorOut,
     ProspectCreate, ProspectOut, EmailSequenceCreate, EmailSequenceOut, EmailLogOut,
     ProyectoCreate, ProyectoOut, TareaCreate, TareaOut,
-    SocioCreate, SocioOut, GastoSplitOut,
+    SocioCreate, SocioOut, GastoSplitOut, CuentaCreate, CuentaOut,
     MateoConfigOut, MateoConversationOut,
     AgentConfigOut, AgentConfigCreate, AgentBlockOut, AgentBlockCreate,
     ToolOut, KBFolderOut, KBDocOut,
@@ -88,12 +88,16 @@ def on_startup():
                     print(f"Added column archivos.{col}")
                 except Exception:
                     conn.rollback()
-            # Migrate movimientos_contables table (Splitwise)
+            # Migrate movimientos_contables table (Splitwise + caja/banco)
             for col, col_type in [
                 ("moneda", "VARCHAR(3) DEFAULT 'CLP'"),
                 ("pagado_por_socio_id", "INTEGER"),
                 ("medio_pago", "VARCHAR(50)"),
                 ("notas", "TEXT"),
+                ("cuenta_id", "INTEGER"),
+                ("cuenta_destino_id", "INTEGER"),
+                ("conciliado", "BOOLEAN DEFAULT FALSE"),
+                ("socio_id", "INTEGER"),
             ]:
                 try:
                     conn.execute(text(f"ALTER TABLE movimientos_contables ADD COLUMN {col} {col_type}"))
@@ -101,6 +105,28 @@ def on_startup():
                     print(f"Added column movimientos_contables.{col}")
                 except Exception:
                     conn.rollback()
+            # Crear tabla cuentas (cuentas bancarias / caja / tarjetas) si no existe
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS cuentas (
+                        id SERIAL PRIMARY KEY,
+                        nombre VARCHAR(200) NOT NULL,
+                        tipo_cuenta VARCHAR(30) DEFAULT 'corriente',
+                        banco VARCHAR(120),
+                        numero VARCHAR(60),
+                        moneda VARCHAR(3) DEFAULT 'CLP',
+                        saldo_inicial FLOAT DEFAULT 0,
+                        activo BOOLEAN DEFAULT TRUE,
+                        color VARCHAR(7) DEFAULT '#2d7a4f',
+                        orden INTEGER DEFAULT 0,
+                        notas TEXT,
+                        created_at TIMESTAMP DEFAULT now()
+                    )
+                """))
+                conn.commit()
+                print("Ensured table cuentas")
+            except Exception:
+                conn.rollback()
             # Migrate conversation_pipelines table (live takeover)
             for col, col_type in [
                 ("control_mode", "VARCHAR(20) DEFAULT 'ai'"),
@@ -1493,8 +1519,8 @@ def crear_movimiento(data: MovimientoCreate, db: Session = Depends(get_db)):
     db.add(m)
     db.commit()
     db.refresh(m)
-    # Si es gasto con socios para splittear, crear GastoSplit igual entre todos
-    if m.tipo == "gasto" and split_ids and m.monto:
+    # Si es gasto/costo con socios para splittear, crear GastoSplit igual entre todos
+    if m.tipo in ("gasto", "costo") and split_ids and m.monto:
         cuota = float(m.monto) / len(split_ids)
         for sid in split_ids:
             db.add(GastoSplit(movimiento_id=m.id, socio_id=sid, monto_asumido=cuota))
@@ -1514,7 +1540,7 @@ def update_movimiento(id: int, data: dict, db: Session = Depends(get_db)):
     # Rebuild splits if provided
     if split_ids is not None:
         db.query(GastoSplit).filter(GastoSplit.movimiento_id == id).delete()
-        if m.tipo == "gasto" and split_ids and m.monto:
+        if m.tipo in ("gasto", "costo") and split_ids and m.monto:
             cuota = float(m.monto) / len(split_ids)
             for sid in split_ids:
                 db.add(GastoSplit(movimiento_id=id, socio_id=sid, monto_asumido=cuota))
@@ -1606,8 +1632,8 @@ def balance_socios(
         * negativo: el socio le debe a la empresa
     """
     socios = db.query(Socio).all()
-    # Gastos filter
-    q_m = db.query(MovimientoContable).filter(MovimientoContable.tipo == "gasto")
+    # Gastos + costos que un socio puede haber pagado de su bolsillo (splitteables)
+    q_m = db.query(MovimientoContable).filter(MovimientoContable.tipo.in_(["gasto", "costo"]))
     if mes:
         q_m = q_m.filter(extract("month", MovimientoContable.fecha) == mes)
     if anio:
@@ -1617,12 +1643,22 @@ def balance_socios(
 
     splits_all = db.query(GastoSplit).filter(GastoSplit.movimiento_id.in_(move_ids)).all() if move_ids else []
 
+    # Dividendos / retiros pagados a cada socio (reducen lo que la empresa le debe)
+    q_div = db.query(MovimientoContable).filter(MovimientoContable.tipo == "dividendo")
+    if mes:
+        q_div = q_div.filter(extract("month", MovimientoContable.fecha) == mes)
+    if anio:
+        q_div = q_div.filter(extract("year", MovimientoContable.fecha) == anio)
+    dividendos = q_div.all()
+
     result = []
     total_gastos = 0.0
+    total_dividendos = 0.0
     for s in socios:
         pagado = sum(float(m.monto or 0) for m in movimientos if m.pagado_por_socio_id == s.id)
         asumido = sum(float(sp.monto_asumido or 0) for sp in splits_all if sp.socio_id == s.id)
-        saldo = pagado - asumido
+        recibido = sum(float(d.monto or 0) for d in dividendos if d.socio_id == s.id)
+        saldo = pagado - asumido - recibido
         result.append({
             "socio_id": s.id,
             "nombre": s.nombre,
@@ -1631,14 +1667,189 @@ def balance_socios(
             "activo": bool(s.activo),
             "total_pagado": round(pagado, 2),
             "total_asumido": round(asumido, 2),
+            "total_dividendos": round(recibido, 2),
             "saldo_empresa_debe": round(saldo, 2),
         })
         total_gastos += pagado
+        total_dividendos += recibido
     return {
         "mes": mes, "anio": anio,
         "total_gastos_clp": round(total_gastos, 2),
+        "total_dividendos_clp": round(total_dividendos, 2),
         "socios": result,
     }
+
+
+# ═══════════════════════════════════════════════════
+# CUENTAS (banco / caja / tarjetas) + libro bancario
+# ═══════════════════════════════════════════════════
+# Signo del movimiento sobre el saldo de su cuenta de origen
+_SIGNO_TIPO = {
+    "ingreso": 1,
+    "costo": -1,
+    "gasto": -1,
+    "dividendo": -1,
+    "pago": -1,
+    "transferencia": -1,  # sale de cuenta_id y entra a cuenta_destino_id
+}
+
+
+def _saldo_cuenta(db: Session, cuenta: "Cuenta") -> float:
+    """Saldo corriente de una cuenta = saldo_inicial + movimientos pagados.
+    Cuenta como egreso lo que sale (cuenta_id) y como abono lo que entra por transferencia
+    (cuenta_destino_id)."""
+    saldo = float(cuenta.saldo_inicial or 0)
+    for m in db.query(MovimientoContable).filter(
+        MovimientoContable.cuenta_id == cuenta.id,
+        MovimientoContable.estado == "pagado",
+    ).all():
+        saldo += float(m.monto or 0) * _SIGNO_TIPO.get(m.tipo, -1)
+    # Transferencias entrantes (esta cuenta es destino)
+    for m in db.query(MovimientoContable).filter(
+        MovimientoContable.cuenta_destino_id == cuenta.id,
+        MovimientoContable.tipo == "transferencia",
+        MovimientoContable.estado == "pagado",
+    ).all():
+        saldo += float(m.monto or 0)
+    return round(saldo, 2)
+
+
+@app.get("/api/cuentas", response_model=list[CuentaOut])
+def listar_cuentas(activos_only: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Cuenta)
+    if activos_only:
+        q = q.filter(Cuenta.activo == True)
+    return q.order_by(Cuenta.orden, Cuenta.nombre).all()
+
+
+@app.post("/api/cuentas", response_model=CuentaOut)
+def crear_cuenta(data: CuentaCreate, db: Session = Depends(get_db)):
+    c = Cuenta(**data.model_dump())
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return c
+
+
+@app.put("/api/cuentas/{id}", response_model=CuentaOut)
+def update_cuenta(id: int, data: dict, db: Session = Depends(get_db)):
+    c = db.query(Cuenta).get(id)
+    if not c:
+        raise HTTPException(404, "Cuenta no encontrada")
+    for k, v in data.items():
+        if hasattr(c, k):
+            setattr(c, k, v)
+    db.commit()
+    db.refresh(c)
+    return c
+
+
+@app.delete("/api/cuentas/{id}")
+def delete_cuenta(id: int, db: Session = Depends(get_db)):
+    c = db.query(Cuenta).get(id)
+    if not c:
+        raise HTTPException(404, "Cuenta no encontrada")
+    en_uso = db.query(MovimientoContable).filter(
+        (MovimientoContable.cuenta_id == id) | (MovimientoContable.cuenta_destino_id == id)
+    ).count()
+    if en_uso:
+        c.activo = False
+        db.commit()
+        return {"deleted": False, "deactivated": True, "reason": "Tiene movimientos asociados; se marco inactiva."}
+    db.delete(c)
+    db.commit()
+    return {"deleted": True}
+
+
+@app.get("/api/cuentas/saldos")
+def saldos_cuentas(db: Session = Depends(get_db)):
+    """Saldo corriente de cada cuenta + saldo total consolidado (solo CLP)."""
+    cuentas = db.query(Cuenta).order_by(Cuenta.orden, Cuenta.nombre).all()
+    out = []
+    total_clp = 0.0
+    for c in cuentas:
+        saldo = _saldo_cuenta(db, c)
+        if (c.moneda or "CLP") == "CLP" and c.activo:
+            total_clp += saldo
+        out.append({
+            "id": c.id, "nombre": c.nombre, "tipo_cuenta": c.tipo_cuenta,
+            "banco": c.banco, "numero": c.numero, "moneda": c.moneda,
+            "color": c.color, "activo": bool(c.activo),
+            "saldo_inicial": float(c.saldo_inicial or 0), "saldo": saldo,
+        })
+    return {"cuentas": out, "total_clp": round(total_clp, 2)}
+
+
+@app.get("/api/cuentas/{id}/movimientos")
+def libro_cuenta(
+    id: int,
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    solo_no_conciliados: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Libro/cartola de una cuenta con saldo corriente acumulado movimiento a movimiento."""
+    c = db.query(Cuenta).get(id)
+    if not c:
+        raise HTTPException(404, "Cuenta no encontrada")
+
+    def _delta(m):
+        if m.cuenta_destino_id == id and m.tipo == "transferencia":
+            return float(m.monto or 0)  # entra a esta cuenta
+        return float(m.monto or 0) * _SIGNO_TIPO.get(m.tipo, -1)
+
+    # TODOS los movimientos de la cuenta en orden cronologico -> saldo corriente exacto
+    todos = db.query(MovimientoContable).filter(
+        (MovimientoContable.cuenta_id == id) | (MovimientoContable.cuenta_destino_id == id)
+    ).order_by(MovimientoContable.fecha.asc(), MovimientoContable.id.asc()).all()
+    saldo = float(c.saldo_inicial or 0)
+    saldo_por_id = {}
+    delta_por_id = {}
+    for m in todos:
+        d = _delta(m)
+        delta_por_id[m.id] = d
+        if m.estado == "pagado":
+            saldo += d
+            saldo_por_id[m.id] = round(saldo, 2)
+
+    # Aplicar filtros solo para la vista
+    movs = todos
+    if mes:
+        movs = [m for m in movs if m.fecha and m.fecha.month == mes]
+    if anio:
+        movs = [m for m in movs if m.fecha and m.fecha.year == anio]
+    if solo_no_conciliados:
+        movs = [m for m in movs if not m.conciliado]
+    movs = list(reversed(movs))  # mas reciente arriba
+
+    rows = []
+    for m in movs:
+        d = delta_por_id.get(m.id, _delta(m))
+        rows.append({
+            "id": m.id, "fecha": m.fecha.isoformat() if m.fecha else None,
+            "tipo": m.tipo, "categoria": m.categoria, "descripcion": m.descripcion,
+            "monto": float(m.monto or 0), "delta": round(d, 2),
+            "es_entrada": d >= 0, "estado": m.estado,
+            "conciliado": bool(m.conciliado), "medio_pago": m.medio_pago,
+            "saldo_corriente": saldo_por_id.get(m.id),
+        })
+    return {
+        "cuenta": {"id": c.id, "nombre": c.nombre, "banco": c.banco, "moneda": c.moneda,
+                   "tipo_cuenta": c.tipo_cuenta, "color": c.color},
+        "saldo_actual": _saldo_cuenta(db, c),
+        "movimientos": rows,
+    }
+
+
+@app.patch("/api/contabilidad/{id}/conciliar")
+def conciliar_movimiento(id: int, db: Session = Depends(get_db)):
+    """Marca/desmarca un movimiento como conciliado contra la cartola del banco."""
+    m = db.query(MovimientoContable).get(id)
+    if not m:
+        raise HTTPException(404, "Movimiento no encontrado")
+    m.conciliado = not bool(m.conciliado)
+    db.commit()
+    return {"id": id, "conciliado": bool(m.conciliado)}
 
 
 @app.get("/api/contabilidad/resumen")
@@ -1653,15 +1864,28 @@ def resumen_contable(
     if anio:
         q = q.filter(extract("year", MovimientoContable.fecha) == anio)
 
-    ingresos = q.filter(MovimientoContable.tipo == "ingreso").with_entities(func.coalesce(func.sum(MovimientoContable.monto), 0)).scalar()
-    gastos = q.filter(MovimientoContable.tipo == "gasto").with_entities(func.coalesce(func.sum(MovimientoContable.monto), 0)).scalar()
+    def _sum(tipo):
+        return float(q.filter(MovimientoContable.tipo == tipo).with_entities(
+            func.coalesce(func.sum(MovimientoContable.monto), 0)).scalar() or 0)
+
+    ingresos = _sum("ingreso")
+    costos = _sum("costo")
+    gastos = _sum("gasto")
+    dividendos = _sum("dividendo")
+    pagos = _sum("pago")
     pendientes = q.filter(MovimientoContable.estado == "pendiente").count()
 
+    margen_bruto = ingresos - costos
+    utilidad_neta = ingresos - costos - gastos
     return {
-        "ingresos": float(ingresos),
-        "gastos": float(gastos),
-        "utilidad_neta": float(ingresos) - float(gastos),
-        "margen": round((float(ingresos) - float(gastos)) / float(ingresos) * 100, 1) if ingresos > 0 else 0,
+        "ingresos": ingresos,
+        "costos": costos,
+        "gastos": gastos,
+        "dividendos": dividendos,
+        "pagos": pagos,
+        "margen_bruto": margen_bruto,
+        "utilidad_neta": utilidad_neta,
+        "margen": round(utilidad_neta / ingresos * 100, 1) if ingresos > 0 else 0,
         "facturas_pendientes": pendientes,
     }
 
@@ -2521,11 +2745,16 @@ def bulk_import_movimientos(movimientos: list[MovimientoCreate], db: Session = D
 def export_movimientos(template_only: bool = False, db: Session = Depends(get_db)):
     output = io.StringIO()
     writer = csv.writer(output)
-    headers = ["tipo", "categoria", "descripcion", "monto", "fecha", "estado", "pedido_id"]
+    headers = ["tipo", "categoria", "descripcion", "monto", "moneda", "fecha", "estado", "cuenta", "medio_pago", "conciliado", "pedido_id"]
     writer.writerow(headers)
     if not template_only:
-        for m in db.query(MovimientoContable).all():
-            writer.writerow([m.tipo, m.categoria, m.descripcion, m.monto, m.fecha, m.estado, m.pedido_id])
+        cuentas_map = {c.id: c.nombre for c in db.query(Cuenta).all()}
+        for m in db.query(MovimientoContable).order_by(MovimientoContable.fecha.desc()).all():
+            writer.writerow([
+                m.tipo, m.categoria, m.descripcion, m.monto, m.moneda or "CLP",
+                m.fecha, m.estado, cuentas_map.get(m.cuenta_id, ""),
+                m.medio_pago or "", "si" if m.conciliado else "no", m.pedido_id,
+            ])
     output.seek(0)
     filename = "plantilla_movimientos.csv" if template_only else "movimientos_export.csv"
     return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={filename}"})

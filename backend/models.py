@@ -121,25 +121,53 @@ class Archivo(Base):
     pedido = relationship("Pedido", back_populates="archivos")
 
 
+class Cuenta(Base):
+    """
+    Cuenta o medio de pago de la empresa (cuenta corriente bancaria, caja efectivo,
+    tarjeta de credito, cuenta USD, etc.). Cada movimiento de caja se asigna a una
+    cuenta y el saldo corriente se calcula como saldo_inicial + suma de movimientos.
+    """
+    __tablename__ = "cuentas"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False)  # "Cuenta Corriente BCI", "Caja efectivo"
+    tipo_cuenta = Column(String(30), default="corriente")  # corriente, vista, tarjeta_credito, efectivo, inversion, otro
+    banco = Column(String(120))  # BCI, Santander, etc.
+    numero = Column(String(60))  # numero de cuenta (puede ir enmascarado)
+    moneda = Column(String(3), default="CLP")
+    saldo_inicial = Column(Float, default=0)  # saldo de apertura
+    activo = Column(Boolean, default=True)
+    color = Column(String(7), default="#2d7a4f")  # hex para UI
+    orden = Column(Integer, default=0)
+    notas = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class MovimientoContable(Base):
     __tablename__ = "movimientos_contables"
     id = Column(Integer, primary_key=True, index=True)
-    tipo = Column(String(20), nullable=False)  # gasto, ingreso
+    tipo = Column(String(20), nullable=False)  # ingreso, costo, gasto, dividendo, pago, transferencia
     categoria = Column(String(100))
     descripcion = Column(String(300))
-    monto = Column(Float, nullable=False)  # monto en CLP
+    monto = Column(Float, nullable=False)  # monto en CLP (siempre positivo; el signo lo da el tipo)
     moneda = Column(String(3), default="CLP")
     fecha = Column(DateTime, nullable=False)
     estado = Column(String(20), default="pendiente")  # pagado, pendiente
     pedido_id = Column(Integer, ForeignKey("pedidos.id"), nullable=True)
     comprobante_url = Column(String(500))
+    # Caja / banco — en que cuenta impacta el movimiento
+    cuenta_id = Column(Integer, ForeignKey("cuentas.id"), nullable=True)
+    cuenta_destino_id = Column(Integer, ForeignKey("cuentas.id"), nullable=True)  # solo transferencias
+    conciliado = Column(Boolean, default=False)  # conciliado contra cartola del banco
     # Split Wise — quien pago y como se reparte (la empresa es la deudora)
     pagado_por_socio_id = Column(Integer, ForeignKey("socios.id"), nullable=True)
+    socio_id = Column(Integer, ForeignKey("socios.id"), nullable=True)  # beneficiario (dividendo / retiro de socio)
     medio_pago = Column(String(50))  # transferencia, tarjeta, efectivo, otro
     notas = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
     splits = relationship("GastoSplit", cascade="all, delete-orphan", back_populates="movimiento")
     pagado_por = relationship("Socio", foreign_keys=[pagado_por_socio_id])
+    cuenta = relationship("Cuenta", foreign_keys=[cuenta_id])
+    cuenta_destino = relationship("Cuenta", foreign_keys=[cuenta_destino_id])
 
 
 class Socio(Base):

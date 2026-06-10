@@ -141,16 +141,20 @@ class FacturaOut(BaseModel):
 
 # --- Movimientos Contables ---
 class MovimientoCreate(BaseModel):
-    tipo: str
+    tipo: str  # ingreso, costo, gasto, dividendo, pago, transferencia
     categoria: str = ""
     descripcion: str = ""
-    monto: float  # CLP
+    monto: float  # CLP (siempre positivo)
     moneda: str = "CLP"
     fecha: datetime
     estado: str = "pendiente"
     pedido_id: Optional[int] = None
     comprobante_url: str = ""
+    cuenta_id: Optional[int] = None
+    cuenta_destino_id: Optional[int] = None  # solo transferencias
+    conciliado: bool = False
     pagado_por_socio_id: Optional[int] = None
+    socio_id: Optional[int] = None  # beneficiario (dividendo / retiro)
     medio_pago: str = ""
     notas: str = ""
     split_socio_ids: List[int] = []  # socios entre los cuales se divide (split igual)
@@ -166,10 +170,43 @@ class MovimientoOut(BaseModel):
     estado: str
     pedido_id: Optional[int]
     comprobante_url: Optional[str] = ""
+    cuenta_id: Optional[int] = None
+    cuenta_destino_id: Optional[int] = None
+    conciliado: Optional[bool] = False
     pagado_por_socio_id: Optional[int] = None
+    socio_id: Optional[int] = None
     medio_pago: Optional[str] = ""
     notas: Optional[str] = ""
     created_at: datetime
+    class Config:
+        from_attributes = True
+
+
+# --- Cuentas (banco / caja / tarjeta) ---
+class CuentaCreate(BaseModel):
+    nombre: str
+    tipo_cuenta: str = "corriente"
+    banco: Optional[str] = ""
+    numero: Optional[str] = ""
+    moneda: str = "CLP"
+    saldo_inicial: float = 0
+    activo: bool = True
+    color: str = "#2d7a4f"
+    orden: int = 0
+    notas: str = ""
+
+class CuentaOut(BaseModel):
+    id: int
+    nombre: str
+    tipo_cuenta: Optional[str] = "corriente"
+    banco: Optional[str] = ""
+    numero: Optional[str] = ""
+    moneda: Optional[str] = "CLP"
+    saldo_inicial: float
+    activo: bool
+    color: Optional[str] = "#2d7a4f"
+    orden: Optional[int] = 0
+    notas: Optional[str] = ""
     class Config:
         from_attributes = True
 

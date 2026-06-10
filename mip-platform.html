@@ -1844,14 +1844,38 @@ html,body{overflow-x:hidden;max-width:100vw}
     <!-- ADMIN: Accounting -->
     <div class="page-body" id="a-acc" style="display:none">
       <div class="admin-header-flex">
-        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Control de Gastos</h2><p style="font-size:12px;color:var(--text-muted)">Montos en CLP · Split automático entre socios</p></div>
-        <div class="admin-btn-group"><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo movimiento</button><button class="btn btn-outline btn-sm" onclick="loadSociosBalance()"><i class="fas fa-balance-scale"></i> Balance socios</button></div>
+        <div><h2 style="font-size:18px;font-weight:600;margin-bottom:2px">Contabilidad & Finanzas</h2><p style="font-size:12px;color:var(--text-muted)">Ingresos · costos · gastos · dividendos · libro bancario con saldo · split entre socios · montos en CLP</p></div>
+        <div class="admin-btn-group"><button class="btn btn-dark btn-sm" onclick="openExpModal()"><i class="fas fa-plus"></i> Nuevo movimiento</button><button class="btn btn-outline btn-sm" onclick="openCuentasModal()"><i class="fas fa-university"></i> Cuentas</button><button class="btn btn-outline btn-sm" onclick="exportContab()"><i class="fas fa-file-export"></i> Exportar</button></div>
       </div>
-      <div class="acc-grid">
+      <div class="acc-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
         <div class="stat-card"><div class="s-label">Ingresos (CLP)</div><div class="s-val" id="acc-ingresos" style="color:var(--success)">$0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Costos (CLP)</div><div class="s-val" id="acc-costos" style="color:var(--danger)">$0</div><div class="s-sub" id="acc-margen-bruto"></div></div>
         <div class="stat-card"><div class="s-label">Gastos (CLP)</div><div class="s-val" id="acc-gastos" style="color:var(--danger)">$0</div><div class="s-sub"></div></div>
         <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val" id="acc-utilidad">$0</div><div class="s-sub" id="acc-margen"></div></div>
-        <div class="stat-card"><div class="s-label">Facturas pendientes</div><div class="s-val" id="acc-pendientes">0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Saldo en cuentas</div><div class="s-val" id="acc-saldo-total" style="color:var(--info)">$0</div><div class="s-sub" id="acc-saldo-sub"></div></div>
+      </div>
+
+      <!-- CUENTAS & SALDOS -->
+      <div class="card" style="padding:20px;margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="font-size:14px;font-weight:600"><i class="fas fa-university" style="margin-right:6px;color:var(--info)"></i>Cuentas & saldos · cuenta corriente del banco</h3>
+          <div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="openCuentaModal()"><i class="fas fa-plus"></i> Nueva cuenta</button><button class="btn btn-outline btn-sm" onclick="loadCuentasSaldos()"><i class="fas fa-sync"></i></button></div>
+        </div>
+        <div id="cuentas-saldos-body">
+          <div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Cargando cuentas...</div>
+        </div>
+      </div>
+
+      <!-- LIBRO BANCARIO (cartola con saldo corriente) -->
+      <div class="card" style="padding:20px;margin-top:16px;display:none" id="cuenta-libro-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 style="font-size:14px;font-weight:600"><i class="fas fa-book" style="margin-right:6px;color:var(--info)"></i><span id="cuenta-libro-title">Cartola</span></h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="libro-no-conc" onchange="reloadCuentaLibro()"> Solo no conciliados</label>
+            <button class="btn btn-outline btn-sm" onclick="closeCuentaLibro()"><i class="fas fa-times"></i> Cerrar</button>
+          </div>
+        </div>
+        <div style="max-height:440px;overflow-y:auto" id="cuenta-libro-body"></div>
       </div>
 
       <!-- SPLITWISE: Balance por socio -->
@@ -1867,9 +1891,9 @@ html,body{overflow-x:hidden;max-width:100vw}
 
       <div class="admin-grid-2" style="margin-top:16px">
         <div class="dtable-wrap">
-          <div class="dtable-header"><h3>Libro de gastos & ingresos</h3><div class="filters"><button class="chip active">Todos</button><button class="chip">Ingresos</button><button class="chip">Gastos</button></div></div>
-          <div style="max-height:420px;overflow-y:auto" id="acc-libro-body">
-            <div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto CLP</div><div>Estado</div></div>
+          <div class="dtable-header"><h3>Libro de movimientos</h3><div class="filters" id="acc-libro-filters"><button class="chip active" data-tipo="" onclick="filterLibro(this,'')">Todos</button><button class="chip" data-tipo="ingreso" onclick="filterLibro(this,'ingreso')">Ingresos</button><button class="chip" data-tipo="costo" onclick="filterLibro(this,'costo')">Costos</button><button class="chip" data-tipo="gasto" onclick="filterLibro(this,'gasto')">Gastos</button><button class="chip" data-tipo="dividendo" onclick="filterLibro(this,'dividendo')">Dividendos</button><button class="chip" data-tipo="pago" onclick="filterLibro(this,'pago')">Pagos</button></div></div>
+          <div style="max-height:460px;overflow-y:auto" id="acc-libro-body">
+            <div class="exp-row hdr"><div></div><div>Descripción</div><div>Tipo</div><div>Fecha</div><div>Monto CLP</div><div>Estado</div></div>
           </div>
           <div class="table-pg" id="acc-libro-pg"></div>
         </div>
@@ -3312,14 +3336,14 @@ html,body{overflow-x:hidden;max-width:100vw}
       <h3 style="font-size:16px;font-weight:600"><i class="fas fa-receipt" style="margin-right:6px;color:var(--info)"></i>Registrar movimiento</h3>
       <button onclick="closeExpModal()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer">&times;</button>
     </div>
-    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Montos en CLP. Si es un gasto de la empresa, marca quién pagó para calcular cuánto le debe la empresa.</p>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Montos en CLP (siempre positivos; el tipo define si suma o resta). Asigna una cuenta para que impacte el saldo del banco/caja.</p>
     <form onsubmit="event.preventDefault(); doExpense();">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Tipo *</label>
-          <select class="form-input" id="exp-tipo" required onchange="toggleSplitwiseSection()"><option value="">Seleccionar...</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select>
+          <select class="form-input" id="exp-tipo" required onchange="onExpTipoChange()"><option value="">Seleccionar...</option><option value="ingreso">Ingreso</option><option value="costo">Costo (CMV / ligado a pedido)</option><option value="gasto">Gasto operacional</option><option value="dividendo">Dividendo / retiro socio</option><option value="pago">Pago (otra salida)</option><option value="transferencia">Transferencia entre cuentas</option></select>
         </div>
-        <div class="form-group"><label class="form-label">Categoría *</label>
-          <select class="form-input" id="exp-categoria" required><option value="">Seleccionar...</option><option>Proveedores China</option><option>Flete & Logística</option><option>Aduanas</option><option>Personal</option><option>QC & Muestras</option><option>Marketing</option><option>Oficina / SaaS</option><option>Pago a cliente</option><option>Otro</option></select>
+        <div class="form-group"><label class="form-label">Categoría</label>
+          <select class="form-input" id="exp-categoria"><option value="">Seleccionar...</option><option>Proveedores China</option><option>Flete & Logística</option><option>Aduanas / Impuestos</option><option>Personal / Sueldos</option><option>QC & Muestras</option><option>Marketing</option><option>Oficina / SaaS</option><option>Honorarios</option><option>Bancarios / Comisiones</option><option>Pago a cliente</option><option>Venta / Factura</option><option>Otro</option></select>
         </div>
       </div>
       <div class="form-group"><label class="form-label">Descripción *</label><input type="text" class="form-input" id="exp-desc" placeholder="Ej: Pago anticipo fábrica SOL-047" required></div>
@@ -3328,30 +3352,90 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-input" id="exp-fecha" required></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Medio de pago</label>
-          <select class="form-input" id="exp-medio"><option value="">—</option><option value="transferencia">Transferencia</option><option value="tarjeta_credito">Tarjeta crédito</option><option value="tarjeta_debito">Tarjeta débito</option><option value="efectivo">Efectivo</option><option value="paypal">PayPal</option><option value="otro">Otro</option></select>
+        <div class="form-group"><label class="form-label" id="exp-cuenta-label">Cuenta (de dónde sale / entra)</label>
+          <select class="form-input" id="exp-cuenta"><option value="">— Sin asignar (no impacta saldo) —</option></select>
         </div>
-        <div class="form-group"><label class="form-label">Estado</label>
-          <select class="form-input" id="exp-estado"><option value="pagado">Pagado</option><option value="pendiente">Pendiente</option></select>
+        <div class="form-group" id="exp-cuenta-destino-group" style="display:none"><label class="form-label">Cuenta destino *</label>
+          <select class="form-input" id="exp-cuenta-destino"><option value="">Seleccionar...</option></select>
+        </div>
+        <div class="form-group" id="exp-socio-group" style="display:none"><label class="form-label">Socio beneficiario *</label>
+          <select class="form-input" id="exp-socio"><option value="">Seleccionar...</option></select>
         </div>
       </div>
-      <!-- SPLITWISE SECTION — solo visible cuando tipo=gasto -->
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Medio de pago</label>
+          <select class="form-input" id="exp-medio"><option value="">—</option><option value="transferencia">Transferencia</option><option value="tarjeta_credito">Tarjeta crédito</option><option value="tarjeta_debito">Tarjeta débito</option><option value="efectivo">Efectivo</option><option value="cheque">Cheque</option><option value="paypal">PayPal</option><option value="otro">Otro</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Estado</label>
+          <select class="form-input" id="exp-estado"><option value="pagado">Pagado (ya movió plata)</option><option value="pendiente">Pendiente (no impacta saldo)</option></select>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);margin-bottom:6px;cursor:pointer"><input type="checkbox" id="exp-conciliado"> Conciliado contra cartola del banco</label>
+      <!-- SPLITWISE SECTION — solo visible cuando tipo=gasto/costo -->
       <div id="exp-splitwise-section" style="display:none;margin-top:12px;padding:14px;background:var(--bg-surface);border-radius:var(--radius);border:1px dashed var(--border)">
-        <h4 style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:10px"><i class="fas fa-users" style="margin-right:4px"></i>SPLITWISE · Reparto entre socios</h4>
+        <h4 style="font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--text-secondary);margin-bottom:10px"><i class="fas fa-users" style="margin-right:4px"></i>SPLITWISE · Reparto entre socios (opcional)</h4>
         <div class="form-group">
-          <label class="form-label">¿Quién pagó este gasto? (la empresa le deberá lo que no le toca)</label>
-          <select class="form-input" id="exp-pagador"><option value="">— Nadie / gasto directo empresa —</option></select>
+          <label class="form-label">¿Quién pagó de su bolsillo? (la empresa le deberá lo que no le toca)</label>
+          <select class="form-input" id="exp-pagador"><option value="">— Nadie / pagó la empresa directo —</option></select>
         </div>
         <div class="form-group">
-          <label class="form-label">¿Entre qué socios dividir el gasto?</label>
+          <label class="form-label">¿Entre qué socios dividir?</label>
           <div id="exp-split-socios" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"></div>
-          <p style="font-size:10px;color:var(--text-muted);margin-top:6px">Se divide en partes iguales entre los seleccionados. Si no seleccionas a nadie, el gasto no se splitea.</p>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:6px">Se divide en partes iguales entre los seleccionados. Si no seleccionas a nadie, no se splitea.</p>
         </div>
       </div>
       <div class="form-group"><label class="form-label">Notas / comentarios</label><textarea class="form-input" id="exp-notas" style="min-height:60px;resize:vertical" placeholder="Notas internas, referencias, contexto..."></textarea></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border);margin-top:14px">
         <button type="button" class="btn btn-outline btn-sm" onclick="closeExpModal()">Cancelar</button>
         <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CUENTAS: lista / gestión -->
+<div class="modal-bg" id="cuentasModal">
+  <div class="modal-box" style="max-width:680px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h3 style="font-size:16px;font-weight:600"><i class="fas fa-university" style="margin-right:6px;color:var(--info)"></i>Cuentas & medios de pago</h3>
+      <button onclick="closeCuentasModal()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer">&times;</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Cuenta corriente del banco, caja efectivo, tarjetas, cuentas USD. El saldo se calcula con el saldo inicial + los movimientos pagados.</p>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-dark btn-sm" onclick="openCuentaModal()"><i class="fas fa-plus"></i> Nueva cuenta</button></div>
+    <div class="dtable-wrap" style="max-height:360px;overflow-y:auto"><table class="dtable"><thead><tr><th>Cuenta</th><th>Tipo</th><th>Banco</th><th>Saldo inicial</th><th>Saldo actual</th><th></th></tr></thead><tbody id="cuentas-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</td></tr></tbody></table></div>
+  </div>
+</div>
+
+<!-- CUENTA: crear / editar -->
+<div class="modal-bg" id="cuentaModal">
+  <div class="modal-box" style="max-width:520px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="font-size:16px;font-weight:600" id="cuenta-title"><i class="fas fa-university" style="margin-right:6px"></i>Nueva cuenta</h3>
+      <button onclick="closeCuentaModal()" style="background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer">&times;</button>
+    </div>
+    <form onsubmit="event.preventDefault(); saveCuenta();">
+      <input type="hidden" id="cuenta-id">
+      <div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-input" id="cuenta-nombre" placeholder="Ej: Cuenta Corriente BCI" required></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de cuenta</label>
+          <select class="form-input" id="cuenta-tipo"><option value="corriente">Cuenta corriente</option><option value="vista">Cuenta vista</option><option value="tarjeta_credito">Tarjeta de crédito</option><option value="efectivo">Caja / efectivo</option><option value="inversion">Inversión</option><option value="otro">Otro</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Banco</label><input type="text" class="form-input" id="cuenta-banco" placeholder="BCI, Santander..."></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">N° de cuenta</label><input type="text" class="form-input" id="cuenta-numero" placeholder="Opcional"></div>
+        <div class="form-group"><label class="form-label">Moneda</label>
+          <select class="form-input" id="cuenta-moneda"><option value="CLP">CLP</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Saldo inicial (apertura)</label><input type="number" class="form-input" id="cuenta-saldo-inicial" placeholder="0" step="1"></div>
+        <div class="form-group"><label class="form-label">Color</label><input type="color" class="form-input" id="cuenta-color" value="#2d7a4f" style="height:40px;padding:4px"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Notas</label><textarea class="form-input" id="cuenta-notas" style="min-height:48px;resize:vertical"></textarea></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border);margin-top:12px">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeCuentaModal()">Cancelar</button>
+        <button type="submit" class="btn btn-dark btn-sm"><i class="fas fa-save"></i> Guardar</button>
       </div>
     </form>
   </div>
@@ -4332,14 +4416,8 @@ function clearReqFilters() {
 
 // ─── Contabilidad ───
 async function loadContabilidad() {
-  try {
-    const resumen = await api('/api/contabilidad/resumen');
-    const cards = document.querySelectorAll('#a-acc .stat-card');
-    if (cards[0]) cards[0].querySelector('.s-val').textContent = '$' + resumen.ingresos.toLocaleString();
-    if (cards[1]) cards[1].querySelector('.s-val').textContent = '$' + resumen.gastos.toLocaleString();
-    if (cards[2]) cards[2].querySelector('.s-val').textContent = '$' + resumen.utilidad_neta.toLocaleString();
-    if (cards[3]) cards[3].querySelector('.s-val').textContent = resumen.facturas_pendientes;
-  } catch (err) { console.error('Contabilidad load error:', err); }
+  // KPIs + libro + P&L los renderiza loadContabilidadDynamic; saldos de cuentas aparte
+  if (typeof loadCuentasSaldos === 'function') loadCuentasSaldos();
 }
 
 async function doExpense() {
@@ -4349,9 +4427,17 @@ async function doExpense() {
   const desc = $('exp-desc').value.trim();
   const monto = parseFloat($('exp-monto').value) || 0;
   const fecha = $('exp-fecha').value;
-  if (!tipo || !categoria || !desc || !monto || !fecha) {
-    toast('error', 'Error', 'Completa los campos requeridos'); return;
+  if (!tipo || !desc || !monto || !fecha) {
+    toast('error', 'Error', 'Completa tipo, descripción, monto y fecha'); return;
   }
+  const cuentaId = $('exp-cuenta')?.value;
+  const cuentaDestino = $('exp-cuenta-destino')?.value;
+  const socioBenef = $('exp-socio')?.value;
+  if (tipo === 'transferencia') {
+    if (!cuentaId || !cuentaDestino) { toast('error', 'Error', 'Transferencia: elige cuenta origen y destino'); return; }
+    if (cuentaId === cuentaDestino) { toast('error', 'Error', 'Origen y destino deben ser distintos'); return; }
+  }
+  if (tipo === 'dividendo' && !socioBenef) { toast('error', 'Error', 'Indica el socio beneficiario del dividendo'); return; }
   // Splitwise data
   const pagador = $('exp-pagador')?.value;
   const splitSocios = Array.from(document.querySelectorAll('#exp-split-socios input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
@@ -4363,36 +4449,54 @@ async function doExpense() {
     estado: $('exp-estado').value,
     medio_pago: $('exp-medio').value || '',
     notas: $('exp-notas').value || '',
+    cuenta_id: cuentaId ? parseInt(cuentaId) : null,
+    cuenta_destino_id: (tipo === 'transferencia' && cuentaDestino) ? parseInt(cuentaDestino) : null,
+    socio_id: (tipo === 'dividendo' && socioBenef) ? parseInt(socioBenef) : null,
+    conciliado: $('exp-conciliado')?.checked || false,
     pagado_por_socio_id: pagador ? parseInt(pagador) : null,
-    split_socio_ids: splitSocios,
+    split_socio_ids: (tipo === 'gasto' || tipo === 'costo') ? splitSocios : [],
   };
   try {
     await api('/api/contabilidad', { method: 'POST', body: JSON.stringify(data) });
     closeExpModal();
     toast('success', 'Movimiento registrado', monto.toLocaleString('es-CL') + ' CLP');
-    if (typeof loadContabilidad === 'function') loadContabilidad();
+    if (typeof loadContabilidadDynamic === 'function') loadContabilidadDynamic();
     if (typeof loadSociosBalance === 'function') loadSociosBalance();
+    if (typeof loadCuentasSaldos === 'function') loadCuentasSaldos();
+    if (_libroCuentaId) reloadCuentaLibro();
   } catch (err) {
     toast('error', 'Error', err.message);
   }
 }
 
-// Mostrar/ocultar seccion Splitwise segun tipo
-function toggleSplitwiseSection() {
+// Ajusta el modal segun el tipo de movimiento
+function onExpTipoChange() {
   const tipo = document.getElementById('exp-tipo')?.value;
-  const section = document.getElementById('exp-splitwise-section');
-  if (section) section.style.display = (tipo === 'gasto') ? 'block' : 'none';
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+  show('exp-splitwise-section', tipo === 'gasto' || tipo === 'costo');
+  show('exp-cuenta-destino-group', tipo === 'transferencia');
+  show('exp-socio-group', tipo === 'dividendo');
+  const lbl = document.getElementById('exp-cuenta-label');
+  if (lbl) lbl.textContent = tipo === 'transferencia' ? 'Cuenta origen *' : (tipo === 'ingreso' ? 'Cuenta donde entra' : 'Cuenta de dónde sale');
 }
 
-// Populate pagador select y checkboxes de socios al abrir modal
+// Populate selects de socios y cuentas al abrir modal
 async function _populateSplitwiseInputs() {
   try {
-    const socios = await api('/api/socios?activos_only=true');
+    const [socios, cuentas] = await Promise.all([
+      api('/api/socios?activos_only=true'),
+      api('/api/cuentas?activos_only=true'),
+    ]);
     const sel = document.getElementById('exp-pagador');
     const checks = document.getElementById('exp-split-socios');
+    const socioBenef = document.getElementById('exp-socio');
     if (sel) {
-      sel.innerHTML = '<option value="">— Nadie / gasto directo empresa —</option>' +
+      sel.innerHTML = '<option value="">— Nadie / pagó la empresa directo —</option>' +
         socios.map(s => `<option value="${s.id}">${s.nombre}${s.email ? ' ('+s.email+')' : ''}</option>`).join('');
+    }
+    if (socioBenef) {
+      socioBenef.innerHTML = '<option value="">Seleccionar...</option>' +
+        socios.map(s => `<option value="${s.id}">${s.nombre}</option>`).join('');
     }
     if (checks) {
       checks.innerHTML = socios.length ? socios.map(s => `
@@ -4401,7 +4505,14 @@ async function _populateSplitwiseInputs() {
           <span>${s.nombre}${s.porcentaje_equity ? ' <span style="color:var(--text-muted)">('+s.porcentaje_equity+'%)</span>' : ''}</span>
         </label>`).join('') : '<p style="font-size:11px;color:var(--text-muted);grid-column:1/-1;margin:0">No hay socios. Agrégalos en Configuración → Socios.</p>';
     }
-  } catch (err) { console.error('populate splitwise err:', err); }
+    const cuentaOpts = '<option value="">— Sin asignar (no impacta saldo) —</option>' +
+      cuentas.map(c => `<option value="${c.id}">${c.nombre}${c.banco ? ' · '+c.banco : ''} (${c.moneda||'CLP'})</option>`).join('');
+    const cSel = document.getElementById('exp-cuenta');
+    if (cSel) cSel.innerHTML = cuentaOpts;
+    const cDest = document.getElementById('exp-cuenta-destino');
+    if (cDest) cDest.innerHTML = '<option value="">Seleccionar...</option>' +
+      cuentas.map(c => `<option value="${c.id}">${c.nombre}${c.banco ? ' · '+c.banco : ''}</option>`).join('');
+  } catch (err) { console.error('populate inputs err:', err); }
 }
 
 // SOCIOS CRUD
@@ -4497,7 +4608,7 @@ async function loadSociosBalance() {
             <div style="font-weight:600;font-size:13px;margin-bottom:4px">${s.nombre}</div>
             <div style="font-size:18px;font-weight:600;color:${color}">${fmt(saldo)}</div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${label}</div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Pagó: $${Math.round(s.total_pagado).toLocaleString('es-CL')} · Le toca: $${Math.round(s.total_asumido).toLocaleString('es-CL')}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:8px">Pagó: $${Math.round(s.total_pagado).toLocaleString('es-CL')} · Le toca: $${Math.round(s.total_asumido).toLocaleString('es-CL')}${s.total_dividendos ? ' · Dividendos: $'+Math.round(s.total_dividendos).toLocaleString('es-CL') : ''}</div>
           </div>`;
         }).join('')}
       </div>
@@ -4777,12 +4888,13 @@ async function confirmDeleteSolicitud(cotId) {
 function toggleSw(sid, did) { const s = document.getElementById(sid); const d = document.getElementById(did); s.classList.toggle('on'); d.style.display = s.classList.contains('on') ? 'block' : 'none'; }
 function openExpModal() {
   // Reset form
-  ['exp-tipo','exp-categoria','exp-desc','exp-monto','exp-fecha','exp-medio','exp-notas','exp-pagador'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  ['exp-tipo','exp-categoria','exp-desc','exp-monto','exp-fecha','exp-medio','exp-notas','exp-pagador','exp-cuenta','exp-cuenta-destino','exp-socio'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  const cc = document.getElementById('exp-conciliado'); if (cc) cc.checked = false;
   const today = new Date().toISOString().split('T')[0];
   const f = document.getElementById('exp-fecha'); if (f) f.value = today;
   const es = document.getElementById('exp-estado'); if (es) es.value = 'pagado';
-  const sec = document.getElementById('exp-splitwise-section'); if (sec) sec.style.display = 'none';
   _populateSplitwiseInputs();
+  onExpTipoChange();
   document.getElementById('expModal').classList.add('open');
 }
 function closeExpModal() { document.getElementById('expModal').classList.remove('open'); }
@@ -4893,34 +5005,223 @@ async function loadAdminHistory() {
 }
 
 // ─── Admin: Contabilidad (Dynamic) ───
+// Meta por tipo de movimiento (icono, color, signo en P&L/caja)
+const TIPO_META = {
+  ingreso:       { label:'Ingreso',     color:'var(--success)', icon:'fa-arrow-down',  sign:1 },
+  costo:         { label:'Costo',        color:'#d97706',        icon:'fa-box',         sign:-1 },
+  gasto:         { label:'Gasto',        color:'var(--danger)',  icon:'fa-arrow-up',    sign:-1 },
+  dividendo:     { label:'Dividendo',    color:'#7c3aed',        icon:'fa-hand-holding-usd', sign:-1 },
+  pago:          { label:'Pago',         color:'#64748b',        icon:'fa-money-bill',  sign:-1 },
+  transferencia: { label:'Transfer.',   color:'var(--info)',    icon:'fa-exchange-alt',sign:0 },
+};
+let _movsCache = [];
+let _libroFiltroTipo = '';
+
 async function loadContabilidadDynamic() {
   try {
     const [resumen, movs] = await Promise.all([api('/api/contabilidad/resumen'), api('/api/contabilidad')]);
+    _movsCache = movs;
     const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-    el('acc-ingresos', '$' + resumen.ingresos.toLocaleString());
-    el('acc-gastos', '$' + resumen.gastos.toLocaleString());
-    el('acc-utilidad', '$' + resumen.utilidad_neta.toLocaleString());
-    el('acc-margen', resumen.margen > 0 ? `Margen ${resumen.margen}%` : '');
-    el('acc-pendientes', resumen.facturas_pendientes);
-    const libro = document.getElementById('acc-libro-body');
-    if (libro && movs.length) {
-      const hdr = '<div class="exp-row hdr"><div></div><div>Descripción</div><div>Categoría</div><div>Fecha</div><div>Monto</div><div>Estado</div></div>';
-      libro.innerHTML = hdr + movs.map(m => {
-        const isIn = m.tipo === 'ingreso';
-        const date = new Date(m.fecha).toLocaleDateString('es-CL',{day:'2-digit',month:'short'});
-        return `<div class="exp-row"><div class="exp-icon" style="background:${isIn?'var(--success-bg)':'var(--danger-bg)'};color:${isIn?'var(--success)':'var(--danger)'}"><i class="fas fa-arrow-${isIn?'down':'up'}"></i></div><div><div style="font-weight:500">${m.descripcion}</div><div class="exp-cat">${m.categoria}</div></div><div><span class="badge ${isIn?'badge-success':'badge-danger'}" style="font-size:10px">${m.tipo}</span></div><div style="color:var(--text-muted)">${date}</div><div class="exp-amt ${isIn?'in':'out'}">${isIn?'+':'-'}$${m.monto.toLocaleString()}</div><div><span class="badge ${m.estado==='pagado'?'badge-success':'badge-warning'}"><i class="fas ${m.estado==='pagado'?'fa-check':'fa-clock'}"></i> ${m.estado}</span></div></div>`;
-      }).join('');
-    }
-    const pl = document.getElementById('acc-pl-body');
-    if (pl) {
-      if (resumen.ingresos > 0 || resumen.gastos > 0) {
-        pl.innerHTML = `<div class="pl-row total"><span class="pl-label">Total ingresos</span><span class="pl-val pos">$${resumen.ingresos.toLocaleString()}</span></div><div class="pl-row total"><span class="pl-label">Total gastos</span><span class="pl-val neg">-$${resumen.gastos.toLocaleString()}</span></div><div style="margin-top:12px;padding:14px;background:rgba(45,122,79,0.06);border:0.5px solid rgba(45,122,79,0.15);border-radius:var(--radius);text-align:center"><div style="font-size:11px;color:var(--success);letter-spacing:.5px">UTILIDAD NETA</div><div style="font-size:24px;font-weight:600;color:${resumen.utilidad_neta>=0?'var(--success)':'var(--danger)'}">$${resumen.utilidad_neta.toLocaleString()}</div><div style="font-size:11px;color:var(--success)">${resumen.margen > 0 ? 'Margen '+resumen.margen+'%' : ''}</div></div>`;
-      } else {
-        pl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sin movimientos registrados</div>';
-      }
-    }
+    el('acc-ingresos', '$' + Math.round(resumen.ingresos).toLocaleString('es-CL'));
+    el('acc-costos', '$' + Math.round(resumen.costos||0).toLocaleString('es-CL'));
+    el('acc-gastos', '$' + Math.round(resumen.gastos).toLocaleString('es-CL'));
+    el('acc-utilidad', '$' + Math.round(resumen.utilidad_neta).toLocaleString('es-CL'));
+    el('acc-margen', resumen.margen ? `Margen ${resumen.margen}%` : '');
+    el('acc-margen-bruto', resumen.margen_bruto != null ? `Bruto $${Math.round(resumen.margen_bruto).toLocaleString('es-CL')}` : '');
+    renderLibro();
+    renderPL(resumen);
   } catch (err) { console.error('Contabilidad error:', err); }
 }
+
+function renderLibro() {
+  const libro = document.getElementById('acc-libro-body');
+  if (!libro) return;
+  const hdr = '<div class="exp-row hdr"><div></div><div>Descripción</div><div>Tipo</div><div>Fecha</div><div>Monto</div><div>Estado</div></div>';
+  const movs = _libroFiltroTipo ? _movsCache.filter(m => m.tipo === _libroFiltroTipo) : _movsCache;
+  if (!movs.length) { libro.innerHTML = hdr + '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Sin movimientos</div>'; return; }
+  libro.innerHTML = hdr + movs.map(m => {
+    const meta = TIPO_META[m.tipo] || TIPO_META.gasto;
+    const date = new Date(m.fecha).toLocaleDateString('es-CL',{day:'2-digit',month:'short'});
+    const signTxt = meta.sign > 0 ? '+' : (meta.sign < 0 ? '-' : '');
+    const amtCls = meta.sign > 0 ? 'in' : (meta.sign < 0 ? 'out' : '');
+    const conc = m.conciliado ? '<i class="fas fa-check-circle" title="Conciliado" style="color:var(--success);font-size:10px;margin-left:4px"></i>' : '';
+    return `<div class="exp-row"><div class="exp-icon" style="background:rgba(0,0,0,0.04);color:${meta.color}"><i class="fas ${meta.icon}"></i></div><div><div style="font-weight:500">${m.descripcion||'—'}${conc}</div><div class="exp-cat">${m.categoria||''}</div></div><div><span class="badge" style="font-size:10px;background:rgba(0,0,0,0.05);color:${meta.color}">${meta.label}</span></div><div style="color:var(--text-muted)">${date}</div><div class="exp-amt ${amtCls}" style="color:${meta.color}">${signTxt}$${Math.round(m.monto).toLocaleString('es-CL')}</div><div><span class="badge ${m.estado==='pagado'?'badge-success':'badge-warning'}"><i class="fas ${m.estado==='pagado'?'fa-check':'fa-clock'}"></i> ${m.estado}</span></div></div>`;
+  }).join('');
+}
+
+function filterLibro(btn, tipo) {
+  _libroFiltroTipo = tipo;
+  document.querySelectorAll('#acc-libro-filters .chip').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderLibro();
+}
+
+function renderPL(r) {
+  const pl = document.getElementById('acc-pl-body');
+  if (!pl) return;
+  if (!(r.ingresos > 0 || r.costos > 0 || r.gastos > 0)) {
+    pl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Sin movimientos registrados</div>';
+    return;
+  }
+  const row = (lbl, val, cls) => `<div class="pl-row"><span class="pl-label">${lbl}</span><span class="pl-val ${cls||''}">${val<0?'-':''}$${Math.abs(Math.round(val)).toLocaleString('es-CL')}</span></div>`;
+  pl.innerHTML =
+    row('Ingresos', r.ingresos, 'pos') +
+    row('(-) Costos (CMV)', -r.costos, 'neg') +
+    `<div class="pl-row total" style="border-top:1px solid var(--border);padding-top:6px"><span class="pl-label">Margen bruto</span><span class="pl-val">$${Math.round(r.margen_bruto).toLocaleString('es-CL')}</span></div>` +
+    row('(-) Gastos operacionales', -r.gastos, 'neg') +
+    `<div style="margin-top:12px;padding:14px;background:rgba(45,122,79,0.06);border:0.5px solid rgba(45,122,79,0.15);border-radius:var(--radius);text-align:center"><div style="font-size:11px;color:var(--success);letter-spacing:.5px">UTILIDAD NETA</div><div style="font-size:24px;font-weight:600;color:${r.utilidad_neta>=0?'var(--success)':'var(--danger)'}">$${Math.round(r.utilidad_neta).toLocaleString('es-CL')}</div><div style="font-size:11px;color:var(--success)">${r.margen ? 'Margen '+r.margen+'%' : ''}</div></div>` +
+    (r.dividendos>0 ? `<div style="margin-top:8px;font-size:11px;color:var(--text-muted);text-align:center">Dividendos pagados (no es gasto): $${Math.round(r.dividendos).toLocaleString('es-CL')}</div>` : '');
+}
+
+// ═══ Cuentas / banco (frontend) ═══
+let _libroCuentaId = null;
+const CUENTA_TIPO_LBL = { corriente:'Cta. corriente', vista:'Cta. vista', tarjeta_credito:'Tarjeta crédito', efectivo:'Efectivo', inversion:'Inversión', otro:'Otro' };
+
+async function loadCuentasSaldos() {
+  const body = document.getElementById('cuentas-saldos-body');
+  if (!body) return;
+  try {
+    const d = await api('/api/cuentas/saldos');
+    const el = document.getElementById('acc-saldo-total');
+    if (el) el.textContent = '$' + Math.round(d.total_clp).toLocaleString('es-CL');
+    const sub = document.getElementById('acc-saldo-sub');
+    if (sub) sub.textContent = d.cuentas.length ? `${d.cuentas.length} cuenta(s)` : '';
+    if (!d.cuentas.length) {
+      body.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:12px">Sin cuentas. Crea tu cuenta corriente del banco para empezar a registrar movimientos.</div>';
+      return;
+    }
+    body.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">${d.cuentas.map(c => `
+      <div onclick="openCuentaLibro(${c.id})" style="cursor:pointer;padding:14px;background:var(--bg-surface);border-radius:var(--radius);border-left:3px solid ${c.color||'#2d7a4f'};${c.activo?'':'opacity:.5'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-weight:600;font-size:13px">${c.nombre}</span><span style="font-size:10px;color:var(--text-muted)">${CUENTA_TIPO_LBL[c.tipo_cuenta]||c.tipo_cuenta}</span></div>
+        <div style="font-size:20px;font-weight:600;color:${c.saldo>=0?'var(--text-primary)':'var(--danger)'}">$${Math.round(c.saldo).toLocaleString('es-CL')}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${c.banco||''}${c.banco?' · ':''}${c.moneda||'CLP'} · ver cartola <i class="fas fa-arrow-right" style="font-size:9px"></i></div>
+      </div>`).join('')}</div>`;
+  } catch (err) {
+    body.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Error: ${err.message}</div>`;
+  }
+}
+
+async function openCuentaLibro(id) {
+  _libroCuentaId = id;
+  const card = document.getElementById('cuenta-libro-card');
+  if (card) card.style.display = '';
+  await reloadCuentaLibro();
+  card?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function closeCuentaLibro() { _libroCuentaId = null; const c = document.getElementById('cuenta-libro-card'); if (c) c.style.display = 'none'; }
+
+async function reloadCuentaLibro() {
+  if (!_libroCuentaId) return;
+  const body = document.getElementById('cuenta-libro-body');
+  const noConc = document.getElementById('libro-no-conc')?.checked;
+  try {
+    const d = await api(`/api/cuentas/${_libroCuentaId}/movimientos${noConc ? '?solo_no_conciliados=true' : ''}`);
+    const title = document.getElementById('cuenta-libro-title');
+    if (title) title.innerHTML = `Cartola · ${d.cuenta.nombre} ${d.cuenta.banco?'· '+d.cuenta.banco:''} <span style="color:var(--text-muted);font-weight:400;font-size:12px">— saldo actual: <b style="color:${d.saldo_actual>=0?'var(--success)':'var(--danger)'}">$${Math.round(d.saldo_actual).toLocaleString('es-CL')}</b></span>`;
+    if (!body) return;
+    if (!d.movimientos.length) { body.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Sin movimientos en esta cuenta</div>'; return; }
+    const hdr = '<div class="exp-row hdr" style="grid-template-columns:28px 2fr 1fr 90px 110px 110px 70px"><div></div><div>Descripción</div><div>Tipo</div><div>Fecha</div><div>Cargo/Abono</div><div>Saldo</div><div>Concil.</div></div>';
+    body.innerHTML = hdr + d.movimientos.map(m => {
+      const meta = TIPO_META[m.tipo] || TIPO_META.gasto;
+      const date = new Date(m.fecha).toLocaleDateString('es-CL',{day:'2-digit',month:'short'});
+      const col = m.es_entrada ? 'var(--success)' : 'var(--danger)';
+      return `<div class="exp-row" style="grid-template-columns:28px 2fr 1fr 90px 110px 110px 70px${m.estado!=='pagado'?';opacity:.55':''}"><div class="exp-icon" style="background:rgba(0,0,0,0.04);color:${meta.color}"><i class="fas ${meta.icon}"></i></div><div><div style="font-weight:500">${m.descripcion||'—'}</div><div class="exp-cat">${m.categoria||''}</div></div><div><span class="badge" style="font-size:10px;background:rgba(0,0,0,0.05);color:${meta.color}">${meta.label}</span></div><div style="color:var(--text-muted)">${date}</div><div style="font-weight:600;color:${col}">${m.es_entrada?'+':'-'}$${Math.round(Math.abs(m.delta)).toLocaleString('es-CL')}</div><div style="font-weight:600">${m.saldo_corriente!=null?'$'+Math.round(m.saldo_corriente).toLocaleString('es-CL'):'<span style=\"color:var(--text-muted);font-size:11px\">pend.</span>'}</div><div><i onclick="toggleConciliado(${m.id})" class="fas ${m.conciliado?'fa-check-circle':'fa-circle'}" title="${m.conciliado?'Conciliado':'Marcar conciliado'}" style="cursor:pointer;color:${m.conciliado?'var(--success)':'var(--text-muted)'}"></i></div></div>`;
+    }).join('');
+  } catch (err) {
+    if (body) body.innerHTML = `<div style="padding:12px;color:var(--danger);font-size:12px">Error: ${err.message}</div>`;
+  }
+}
+
+async function toggleConciliado(id) {
+  try {
+    await api(`/api/contabilidad/${id}/conciliar`, { method:'PATCH' });
+    reloadCuentaLibro();
+    loadContabilidadDynamic();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+// Cuentas: modales CRUD
+function openCuentasModal() { document.getElementById('cuentasModal').classList.add('open'); loadCuentasList(); }
+function closeCuentasModal() { document.getElementById('cuentasModal').classList.remove('open'); }
+
+async function loadCuentasList() {
+  const tb = document.getElementById('cuentas-tbody');
+  if (!tb) return;
+  try {
+    const d = await api('/api/cuentas/saldos');
+    if (!d.cuentas.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted)">Sin cuentas aún</td></tr>'; return; }
+    tb.innerHTML = d.cuentas.map(c => `<tr${c.activo?'':' style="opacity:.5"'}>
+      <td style="font-weight:500"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color||'#2d7a4f'};margin-right:8px"></span>${c.nombre}</td>
+      <td>${CUENTA_TIPO_LBL[c.tipo_cuenta]||c.tipo_cuenta}</td>
+      <td style="color:var(--text-muted)">${c.banco||'—'}</td>
+      <td>$${Math.round(c.saldo_inicial).toLocaleString('es-CL')}</td>
+      <td style="font-weight:600;color:${c.saldo>=0?'var(--text-primary)':'var(--danger)'}">$${Math.round(c.saldo).toLocaleString('es-CL')}</td>
+      <td style="white-space:nowrap"><button class="btn btn-outline btn-sm" onclick='editCuenta(${JSON.stringify(c).replace(/'/g,"&#39;")})'><i class="fas fa-edit"></i></button> <button class="btn btn-outline btn-sm" onclick="deleteCuenta(${c.id}, '${(c.nombre||'').replace(/'/g,"&#39;")}')" style="color:var(--danger)"><i class="fas fa-trash"></i></button></td>
+    </tr>`).join('');
+  } catch (err) { tb.innerHTML = `<tr><td colspan="6" style="color:var(--danger);padding:12px">Error: ${err.message}</td></tr>`; }
+}
+
+function openCuentaModal() {
+  document.getElementById('cuenta-title').innerHTML = '<i class="fas fa-university" style="margin-right:6px"></i>Nueva cuenta';
+  ['cuenta-id','cuenta-nombre','cuenta-banco','cuenta-numero','cuenta-notas'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('cuenta-tipo').value = 'corriente';
+  document.getElementById('cuenta-moneda').value = 'CLP';
+  document.getElementById('cuenta-saldo-inicial').value = '';
+  document.getElementById('cuenta-color').value = '#2d7a4f';
+  document.getElementById('cuentaModal').classList.add('open');
+}
+function closeCuentaModal() { document.getElementById('cuentaModal').classList.remove('open'); }
+
+function editCuenta(c) {
+  document.getElementById('cuenta-title').innerHTML = '<i class="fas fa-edit" style="margin-right:6px"></i>Editar cuenta';
+  document.getElementById('cuenta-id').value = c.id;
+  document.getElementById('cuenta-nombre').value = c.nombre || '';
+  document.getElementById('cuenta-tipo').value = c.tipo_cuenta || 'corriente';
+  document.getElementById('cuenta-banco').value = c.banco || '';
+  document.getElementById('cuenta-numero').value = c.numero || '';
+  document.getElementById('cuenta-moneda').value = c.moneda || 'CLP';
+  document.getElementById('cuenta-saldo-inicial').value = c.saldo_inicial || 0;
+  document.getElementById('cuenta-color').value = c.color || '#2d7a4f';
+  document.getElementById('cuenta-notas').value = c.notas || '';
+  document.getElementById('cuentaModal').classList.add('open');
+}
+
+async function saveCuenta() {
+  const $ = id => document.getElementById(id).value;
+  const id = $('cuenta-id');
+  const data = {
+    nombre: $('cuenta-nombre').trim(),
+    tipo_cuenta: $('cuenta-tipo'),
+    banco: $('cuenta-banco').trim(),
+    numero: $('cuenta-numero').trim(),
+    moneda: $('cuenta-moneda'),
+    saldo_inicial: parseFloat($('cuenta-saldo-inicial')) || 0,
+    color: $('cuenta-color'),
+    notas: $('cuenta-notas'),
+    activo: true,
+  };
+  if (!data.nombre) { toast('error', 'Error', 'Nombre requerido'); return; }
+  try {
+    if (id) await api('/api/cuentas/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/cuentas', { method: 'POST', body: JSON.stringify(data) });
+    closeCuentaModal();
+    toast('success', 'Cuenta guardada', data.nombre);
+    loadCuentasList();
+    loadCuentasSaldos();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+async function deleteCuenta(id, nombre) {
+  if (!confirm('¿Eliminar cuenta "' + nombre + '"? Si tiene movimientos se marcará inactiva en vez de borrarse.')) return;
+  try {
+    const r = await api('/api/cuentas/' + id, { method: 'DELETE' });
+    toast('success', r.deactivated ? 'Cuenta desactivada' : 'Cuenta eliminada', r.reason || '');
+    loadCuentasList();
+    loadCuentasSaldos();
+  } catch (err) { toast('error', 'Error', err.message); }
+}
+
+function exportContab() { window.open('/api/contabilidad/export', '_blank'); }
 
 // ─── Admin: Invite Client to Platform ───
 async function inviteClientToPlatform(email, nombre) {
@@ -8073,6 +8374,7 @@ async function viewMateoConv(id) {
     }
     if (id === 'a-acc') {
       setTimeout(loadSociosBalance, 80);
+      setTimeout(loadCuentasSaldos, 90);
     }
     if (id === 'a-agents') {
       setTimeout(loadAgents, 50);
