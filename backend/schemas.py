@@ -57,6 +57,7 @@ class CotizacionCreate(BaseModel):
 
 class CotizacionUpdate(BaseModel):
     estado: Optional[str] = None
+    cliente_id: Optional[int] = None
     producto: Optional[str] = None
     descripcion: Optional[str] = None
     cantidad: Optional[str] = None
