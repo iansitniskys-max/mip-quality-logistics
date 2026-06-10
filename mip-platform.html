@@ -1851,6 +1851,7 @@ html,body{overflow-x:hidden;max-width:100vw}
         <div class="stat-card"><div class="s-label">Ingresos (CLP)</div><div class="s-val" id="acc-ingresos" style="color:var(--success)">$0</div><div class="s-sub"></div></div>
         <div class="stat-card"><div class="s-label">Costos (CLP)</div><div class="s-val" id="acc-costos" style="color:var(--danger)">$0</div><div class="s-sub" id="acc-margen-bruto"></div></div>
         <div class="stat-card"><div class="s-label">Gastos (CLP)</div><div class="s-val" id="acc-gastos" style="color:var(--danger)">$0</div><div class="s-sub"></div></div>
+        <div class="stat-card"><div class="s-label">Dividendos (CLP)</div><div class="s-val" id="acc-dividendos" style="color:#8b5cf6">$0</div><div class="s-sub">retiros a socios</div></div>
         <div class="stat-card"><div class="s-label">Utilidad neta</div><div class="s-val" id="acc-utilidad">$0</div><div class="s-sub" id="acc-margen"></div></div>
         <div class="stat-card"><div class="s-label">Saldo en cuentas</div><div class="s-val" id="acc-saldo-total" style="color:var(--info)">$0</div><div class="s-sub" id="acc-saldo-sub"></div></div>
       </div>
@@ -5025,6 +5026,7 @@ async function loadContabilidadDynamic() {
     el('acc-ingresos', '$' + Math.round(resumen.ingresos).toLocaleString('es-CL'));
     el('acc-costos', '$' + Math.round(resumen.costos||0).toLocaleString('es-CL'));
     el('acc-gastos', '$' + Math.round(resumen.gastos).toLocaleString('es-CL'));
+    el('acc-dividendos', '$' + Math.round(resumen.dividendos||0).toLocaleString('es-CL'));
     el('acc-utilidad', '$' + Math.round(resumen.utilidad_neta).toLocaleString('es-CL'));
     el('acc-margen', resumen.margen ? `Margen ${resumen.margen}%` : '');
     el('acc-margen-bruto', resumen.margen_bruto != null ? `Bruto $${Math.round(resumen.margen_bruto).toLocaleString('es-CL')}` : '');
